@@ -1,26 +1,52 @@
-# Environment
+# Environment — NEVER commit real credentials
 .env
 .env.*
+!.env.example
 
-# Dependencies
+# Composer dependencies
 /vendor/
+
+# Node / npm
 /node_modules/
+
+# Laravel compiled/generated files
+/public/hot
+/public/storage
+/public/build
+/storage/*.key
+/bootstrap/cache/*.php
+
+# Sail / Docker
+/.fleet
+docker-compose.override.yml
 
 # Logs
 *.log
+/storage/logs/
 
-# OS
+# Cache
+/storage/cache/
+/storage/framework/cache/
+/storage/framework/sessions/
+/storage/framework/testing/
+/storage/framework/views/
+
+# Uploaded files (real uploads go in storage/app — not committed)
+/storage/app/public/
+
+# OS metadata
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# IDE
+# IDE / editor
 .vscode/
 .idea/
+*.swp
+*.swo
+.phpunit.result.cache
+.phpunit.cache/
 
 # Temporary files
 *.tmp
 *.temp
-
-# Runtime
-/storage/logs/
-/storage/cache/
