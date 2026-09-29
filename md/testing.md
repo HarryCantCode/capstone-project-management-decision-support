@@ -38,6 +38,8 @@ A feature isn't complete until:
    failure/edge case).
 2. The full test suite passes, not just the new tests.
 3. Any role-based access rule introduced is covered by an authorization test.
+4. It passes the pre-delivery validation and refinement gate defined in
+   [`.agents/skills/senior-dev-validator/SKILL.md`](file:///c:/Coding%20projects/Project%20mangement%20system%20-%20capstone/.agents/skills/senior-dev-validator/SKILL.md).
 
 Don't skip tests because a feature "seems simple" — the cost/allocation
 modules in particular have failure modes (over-allocating stock, incorrect
