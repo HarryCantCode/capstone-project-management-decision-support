@@ -14,8 +14,7 @@ use Illuminate\Support\Facades\Schema;
  * No soft deletes on this table — history rows are append-only and must
  * never be deleted (they're the audit record of what happened).
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('project_status_history', function (Blueprint $table) {

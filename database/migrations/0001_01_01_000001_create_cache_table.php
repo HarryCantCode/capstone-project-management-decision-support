@@ -8,8 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * Standard Laravel cache/jobs tables.
  * Required by queue and cache drivers configured in .env.example.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('cache', function (Blueprint $table) {

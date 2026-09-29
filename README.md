@@ -20,7 +20,53 @@ Internal tool for Dex International Co. — elevator and crane installation, mai
 
 ---
 
-## Local Development Setup (Laravel Sail / WSL2)
+## Quick Start: One-Command Automated Setup
+
+### Prerequisites
+1. **Docker Desktop** — running on your PC (download from [docker.com](https://www.docker.com/products/docker-desktop/)).
+2. **Git** — to clone the repository.
+
+### Run on a New PC (Windows PowerShell)
+```powershell
+# 1. Clone the repository
+git clone https://github.com/HarryCantCode/capstone-project-management-decision-support.git
+cd capstone-project-management-decision-support
+
+# 2. Run the automated setup script
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
+```
+
+### Run on a New PC (Linux / macOS / WSL2 Bash)
+```bash
+# 1. Clone the repository
+git clone https://github.com/HarryCantCode/capstone-project-management-decision-support.git
+cd capstone-project-management-decision-support
+
+# 2. Run the automated setup script
+chmod +x setup.sh
+./setup.sh
+```
+
+The automated script handles:
+- Checking Docker status
+- Generating `.env` from `.env.example`
+- Bootstrapping Composer packages via a temporary Docker container (no PHP needed on the host PC)
+- Launching all Docker containers (`laravel.test`, `mysql`, `redis`, `phpmyadmin`)
+- Generating the Laravel application key
+- **Restoring Full Database Data:** Automatically imports `database/seed_data.sql` if present (restoring all existing projects, personnel, accounts, and history). If absent, it falls back to clean migrations and demo seeders.
+- Installing Node packages and compiling Vite production assets
+
+Once finished, navigate to **http://localhost** in your browser!
+
+### Syncing Database Data Between PCs
+To capture the latest database state (projects, accounts, costs, personnel) from this machine and share it to GitHub:
+- **Windows PowerShell:** `powershell -ExecutionPolicy Bypass -File .\export-db.ps1`
+- **Linux / macOS / WSL2:** `./export-db.sh`
+Then commit and push `database/seed_data.sql` to GitHub. When the second PC runs `setup.ps1` or `setup.sh`, it will automatically load that data!
+
+---
+
+## Manual Development Setup (Laravel Sail / WSL2)
 
 ### Prerequisites
 
@@ -35,11 +81,11 @@ Internal tool for Dex International Co. — elevator and crane installation, mai
 
 3. **Git** — must be installed on Windows (already configured if you cloned this repo).
 
-### First-time setup (run all commands inside WSL2/Ubuntu terminal)
+### First-time manual setup (run all commands inside WSL2/Ubuntu terminal)
 
 ```bash
 # 1. Navigate to the project (Windows filesystem is mounted under /mnt/c)
-cd "/mnt/c/Coding projects/Project mangement system - capstone"
+cd "/mnt/c/MY PROJECTS/Project mangement system - capstone"
 
 # 2. Install PHP dependencies (uses Sail's PHP image for first run)
 docker run --rm \

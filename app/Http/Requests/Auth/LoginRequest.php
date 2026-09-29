@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -35,25 +36,95 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'email' => ['required', 'string'],
             'password' => ['required', 'string'],
         ];
     }
 
     /**
      * Attempt to authenticate the request's credentials.
+     * Supports both email address and 7-digit account number.
      *
      * @throws \Illuminate\Validation\ValidationException
      */
     public function authenticate(): void
     {
-        $this->ensureIsNotRateLimited();
-
-        $credentials = $this->only('email', 'password');
+        $loginInput = trim($this->input('email'));
+        $password = $this->input('password');
         $remember = $this->boolean('remember');
 
+        // Determine if user entered an email address or an account number
+        $fieldType = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'account_number';
+
+        // 1. Check if this account exists but is archived
+        $isArchived = User::onlyTrashed()->where($fieldType, $loginInput)->exists();
+        if ($isArchived) {
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'We could not find any credentials that match our system. Please contact your administrator for assistance..',
+            ]);
+        }
+
+        // 2. Check if an active account exists with this email or account number
+        $user = User::where($fieldType, $loginInput)->first();
+        if (! $user) {
+            $this->ensureIsNotRateLimited();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'We could not find any credentials that match our system. Please contact your administrator for assistance..',
+            ]);
+        }
+
+        // 3. Check if user account is currently locked out
+        if ($user->isLocked()) {
+            $remaining = $user->lockoutRemainingMinutes();
+            $durationStr = $remaining <= 1 ? '1 minute' : "{$remaining} minutes";
+
+            throw ValidationException::withMessages([
+                'email' => "Your account is temporarily locked out. Please try again in {$durationStr} or contact your administrator for assistance.",
+            ]);
+        }
+
+        $this->ensureIsNotRateLimited();
+
+        $credentials = [
+            $fieldType => $loginInput,
+            'password' => $password,
+        ];
+
+        // 4. Attempt authentication with provided password
         if (! Auth::attempt($credentials, $remember)) {
             RateLimiter::hit($this->throttleKey());
+
+            $user->increment('failed_login_attempts');
+            $attempts = (int) $user->failed_login_attempts;
+
+            // 7 or more failed attempts: 30-minute temporary lockout
+            if ($attempts >= 7) {
+                $user->update(['locked_until' => now()->addMinutes(30)]);
+
+                throw ValidationException::withMessages([
+                    'email' => 'You entered your credentials wrong 7 times. Your account has been temporarily locked out for 30 minutes. Please try again later or contact your administrator.',
+                ]);
+            }
+
+            // 5 failed attempts: 5-minute temporary lockout
+            if ($attempts === 5) {
+                $user->update(['locked_until' => now()->addMinutes(5)]);
+
+                throw ValidationException::withMessages([
+                    'email' => 'You entered your credentials wrong 5 times. Your account has been temporarily locked out for 5 minutes. Please try again later or contact your administrator.',
+                ]);
+            }
+
+            // 3 failed attempts: warning notification message
+            if ($attempts === 3) {
+                throw ValidationException::withMessages([
+                    'email' => 'You entered your credentials wrong 3 times, if you enter your password 5 times you will be locked out of your account',
+                ]);
+            }
 
             throw ValidationException::withMessages([
                 'email' => __('auth.failed'),
@@ -61,6 +132,13 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        if ($user->failed_login_attempts > 0 || $user->locked_until !== null) {
+            $user->update([
+                'failed_login_attempts' => 0,
+                'locked_until' => null,
+            ]);
+        }
     }
 
     /**

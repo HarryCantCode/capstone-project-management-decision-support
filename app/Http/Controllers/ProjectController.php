@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreProjectRequest;
+use App\Http\Requests\TransitionProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
+use App\Models\Personnel;
 use App\Models\Project;
 use App\Services\ProjectService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -14,13 +18,14 @@ use Illuminate\View\View;
  *
  * All business logic is in ProjectService.
  * Authorization is in ProjectPolicy (checked via $this->authorize()).
- * Validation is in StoreProjectRequest / UpdateProjectRequest.
+ * Validation is in dedicated Form Request classes.
  */
 class ProjectController extends Controller
 {
     public function __construct(
         private readonly ProjectService $projectService,
-    ) {}
+    ) {
+    }
 
     /**
      * Display a paginated list of projects with optional status filter.
@@ -62,20 +67,34 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('projects.show', $project)
-            ->with('status', "Project "{$project->name}" created successfully.");
+            ->with('status', "Project {$project->name} created successfully.");
     }
 
     /**
-     * Show project detail with eager-loaded history.
-     * Status history is ordered by changed_at (ascending) in the relationship.
+     * Show project detail with eager-loaded history, personnel, itemized costs, and finances.
      */
     public function show(Project $project): View
     {
         $this->authorize('view', $project);
 
-        $project->load(['creator', 'updater', 'statusHistory.changedBy']);
+        $project->load([
+            'creator',
+            'updater',
+            'statusHistory.changedBy',
+            'personnel',
+            'personnelHistory.personnel',
+            'personnelHistory.assignedBy',
+            'personnelHistory.releasedBy',
+            'costs' => fn ($query) => $query->with('creator')->orderByDesc('incurred_date')->orderByDesc('id'),
+            'tasks.subtasks',
+        ]);
 
-        return view('projects.show', compact('project'));
+        $availablePersonnel = Personnel::query()
+            ->whereNull('project_id')
+            ->orderBy('last_name')
+            ->get(['id', 'employee_id', 'first_name', 'middle_name', 'last_name', 'expertise']);
+
+        return view('projects.show', compact('project', 'availablePersonnel'));
     }
 
     /** Show the edit project form. */
@@ -86,7 +105,9 @@ class ProjectController extends Controller
         return view('projects.edit', compact('project'));
     }
 
-    /** Update project details (not status — transitions use a dedicated route). */
+    /**
+     * Update project core fields.
+     */
     public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
     {
         $this->authorize('update', $project);
@@ -106,11 +127,12 @@ class ProjectController extends Controller
     {
         $this->authorize('delete', $project);
 
-        $project->delete();
+        $projectName = $project->name;
+        $this->projectService->delete($project);
 
         return redirect()
             ->route('projects.index')
-            ->with('status', "Project "{$project->name}" has been deleted.");
+            ->with('status', "Project {$projectName} has been deleted.");
     }
 
     /**
@@ -120,19 +142,230 @@ class ProjectController extends Controller
      * Transition validation happens in ProjectService::transition() —
      * invalid transitions return a 422 with an inline error.
      */
-    public function transition(Project $project): RedirectResponse
+    public function transition(TransitionProjectRequest $request, Project $project): RedirectResponse
     {
         $this->authorize('transition', $project);
 
-        $validated = request()->validate([
-            'status' => ['required', 'string', 'in:pending,ongoing,completed'],
-            'notes' => ['nullable', 'string', 'max:500'],
-        ]);
+        $validated = $request->validated();
 
         $this->projectService->transition($project, $validated['status'], $validated['notes'] ?? null);
 
+        $msg = $validated['status'] === 'completed'
+            ? "Project status updated to completed. Assigned manpower have been released and marked available."
+            : "Project status updated to {$validated['status']}.";
+
         return redirect()
             ->route('projects.show', $project)
-            ->with('status', "Project status updated to "{$validated['status']}".");
+            ->with('status', $msg);
+    }
+
+    /**
+     * Update the tracked actual spend for the project.
+     */
+    public function updateSpend(Request $request, Project $project): RedirectResponse
+    {
+        $this->authorize('update', $project);
+
+        $validated = $request->validate([
+            'actual_spend' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
+        ]);
+
+        $this->projectService->updateSpend($project, (float) $validated['actual_spend']);
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('status', "Project actual spend updated to ₱" . number_format($validated['actual_spend'], 2) . ".");
+    }
+
+    /**
+     * Unassign a personnel from this project.
+     */
+    public function unassignPersonnel(Request $request, Project $project, Personnel $personnel): RedirectResponse
+    {
+        $this->authorize('update', $project);
+
+        if ($personnel->project_id === $project->id) {
+            DB::transaction(function () use ($project, $personnel) {
+                $now = now()->toDateString();
+
+                $personnel->update([
+                    'project_id'    => null,
+                    'date_assigned' => null,
+                    'updated_by'    => auth()->id(),
+                ]);
+
+                \App\Models\ProjectPersonnelHistory::where('project_id', $project->id)
+                    ->where('personnel_id', $personnel->id)
+                    ->whereNull('released_at')
+                    ->update([
+                        'released_at'    => $now,
+                        'release_reason' => 'unassigned',
+                        'released_by'    => auth()->id(),
+                    ]);
+
+                \App\Models\ProjectStatusHistory::create([
+                    'project_id'  => $project->id,
+                    'from_status' => $project->status,
+                    'to_status'   => $project->status,
+                    'notes'       => "Unassigned manpower: {$personnel->employee_id} ({$personnel->full_name} - {$personnel->expertise})",
+                    'changed_by'  => auth()->id(),
+                    'changed_at'  => now(),
+                ]);
+            });
+
+            return redirect()
+                ->route('projects.show', $project)
+                ->with('status', "Personnel {$personnel->employee_id} ({$personnel->full_name}) unassigned successfully.");
+        }
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('error', "Personnel is not assigned to this project.");
+    }
+
+    /**
+     * Assign a personnel to this project.
+     */
+    public function assignPersonnel(Request $request, Project $project): RedirectResponse
+    {
+        $this->authorize('update', $project);
+
+        if ($project->status === 'completed') {
+            return redirect()
+                ->route('projects.show', $project)
+                ->with('error', "Cannot assign personnel to a completed project.");
+        }
+
+        $validated = $request->validate([
+            'personnel_ids'   => ['nullable', 'array'],
+            'personnel_ids.*' => ['required', 'exists:personnel,id'],
+            'personnel_id'    => ['nullable', 'exists:personnel,id'],
+        ]);
+
+        $ids = $validated['personnel_ids'] ?? [];
+        if (!empty($validated['personnel_id'])) {
+            $ids[] = $validated['personnel_id'];
+        }
+        $ids = array_unique(array_filter($ids));
+
+        if (empty($ids)) {
+            return redirect()
+                ->route('projects.show', $project)
+                ->with('error', "Please select at least one personnel to assign.");
+        }
+
+        $now = now()->toDateString();
+        $count = 0;
+
+        $personnelList = Personnel::whereIn('id', $ids)->get();
+
+        DB::transaction(function () use ($personnelList, $project, $now, &$count) {
+            foreach ($personnelList as $personnel) {
+                $oldProjectId = $personnel->project_id;
+                if ($oldProjectId && $oldProjectId != $project->id) {
+                    \App\Models\ProjectPersonnelHistory::where('project_id', $oldProjectId)
+                        ->where('personnel_id', $personnel->id)
+                        ->whereNull('released_at')
+                        ->update([
+                            'released_at'    => $now,
+                            'release_reason' => 'reassigned',
+                            'released_by'    => auth()->id(),
+                        ]);
+                }
+
+                $personnel->update([
+                    'project_id'    => $project->id,
+                    'date_assigned' => $now,
+                    'updated_by'    => auth()->id(),
+                ]);
+
+                if ($oldProjectId != $project->id) {
+                    \App\Models\ProjectPersonnelHistory::create([
+                        'project_id'   => $project->id,
+                        'personnel_id' => $personnel->id,
+                        'assigned_at'  => $now,
+                        'assigned_by'  => auth()->id(),
+                    ]);
+                }
+                $count++;
+            }
+
+            $manpowerSummary = $personnelList->map(fn ($p) => "{$p->employee_id} ({$p->full_name} - {$p->expertise})")->implode(', ');
+            \App\Models\ProjectStatusHistory::create([
+                'project_id'  => $project->id,
+                'from_status' => $project->status,
+                'to_status'   => $project->status,
+                'notes'       => $count === 1
+                    ? "Assigned manpower: {$manpowerSummary}"
+                    : "Assigned {$count} manpower: {$manpowerSummary}",
+                'changed_by'  => auth()->id(),
+                'changed_at'  => now(),
+            ]);
+        });
+
+        $msg = $count === 1
+            ? "Personnel {$personnelList->first()->employee_id} ({$personnelList->first()->full_name}) assigned to project successfully."
+            : "Successfully assigned {$count} personnel to {$project->name}.";
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('status', $msg);
+    }
+
+    /**
+     * Add an itemized cost / expenditure entry to the project.
+     */
+    public function addCost(Request $request, Project $project): RedirectResponse
+    {
+        $this->authorize('update', $project);
+
+        $validated = $request->validate([
+            'description' => ['required', 'string', 'max:255'],
+            'cost_type' => ['required', 'string', 'in:materials,equipment,labor,subcontractor,other'],
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:999999999.99'],
+            'incurred_date' => ['nullable', 'date'],
+        ]);
+
+        $this->projectService->addCost($project, $validated);
+
+        return redirect($this->getCostRedirectUrl($request, $project))
+            ->with('status', "Cost entry '{$validated['description']}' of ₱" . number_format($validated['amount'], 2) . " logged successfully.");
+    }
+
+    /**
+     * Remove an itemized cost / expenditure entry from the project.
+     */
+    public function deleteCost(Request $request, Project $project, \App\Models\ProjectCost $cost): RedirectResponse
+    {
+        $this->authorize('update', $project);
+
+        $redirectUrl = $this->getCostRedirectUrl($request, $project);
+
+        if ($cost->project_id === $project->id) {
+            $this->projectService->deleteCost($project, $cost);
+
+            return redirect($redirectUrl)
+                ->with('status', "Cost entry '{$cost->description}' removed successfully.");
+        }
+
+        return redirect($redirectUrl)
+            ->with('error', "Cost item not found on this project.");
+    }
+
+    /**
+     * Determine the redirect URL after adding or deleting a project cost.
+     */
+    protected function getCostRedirectUrl(Request $request, Project $project): string
+    {
+        if ($request->input('redirect_to') === 'costing') {
+            return route('costing.show', $project);
+        }
+
+        $referer = (string) $request->headers->get('referer');
+        if ($referer !== '' && str_contains($referer, '/costing/')) {
+            return route('costing.show', $project);
+        }
+
+        return route('projects.show', $project);
     }
 }

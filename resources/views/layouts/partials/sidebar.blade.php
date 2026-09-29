@@ -13,7 +13,7 @@
             <path d="M8 10h8a6 6 0 0 1 0 12H8V10z" fill="white"/>
             <rect x="19" y="17" width="5" height="5" rx="1" fill="white" opacity="0.7"/>
         </svg>
-        <span>Dex PMS</span>
+        <span>Dex International Co.</span>
     </a>
 </div>
 
@@ -44,7 +44,7 @@
         <span class="nav-section-label">Projects</span>
         <ul class="nav-list" role="list">
             <li>
-                <a href="#" {{-- route('projects.index') --}}
+                <a href="{{ route('projects.index') }}"
                    class="nav-link {{ request()->routeIs('projects.*') ? 'nav-link--active' : '' }}"
                    aria-current="{{ request()->routeIs('projects.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -53,19 +53,8 @@
                     Projects
                 </a>
             </li>
-            @role('Admin')
             <li>
-                <a href="#" {{-- route('scheduling.index') --}}
-                   class="nav-link {{ request()->routeIs('scheduling.*') ? 'nav-link--active' : '' }}"
-                   aria-current="{{ request()->routeIs('scheduling.*') ? 'page' : 'false' }}">
-                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M6 2a1 1 0 0 0-1 1v1H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1V3a1 1 0 1 0-2 0v1H7V3a1 1 0 0 0-1-1zm0 5a1 1 0 0 0 0 2h8a1 1 0 1 0 0-2H6z" clip-rule="evenodd"/>
-                    </svg>
-                    Scheduling
-                </a>
-            </li>
-            <li>
-                <a href="#" {{-- route('costing.index') --}}
+                <a href="{{ route('costing.index') }}"
                    class="nav-link {{ request()->routeIs('costing.*') ? 'nav-link--active' : '' }}"
                    aria-current="{{ request()->routeIs('costing.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -75,18 +64,17 @@
                     Costing
                 </a>
             </li>
-            @endrole
         </ul>
     </div>
     @endrole
 
-    {{-- Resources — Manager and Inventory Staff --}}
-    @role('Manager|Inventory Staff')
+    {{-- Resources — Admin, Manager and Staff --}}
+    @role('Admin|Manager|Staff')
     <div class="nav-section">
         <span class="nav-section-label">Resources</span>
         <ul class="nav-list" role="list">
             <li>
-                <a href="#" {{-- route('resources.index') --}}
+                <a href="{{ route('resources.index') }}"
                    class="nav-link {{ request()->routeIs('resources.*') ? 'nav-link--active' : '' }}"
                    aria-current="{{ request()->routeIs('resources.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -96,7 +84,7 @@
                 </a>
             </li>
             <li>
-                <a href="#" {{-- route('equipment.index') --}}
+                <a href="{{ route('equipment.index') }}"
                    class="nav-link {{ request()->routeIs('equipment.*') ? 'nav-link--active' : '' }}"
                    aria-current="{{ request()->routeIs('equipment.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -109,15 +97,15 @@
     </div>
     @endrole
 
-    {{-- Manpower — Manager only --}}
-    @role('Manager')
+    {{-- Manpower — Admin and Manager --}}
+    @role('Admin|Manager')
     <div class="nav-section">
         <span class="nav-section-label">Personnel</span>
         <ul class="nav-list" role="list">
             <li>
-                <a href="#" {{-- route('manpower.index') --}}
-                   class="nav-link {{ request()->routeIs('manpower.*') ? 'nav-link--active' : '' }}"
-                   aria-current="{{ request()->routeIs('manpower.*') ? 'page' : 'false' }}">
+                <a href="{{ route('scheduling.index') }}"
+                   class="nav-link {{ request()->routeIs('scheduling.*') ? 'nav-link--active' : '' }}"
+                   aria-current="{{ request()->routeIs('scheduling.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M9 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM17 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 0 0-1.5-4.33A5 5 0 0 1 19 16v1h-6.07zM6 11a5 5 0 0 1 5 5v1H1v-1a5 5 0 0 1 5-5z"/>
                     </svg>
@@ -134,7 +122,7 @@
         <span class="nav-section-label">Insights</span>
         <ul class="nav-list" role="list">
             <li>
-                <a href="#" {{-- route('reports.index') --}}
+                <a href="{{ route('reports.index') }}"
                    class="nav-link {{ request()->routeIs('reports.*') ? 'nav-link--active' : '' }}"
                    aria-current="{{ request()->routeIs('reports.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -144,14 +132,13 @@
                 </a>
             </li>
             <li>
-                <a href="#" {{-- route('decision-support.index') --}}
+                <a href="{{ route('decision-support.index') }}"
                    class="nav-link {{ request()->routeIs('decision-support.*') ? 'nav-link--active' : '' }}"
                    aria-current="{{ request()->routeIs('decision-support.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M11 3a1 1 0 1 0-2 0v1a1 1 0 1 0 2 0V3zM15.657 5.757a1 1 0 0 0-1.414-1.414l-.707.707a1 1 0 0 0 1.414 1.414l.707-.707zM18 10a1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM5.05 6.464A1 1 0 1 0 6.464 5.05l-.707-.707a1 1 0 0 0-1.414 1.414l.707.707zM5 10a1 1 0 0 1-1 1H3a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM8 16v-1h4v1a2 2 0 1 1-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 1 0-4.954 0c.27.213.462.519.476.859h4.001z"/>
                     </svg>
                     Decision Support
-                    <span class="nav-badge nav-badge--coming">Coming soon</span>
                 </a>
             </li>
         </ul>
@@ -164,13 +151,13 @@
         <span class="nav-section-label">Administration</span>
         <ul class="nav-list" role="list">
             <li>
-                <a href="#" {{-- route('users.index') --}}
-                   class="nav-link {{ request()->routeIs('users.*') ? 'nav-link--active' : '' }}"
-                   aria-current="{{ request()->routeIs('users.*') ? 'page' : 'false' }}">
+                <a href="{{ route('account.settings') }}"
+                   class="nav-link {{ request()->routeIs('account.settings') || request()->routeIs('account.users.*') ? 'nav-link--active' : '' }}"
+                   aria-current="{{ request()->routeIs('account.settings') || request()->routeIs('account.users.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-7 9a7 7 0 1 1 14 0H3z" clip-rule="evenodd"/>
                     </svg>
-                    Users
+                    User Management
                 </a>
             </li>
         </ul>

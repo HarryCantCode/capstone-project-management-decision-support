@@ -11,8 +11,7 @@ use Illuminate\Support\Facades\Schema;
  * These are nullable on users itself (the first user has no creator yet
  * when the seeder runs), and also nullable for the system-level guest.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {

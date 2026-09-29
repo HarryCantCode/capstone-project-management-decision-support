@@ -1,10 +1,10 @@
 @extends('layouts.auth')
 
-@section('title', 'Sign In')
+@section('title', 'Dex International Co.')
 
 @section('content')
-    <h1 class="auth-heading">Sign in to your account</h1>
-    <p class="auth-subheading">Dex International Co. — Project Management</p>
+    <h1 class="auth-heading">Welcome back</h1>
+    <p class="auth-subheading">Project Management System</p>
 
     {{-- Session status (e.g. "You have been logged out") --}}
     @if (session('status'))
@@ -16,18 +16,19 @@
     <form method="POST" action="{{ route('login.store') }}" id="login-form" novalidate>
         @csrf
 
-        {{-- Email --}}
+        {{-- Email or Account Number --}}
         <div class="form-group">
-            <label for="email" class="form-label">Email address</label>
+            <label for="email" class="form-label">Email address or Account Number</label>
             <input
                 id="email"
-                type="email"
+                type="text"
                 name="email"
                 class="form-control @error('email') is-invalid @enderror"
                 value="{{ old('email') }}"
                 required
-                autocomplete="email"
+                autocomplete="username"
                 autofocus
+                placeholder="name@dex-pms.local or 1000001"
                 aria-describedby="email-error"
             >
             @error('email')

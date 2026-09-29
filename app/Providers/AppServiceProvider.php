@@ -3,7 +3,11 @@
 namespace App\Providers;
 
 use App\Http\Middleware\EnsureTwoFactorVerified;
+use App\Models\Project;
+use App\Models\Resource;
 use App\Models\User;
+use App\Policies\ProjectPolicy;
+use App\Policies\ResourcePolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -35,7 +39,13 @@ class AppServiceProvider extends ServiceProvider
             EnsureTwoFactorVerified::class,
         );
 
+        $this->app['router']->aliasMiddleware('role', \Spatie\Permission\Middleware\RoleMiddleware::class);
+        $this->app['router']->aliasMiddleware('permission', \Spatie\Permission\Middleware\PermissionMiddleware::class);
+        $this->app['router']->aliasMiddleware('role_or_permission', \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class);
+
         // Policy registrations
         Gate::policy(User::class, UserPolicy::class);
+        Gate::policy(Project::class, ProjectPolicy::class);
+        Gate::policy(Resource::class, ResourcePolicy::class);
     }
 }

@@ -14,6 +14,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ProjectStatusHistory extends Model
 {
+    protected $table = 'project_status_history';
+
+    public const CREATED_AT = null;
+
     /**
      * This table has no updated_at — history rows are written once, never edited.
      */
@@ -43,6 +47,11 @@ class ProjectStatusHistory extends Model
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
+    /**
+     * Get the project that this status history record belongs to.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
@@ -56,6 +65,6 @@ class ProjectStatusHistory extends Model
      */
     public function changedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'changed_by');
+        return $this->belongsTo(User::class, 'changed_by')->withTrashed();
     }
 }

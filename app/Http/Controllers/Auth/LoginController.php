@@ -43,6 +43,11 @@ class LoginController extends Controller
             return redirect()->route('auth.two-factor');
         }
 
+        // Staff cannot access the dashboard
+        if ($user->hasRole('Staff')) {
+            return redirect()->route('resources.index');
+        }
+
         return redirect()->intended(route('dashboard'));
     }
 

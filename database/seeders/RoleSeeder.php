@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 
@@ -24,7 +23,7 @@ class RoleSeeder extends Seeder
     private const ROLES = [
         'Admin',
         'Manager',
-        'Inventory Staff',
+        'Staff',
     ];
 
     public function run(): void

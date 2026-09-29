@@ -18,7 +18,10 @@ class DatabaseSeeder extends Seeder
         $this->call(RoleSeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
-            $this->call(DemoUserSeeder::class);
+            $this->call([
+                DemoUserSeeder::class,
+                ResourceSeeder::class,
+            ]);
         }
     }
 }

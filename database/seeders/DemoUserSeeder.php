@@ -36,7 +36,7 @@ class DemoUserSeeder extends Seeder
                 'name' => 'Jose Cruz',
                 'email' => 'inventory@dex-pms.local',
                 'password' => Hash::make('DexInventory2026!'),
-                'role' => 'Inventory Staff',
+                'role' => 'Staff',
             ],
         ];
 
@@ -45,10 +45,12 @@ class DemoUserSeeder extends Seeder
             unset($userData['role']);
 
             /** @var User $user */
-            $user = User::firstOrCreate(
-                ['email' => $userData['email']],
-                $userData,
-            );
+            $user = User::withTrashed()->firstOrNew(['email' => $userData['email']]);
+            if ($user->trashed()) {
+                $user->restore();
+            }
+            $user->fill($userData);
+            $user->saveQuietly();
 
             // Track who created the user (self-reference for seeded admin;
             // admin creates the other two roles)

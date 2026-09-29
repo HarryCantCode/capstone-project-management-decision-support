@@ -16,8 +16,7 @@ use Illuminate\Support\Facades\Schema;
  *   ongoing → completed (only)
  * All other transitions are blocked in ProjectService, not here.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('projects', function (Blueprint $table) {
