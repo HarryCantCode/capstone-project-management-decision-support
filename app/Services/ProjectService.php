@@ -74,7 +74,7 @@ class ProjectService
                 'updated_by' => $user->id,
             ]);
 
-            // Create initial default Major Task: Securing Permits & Mobilization (covering Week 1)
+            // Create initial default Major Task: Pre-construction & Regulatory Compliance (covering Week 1)
             $this->createDefaultPermitTask($project, $user->id);
 
             $stats = Project::getDashboardStats();
@@ -87,7 +87,7 @@ class ProjectService
     }
 
     /**
-     * Create the default initial Major Task (Securing permits, clearances & mobilization)
+     * Create the default initial Major Task (Pre-construction & Regulatory Compliance)
      * covering Week 1, with standard sub tasks checklist.
      */
     public function createDefaultPermitTask(Project $project, ?int $userId = null): ProjectTask
@@ -97,19 +97,19 @@ class ProjectService
 
         $task = ProjectTask::create([
             'project_id' => $project->id,
-            'task_name' => 'Securing Permits, Clearances & Site Mobilization',
+            'task_name' => 'Pre-construction & Regulatory Compliance',
             'start_date' => $startDate->toDateString(),
             'end_date' => $endDate->toDateString(),
-            'description' => 'Securing required building & installation permits, DOLE safety program clearances, initial hoistway inspection, and site mobilization.',
+            'description' => 'Securing required permits, obtaining design approvals, verifying site readiness, and preparing the installation area prior to elevator construction and mobilization.',
             'status' => 'pending',
             'sort_order' => 1,
             'created_by' => $userId ?? Auth::id(),
         ]);
 
         $defaultSubtasks = [
-            ['title' => 'Secure LGU building & installation permits', 'due_date' => $startDate->copy()->addDays(1)->toDateString()],
-            ['title' => 'Process DOLE construction safety & health program clearance', 'due_date' => $startDate->copy()->addDays(2)->toDateString()],
-            ['title' => 'Conduct hoistway structural inspection & dimension verification', 'due_date' => $startDate->copy()->addDays(4)->toDateString()],
+            ['title' => 'LGU building & mechanical permits', 'due_date' => $startDate->copy()->addDays(1)->toDateString()],
+            ['title' => 'Approval of project design / plan', 'due_date' => $startDate->copy()->addDays(2)->toDateString()],
+            ['title' => 'Site inspection and readiness assessment', 'due_date' => $startDate->copy()->addDays(4)->toDateString()],
             ['title' => 'Initial site mobilization and safety barricade staging', 'due_date' => $startDate->copy()->addDays(6)->toDateString()],
         ];
 

@@ -11,7 +11,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(fn () => $this->seed(RoleSeeder::class));
 
-test('creating a project automatically initializes default permits major task with 4 sub tasks and due dates', function () {
+test('creating a project automatically initializes default pre-construction major task with 4 sub tasks and due dates', function () {
     $manager = User::factory()->create();
     $manager->assignRole('Manager');
 
@@ -38,11 +38,19 @@ test('creating a project automatically initializes default permits major task wi
     expect($project->tasks)->toHaveCount(1);
 
     $defaultTask = $project->tasks->first();
-    expect($defaultTask->task_name)->toContain('Permits')
+    expect($defaultTask->task_name)->toBe('Pre-construction & Regulatory Compliance')
+        ->and($defaultTask->description)->toBe('Securing required permits, obtaining design approvals, verifying site readiness, and preparing the installation area prior to elevator construction and mobilization.')
         ->and($defaultTask->start_date->format('Y-m-d'))->toBe($startDate)
         ->and($defaultTask->end_date->format('Y-m-d'))->toBe(now()->addDay()->addDays(6)->format('Y-m-d'))
         ->and($defaultTask->subtasks)->toHaveCount(4)
-        ->and($defaultTask->subtasks->first()->due_date)->not->toBeNull()
+        ->and($defaultTask->subtasks[0]->title)->toBe('LGU building & mechanical permits')
+        ->and($defaultTask->subtasks[0]->due_date->format('Y-m-d'))->toBe(now()->addDay()->addDays(1)->format('Y-m-d'))
+        ->and($defaultTask->subtasks[1]->title)->toBe('Approval of project design / plan')
+        ->and($defaultTask->subtasks[1]->due_date->format('Y-m-d'))->toBe(now()->addDay()->addDays(2)->format('Y-m-d'))
+        ->and($defaultTask->subtasks[2]->title)->toBe('Site inspection and readiness assessment')
+        ->and($defaultTask->subtasks[2]->due_date->format('Y-m-d'))->toBe(now()->addDay()->addDays(4)->format('Y-m-d'))
+        ->and($defaultTask->subtasks[3]->title)->toBe('Initial site mobilization and safety barricade staging')
+        ->and($defaultTask->subtasks[3]->due_date->format('Y-m-d'))->toBe(now()->addDay()->addDays(6)->format('Y-m-d'))
         ->and($defaultTask->progress_percentage)->toBe(0);
 });
 
