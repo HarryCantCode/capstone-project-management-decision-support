@@ -74,17 +74,208 @@
 
             {{-- Top bar --}}
             <header class="app-topbar" role="banner">
-                <div class="topbar-search" style="flex: 1; max-width: 400px; position: relative;">
-                    <svg style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--color-muted);" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                    </svg>
-                    <input type="text" placeholder="Search projects, resources..." class="form-control" style="padding-left: 36px; border-radius: 20px; background: var(--color-surface-alt); border: none; font-size: 0.875rem;" disabled>
+                {{-- Global Searchbar (Top-Left) --}}
+                <div
+                    class="topbar-search"
+                    x-data="globalSearch()"
+                    @keydown="onKeydown($event)"
+                    @click.outside="open = false"
+                >
+                    <div class="topbar-search-input-wrap">
+                        <svg class="topbar-search-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input
+                            type="text"
+                            x-ref="searchInput"
+                            x-model="query"
+                            @input.debounce.250ms="performSearch()"
+                            @focus="if(query.trim().length >= 1) open = true"
+                            placeholder="Search projects, manpower, resources... (Press '/' to focus)"
+                            class="topbar-search-input"
+                            autocomplete="off"
+                            aria-label="Global real-time search"
+                            aria-autocomplete="list"
+                            :aria-expanded="open.toString()"
+                            role="combobox"
+                        >
+                        <div class="topbar-search-actions">
+                            <div x-show="loading" class="topbar-search-spinner" aria-hidden="true" style="display: none;"></div>
+                            <button
+                                type="button"
+                                x-show="query.length > 0 && !loading"
+                                @click="clear()"
+                                class="topbar-search-clear"
+                                title="Clear search query"
+                                aria-label="Clear search query"
+                                style="display: none;"
+                            >
+                                <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Real-time Dropdown Results --}}
+                    <div
+                        class="search-dropdown"
+                        x-show="open && query.trim().length >= 1"
+                        x-cloak
+                        x-transition:enter="transition ease-out duration-150"
+                        x-transition:enter-start="opacity-0 transform scale-95"
+                        x-transition:enter-end="opacity-100 transform scale-100"
+                        x-transition:leave="transition ease-in duration-100"
+                        x-transition:leave-start="opacity-100 transform scale-100"
+                        x-transition:leave-end="opacity-0 transform scale-95"
+                        role="listbox"
+                    >
+                        <div class="search-dropdown-content" x-ref="resultsContainer">
+                            {{-- Projects Section --}}
+                            <template x-if="results.projects && results.projects.length > 0">
+                                <div>
+                                    <div class="search-category-header">
+                                        <span>Projects</span>
+                                        <span x-text="`${results.projects.length} found`"></span>
+                                    </div>
+                                    <template x-for="(project, idx) in results.projects" :key="'proj-' + project.id">
+                                        <a
+                                            :href="project.url"
+                                            class="search-result-item"
+                                            :class="{ 'is-keyboard-active': selectedIndex === idx }"
+                                            @mouseenter="selectedIndex = idx"
+                                        >
+                                            <div class="search-result-icon search-result-icon--project" title="Project">
+                                                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                                                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                                                </svg>
+                                            </div>
+                                            <div class="search-result-info">
+                                                <div class="search-result-top">
+                                                    <span class="search-result-title" x-text="project.title"></span>
+                                                    <span class="search-result-code" x-text="project.code"></span>
+                                                </div>
+                                                <div class="search-result-bottom">
+                                                    <span x-text="project.subtitle"></span>
+                                                    <span>·</span>
+                                                    <span x-text="project.meta"></span>
+                                                </div>
+                                            </div>
+                                            <div class="search-result-badge">
+                                                <span class="status-pill" :class="`status-pill--${project.status_class}`" x-text="project.status"></span>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Manpower Section --}}
+                            <template x-if="results.manpower && results.manpower.length > 0">
+                                <div>
+                                    <div class="search-category-header">
+                                        <span>Manpower</span>
+                                        <span x-text="`${results.manpower.length} found`"></span>
+                                    </div>
+                                    <template x-for="(person, idx) in results.manpower" :key="'man-' + person.id">
+                                        <a
+                                            :href="person.url"
+                                            class="search-result-item"
+                                            :class="{ 'is-keyboard-active': selectedIndex === (results.projects ? results.projects.length : 0) + idx }"
+                                            @mouseenter="selectedIndex = (results.projects ? results.projects.length : 0) + idx"
+                                        >
+                                            <div class="search-result-icon search-result-icon--manpower" title="Manpower Personnel">
+                                                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                                    <circle cx="9" cy="7" r="4"/>
+                                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                                </svg>
+                                            </div>
+                                            <div class="search-result-info">
+                                                <div class="search-result-top">
+                                                    <span class="search-result-title" x-text="person.title"></span>
+                                                    <span class="search-result-code" x-text="person.code"></span>
+                                                </div>
+                                                <div class="search-result-bottom">
+                                                    <span style="font-weight: 500; color: var(--color-ink);" x-text="person.subtitle"></span>
+                                                    <span>·</span>
+                                                    <span x-text="person.meta"></span>
+                                                </div>
+                                            </div>
+                                            <div class="search-result-badge">
+                                                <span class="status-pill" :class="`status-pill--${person.status_class}`" x-text="person.status"></span>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Resources Section --}}
+                            <template x-if="results.resources && results.resources.length > 0">
+                                <div>
+                                    <div class="search-category-header">
+                                        <span>Resources</span>
+                                        <span x-text="`${results.resources.length} found`"></span>
+                                    </div>
+                                    <template x-for="(res, idx) in results.resources" :key="'res-' + res.id">
+                                        <a
+                                            :href="res.url"
+                                            class="search-result-item"
+                                            :class="{ 'is-keyboard-active': selectedIndex === (results.projects ? results.projects.length : 0) + (results.manpower ? results.manpower.length : 0) + idx }"
+                                            @mouseenter="selectedIndex = (results.projects ? results.projects.length : 0) + (results.manpower ? results.manpower.length : 0) + idx"
+                                        >
+                                            <div class="search-result-icon search-result-icon--resource" title="Resource">
+                                                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                                                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                                                </svg>
+                                            </div>
+                                            <div class="search-result-info">
+                                                <div class="search-result-top">
+                                                    <span class="search-result-title" x-text="res.title"></span>
+                                                    <span class="search-result-code" x-text="res.code"></span>
+                                                </div>
+                                                <div class="search-result-bottom">
+                                                    <span x-text="res.subtitle"></span>
+                                                    <span>·</span>
+                                                    <span x-text="res.meta"></span>
+                                                </div>
+                                            </div>
+                                            <div class="search-result-badge">
+                                                <span class="status-pill" :class="`status-pill--${res.status_class}`" x-text="res.status"></span>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- No Results Empty State --}}
+                            <div x-show="!loading && results.total === 0" class="search-empty-state">
+                                <svg style="width: 32px; height: 32px; margin: 0 auto 8px; color: var(--color-muted); opacity: 0.6;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                </svg>
+                                <p style="font-weight: 600; font-size: 0.875rem; margin-bottom: 2px; color: var(--color-ink);">No matching records found</p>
+                                <p style="font-size: 0.8125rem; margin: 0; color: var(--color-muted);">No projects, manpower, or resources match "<strong x-text="query"></strong>".</p>
+                            </div>
+                        </div>
+
+                        {{-- Footer with keyboard hints --}}
+                        <div class="search-dropdown-footer">
+                            <span x-text="results.total > 0 ? `${results.total} matching result${results.total === 1 ? '' : 's'}` : 'Global Search'"></span>
+                            <div class="search-kbd-hints">
+                                <span><kbd class="search-kbd">↑</kbd><kbd class="search-kbd">↓</kbd> Navigate</span>
+                                <span><kbd class="search-kbd">↵</kbd> Select</span>
+                                <span><kbd class="search-kbd">Esc</kbd> Close</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <span class="topbar-page-title" style="margin-left: auto; margin-right: 16px; font-weight: 600; color: var(--color-ink); letter-spacing: -0.01em;">Project Management System</span>
-
-                {{-- User dropdown --}}
-                <div class="topbar-user" x-data="{ open: false }">
+                {{-- User dropdown (Right-aligned) --}}
+                <div class="topbar-user" style="margin-left: auto; display: flex; align-items: center;" x-data="{ open: false }">
                     <button
                         id="user-menu-button"
                         type="button"
@@ -188,6 +379,116 @@
 
         </div>
     </div>
+
+    <script>
+        function globalSearch() {
+            return {
+                query: '',
+                open: false,
+                loading: false,
+                results: { projects: [], manpower: [], resources: [], total: 0 },
+                selectedIndex: -1,
+                searchUrl: '{{ route('global-search') }}',
+                abortController: null,
+
+                init() {
+                    window.addEventListener('keydown', (e) => {
+                        if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                            e.preventDefault();
+                            this.$refs.searchInput.focus();
+                        }
+                    });
+                },
+
+                async performSearch() {
+                    const q = this.query.trim();
+                    if (q.length < 1) {
+                        this.results = { projects: [], manpower: [], resources: [], total: 0 };
+                        this.open = false;
+                        this.selectedIndex = -1;
+                        return;
+                    }
+
+                    this.loading = true;
+                    this.open = true;
+
+                    if (this.abortController) {
+                        this.abortController.abort();
+                    }
+                    this.abortController = new AbortController();
+
+                    try {
+                        const response = await fetch(`${this.searchUrl}?q=${encodeURIComponent(q)}`, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            signal: this.abortController.signal
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.results = data;
+                            this.selectedIndex = -1;
+                        }
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            console.error('Search error:', err);
+                        }
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                get allItems() {
+                    return [
+                        ...(this.results.projects || []).map(item => ({ ...item, category: 'project' })),
+                        ...(this.results.manpower || []).map(item => ({ ...item, category: 'manpower' })),
+                        ...(this.results.resources || []).map(item => ({ ...item, category: 'resource' }))
+                    ];
+                },
+
+                onKeydown(e) {
+                    const items = this.allItems;
+                    if (!this.open || items.length === 0) return;
+
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.selectedIndex = (this.selectedIndex + 1) % items.length;
+                        this.scrollToActive();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        this.selectedIndex = (this.selectedIndex - 1 + items.length) % items.length;
+                        this.scrollToActive();
+                    } else if (e.key === 'Enter') {
+                        if (this.selectedIndex >= 0 && this.selectedIndex < items.length) {
+                            e.preventDefault();
+                            window.location.href = items[this.selectedIndex].url;
+                        }
+                    } else if (e.key === 'Escape') {
+                        this.open = false;
+                    }
+                },
+
+                scrollToActive() {
+                    this.$nextTick(() => {
+                        const activeEl = this.$refs.resultsContainer?.querySelector('.is-keyboard-active');
+                        if (activeEl) {
+                            activeEl.scrollIntoView({ block: 'nearest' });
+                        }
+                    });
+                },
+
+                clear() {
+                    this.query = '';
+                    this.results = { projects: [], manpower: [], resources: [], total: 0 };
+                    this.open = false;
+                    this.selectedIndex = -1;
+                    this.$refs.searchInput.focus();
+                }
+            };
+        }
+    </script>
 
     @stack('scripts')
 </body>

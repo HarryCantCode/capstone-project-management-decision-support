@@ -34,6 +34,7 @@ class UpdateProjectRequest extends FormRequest
             'start_date' => ['required', 'date'],
             'target_completion_date' => ['required', 'date', 'after_or_equal:start_date'],
             'contract_price' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
+            'update_notes' => ['required', 'string', 'max:1000'],
         ];
     }
 
@@ -61,6 +62,8 @@ class UpdateProjectRequest extends FormRequest
             'contract_price.required' => 'Contract price is required.',
             'contract_price.numeric' => 'Contract price must be a valid number.',
             'contract_price.min' => 'Contract price cannot be negative.',
+            'update_notes.required' => 'Reason for update / audit note is required.',
+            'update_notes.max' => 'Reason for update cannot exceed 1,000 characters.',
         ];
     }
 }

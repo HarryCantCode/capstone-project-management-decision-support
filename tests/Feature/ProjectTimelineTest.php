@@ -339,21 +339,113 @@ test('project show page renders dynamic major tasks and sub tasks checklist with
         ->assertDontSee('Progress 1: Mobilization & Initial Site Preparation Key Deliverables');
 });
 
-test('project show page renders requested exact empty state copy when no tasks exist without default initialize button', function () {
+test('project show page automatically populates default major task if project had no tasks', function () {
     $manager = User::factory()->create();
     $manager->assignRole('Manager');
 
     $project = Project::factory()->create();
-    // Delete any tasks created if factory or lifecycle created any
+    // Force delete any tasks to simulate pre-existing project with no tasks
     $project->tasks()->delete();
+    expect($project->tasks()->count())->toBe(0);
 
     $this->actingAs($manager)
         ->get(route('projects.show', $project))
         ->assertOk()
-        ->assertSee('This project does not have any weekly major tasks configured yet. You can create your first major task with week-based schedules.')
-        ->assertSee('+ Add First Major Task')
-        ->assertDontSee('Initialize Default Permit Milestone')
-        ->assertDontSee('This project does not have any weekly mother tasks configured yet');
+        ->assertSee('Pre-construction & Regulatory Compliance')
+        ->assertSee('LGU building & mechanical permits')
+        ->assertDontSee('Update Project Status');
+
+    expect($project->fresh()->tasks)->toHaveCount(1)
+        ->and($project->fresh()->tasks->first()->task_name)->toBe('Pre-construction & Regulatory Compliance');
+});
+
+test('ticking a subtask on the first major task transitions pending project to in-progress', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create(['status' => 'pending']);
+    $firstTask = $project->tasks->first();
+    expect($firstTask)->not->toBeNull();
+    $subtask1 = $firstTask->subtasks->first();
+    expect($subtask1)->not->toBeNull();
+    expect($project->fresh()->status)->toBe('pending');
+
+    $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $firstTask, $subtask1]))
+        ->assertOk()
+        ->assertJson([
+            'success' => true,
+            'is_completed' => true,
+            'project_status' => 'ongoing',
+            'project_status_label' => 'In Progress',
+        ]);
+
+    expect($project->fresh()->status)->toBe('ongoing');
+});
+
+test('unticking the checkboxes on the first major task reverts project status back to pending', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create(['status' => 'pending']);
+    $firstTask = $project->tasks->first();
+    $subtasks = $firstTask->subtasks;
+    $subtask1 = $subtasks[0];
+    $subtask2 = $subtasks[1];
+
+    // Tick subtask 1 -> should become ongoing
+    $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $firstTask, $subtask1]))
+        ->assertOk()
+        ->assertJson([
+            'project_status' => 'ongoing',
+            'project_status_label' => 'In Progress',
+        ]);
+    expect($project->fresh()->status)->toBe('ongoing');
+
+    // Tick subtask 2 -> stays ongoing
+    $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $firstTask, $subtask2]))
+        ->assertOk()
+        ->assertJson([
+            'project_status' => 'ongoing',
+        ]);
+    expect($project->fresh()->status)->toBe('ongoing');
+
+    // Untick subtask 1 -> still has subtask 2 completed, stays ongoing
+    $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $firstTask, $subtask1]))
+        ->assertOk()
+        ->assertJson([
+            'is_completed' => false,
+            'project_status' => 'ongoing',
+        ]);
+    expect($project->fresh()->status)->toBe('ongoing');
+
+    // Untick subtask 2 -> all completed subtasks are now 0, reverts to pending
+    $response = $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $firstTask, $subtask2]))
+        ->assertOk()
+        ->assertJson([
+            'is_completed' => false,
+            'project_status' => 'pending',
+            'project_status_label' => 'Pending',
+            'transition_audit_entry' => [
+                'status' => 'pending',
+                'status_label' => 'Pending',
+                'notes' => 'Status transitioned from Ongoing to Pending',
+            ],
+        ]);
+
+    expect($project->fresh()->status)->toBe('pending');
+
+    // Verify history recorded the transition
+    $this->assertDatabaseHas('project_status_history', [
+        'project_id' => $project->id,
+        'from_status' => 'ongoing',
+        'to_status' => 'pending',
+        'notes' => 'Status transitioned from Ongoing to Pending',
+    ]);
 });
 
 test('adding a sub task rejects dates outside the major task week', function () {
@@ -463,6 +555,7 @@ test('ticking subtasks returns real-time progress payload with overall project p
     $manager->assignRole('Manager');
 
     $project = Project::factory()->create();
+    $project->tasks()->delete();
     $task1 = ProjectTask::create([
         'project_id' => $project->id,
         'task_name' => 'Week 1 Phase',
@@ -498,4 +591,187 @@ test('ticking subtasks returns real-time progress payload with overall project p
             'total_subtasks_across_project' => 4,
             'completed_subtasks_across_project' => 1,
         ]);
+});
+
+test('creating a major task records audit trail record in project changes history', function () {
+    $manager = User::factory()->create(['name' => 'Engr. Alex Carter']);
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create([
+        'name' => 'Highland Tower Elevator',
+        'status' => 'ongoing',
+    ]);
+
+    $weekStart = now()->addDays(7)->format('Y-m-d');
+    $weekEnd = now()->addDays(13)->format('Y-m-d');
+
+    $this->actingAs($manager)
+        ->post(route('projects.tasks.store', $project), [
+            'task_name' => 'Traction Machine Rigging & Alignment',
+            'start_date' => $weekStart,
+            'end_date' => $weekEnd,
+            'description' => 'Rigging and hoisting gearless machine into the machine room penthouse.',
+        ])
+        ->assertRedirect(route('projects.show', $project));
+
+    $history = $project->fresh()->statusHistory->first();
+    expect($history)->not->toBeNull()
+        ->and($history->notes)->toContain("Created major task: 'Traction Machine Rigging & Alignment'")
+        ->and($history->changedBy->name)->toBe('Engr. Alex Carter');
+});
+
+test('creating a major task with initial subtasks records both major task creation and minor tasks creation in audit trail', function () {
+    $manager = User::factory()->create(['name' => 'Project Manager Cruz']);
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create([
+        'name' => 'Eastwood Commercial Center',
+        'status' => 'ongoing',
+    ]);
+
+    $weekStart = now()->addDays(14)->format('Y-m-d');
+    $weekEnd = now()->addDays(20)->format('Y-m-d');
+    $subtaskDate = now()->addDays(16)->format('Y-m-d');
+
+    $this->actingAs($manager)
+        ->post(route('projects.tasks.store', $project), [
+            'task_name' => 'Shaft Electrical Wiring & Traveling Cables',
+            'start_date' => $weekStart,
+            'end_date' => $weekEnd,
+            'subtasks' => [
+                'Suspend main traveling cable',
+                'Wire hoistway junction boxes',
+            ],
+            'subtask_dates' => [
+                $subtaskDate,
+                null,
+            ],
+        ])
+        ->assertRedirect(route('projects.show', $project));
+
+    $histories = $project->fresh()->statusHistory;
+    $historyNotes = $histories->pluck('notes')->all();
+
+    expect($historyNotes)->toContain("Created major task: 'Shaft Electrical Wiring & Traveling Cables' (" . \Carbon\Carbon::parse($weekStart)->format('M j, Y') . " to " . \Carbon\Carbon::parse($weekEnd)->format('M j, Y') . ")")
+        ->and(collect($historyNotes)->first(fn ($n) => str_contains($n, "Created minor task: 'Suspend main traveling cable'")))->not->toBeNull()
+        ->and(collect($historyNotes)->first(fn ($n) => str_contains($n, "Created minor task: 'Wire hoistway junction boxes'")))->not->toBeNull();
+});
+
+test('adding a minor task to an existing major task records minor task creation in audit trail', function () {
+    $manager = User::factory()->create(['name' => 'Supervisor Gomez']);
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create(['status' => 'ongoing']);
+    $task = ProjectTask::create([
+        'project_id' => $project->id,
+        'task_name' => 'Car Enclosure Assembly',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(6)->toDateString(),
+        'created_by' => $manager->id,
+    ]);
+
+    $dueDate = now()->addDays(2)->format('Y-m-d');
+
+    $this->actingAs($manager)
+        ->post(route('projects.tasks.subtasks.store', [$project, $task]), [
+            'title' => 'Install transom panels and car ceiling lights',
+            'due_date' => $dueDate,
+        ])
+        ->assertRedirect(route('projects.show', $project));
+
+    $history = $project->fresh()->statusHistory->first();
+    expect($history)->not->toBeNull()
+        ->and($history->notes)->toContain("Created minor task: 'Install transom panels and car ceiling lights'")
+        ->and($history->notes)->toContain("under 'Car Enclosure Assembly'")
+        ->and($history->changedBy->name)->toBe('Supervisor Gomez');
+});
+
+test('ticking and unticking checkboxes for specific tasks records granular audit trail events in project changes history', function () {
+    $manager = User::factory()->create(['name' => 'QC Engineer Santos']);
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create(['status' => 'ongoing']);
+    $task = ProjectTask::create([
+        'project_id' => $project->id,
+        'task_name' => 'Pre-commissioning Inspection',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(6)->toDateString(),
+        'created_by' => $manager->id,
+    ]);
+
+    $subtask = $task->subtasks()->create([
+        'title' => 'Governor overspeed trip switch test',
+        'is_completed' => false,
+    ]);
+
+    // 1. Tick the checkbox
+    $responseTick = $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $task, $subtask]))
+        ->assertOk()
+        ->assertJson([
+            'success' => true,
+            'is_completed' => true,
+            'audit_entry' => [
+                'notes' => "Ticked checkbox: completed sub task 'Governor overspeed trip switch test' under 'Pre-commissioning Inspection'",
+                'user_name' => 'QC Engineer Santos',
+            ],
+        ]);
+
+    $tickHistory = $project->fresh()->statusHistory->first();
+    expect($tickHistory->notes)
+        ->toBe("Ticked checkbox: completed sub task 'Governor overspeed trip switch test' under 'Pre-commissioning Inspection'")
+        ->and($tickHistory->changedBy->name)->toBe('QC Engineer Santos');
+
+    // 2. Untick the checkbox
+    $responseUntick = $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $task, $subtask]))
+        ->assertOk()
+        ->assertJson([
+            'success' => true,
+            'is_completed' => false,
+            'audit_entry' => [
+                'notes' => "Unticked checkbox: marked sub task 'Governor overspeed trip switch test' as incomplete under 'Pre-commissioning Inspection'",
+                'user_name' => 'QC Engineer Santos',
+            ],
+        ]);
+
+    $untickHistory = $project->fresh()->statusHistory->first();
+    expect($untickHistory->notes)
+        ->toBe("Unticked checkbox: marked sub task 'Governor overspeed trip switch test' as incomplete under 'Pre-commissioning Inspection'")
+        ->and($untickHistory->changedBy->name)->toBe('QC Engineer Santos');
+});
+
+test('project show page renders major task creation, minor task creation, and checkbox audit trail rows', function () {
+    $manager = User::factory()->create(['name' => 'Site Lead Ramos']);
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create([
+        'name' => 'Ortigas Financial Center Lift',
+        'status' => 'ongoing',
+    ]);
+
+    // Create major task with subtask
+    $this->actingAs($manager)
+        ->post(route('projects.tasks.store', $project), [
+            'task_name' => 'Week 3 - Counterweight Installation',
+            'start_date' => now()->addDays(1)->format('Y-m-d'),
+            'end_date' => now()->addDays(7)->format('Y-m-d'),
+            'subtasks' => ['Stack filler weights and verify clearances'],
+        ]);
+
+    $task = $project->tasks()->where('task_name', 'Week 3 - Counterweight Installation')->first();
+    $subtask = $task->subtasks()->first();
+
+    // Tick subtask checkbox
+    $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $task, $subtask]));
+
+    // Render project show page
+    $response = $this->actingAs($manager)->get(route('projects.show', $project));
+    $response->assertOk()
+        ->assertSeeText('Audit Trail & Status History')
+        ->assertSeeText("Created major task: 'Week 3 - Counterweight Installation'")
+        ->assertSeeText("Created minor task: 'Stack filler weights and verify clearances'")
+        ->assertSeeText("Ticked checkbox: completed sub task 'Stack filler weights and verify clearances'")
+        ->assertSeeText('Site Lead Ramos');
 });

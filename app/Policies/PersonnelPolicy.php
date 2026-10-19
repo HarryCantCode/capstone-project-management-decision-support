@@ -44,4 +44,20 @@ class PersonnelPolicy
     {
         return $user->hasAnyRole(['Admin', 'Manager']);
     }
+
+    /**
+     * Determine whether the user can archive (soft delete) personnel.
+     */
+    public function delete(User $user, Personnel $personnel): bool
+    {
+        return $user->hasAnyRole(['Admin', 'Manager']);
+    }
+
+    /**
+     * Determine whether the user can restore archived personnel.
+     */
+    public function restore(User $user, Personnel $personnel): bool
+    {
+        return $user->hasAnyRole(['Admin', 'Manager']);
+    }
 }

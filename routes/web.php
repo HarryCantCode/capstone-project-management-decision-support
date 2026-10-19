@@ -47,6 +47,9 @@ Route::middleware(['auth', 'two-factor'])->group(function () {
     // Dashboard — accessible to Admin and Manager (hard 403 for Inventory Staff)
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
+    // Global real-time search across Projects, Manpower, and Resources
+    Route::get('/global-search', [\App\Http\Controllers\GlobalSearchController::class, 'search'])->name('global-search');
+
     // ─── Account settings & User management ─────────────────────────────────
     Route::prefix('account')->name('account.')->group(function () {
         Route::get('/settings', function () {

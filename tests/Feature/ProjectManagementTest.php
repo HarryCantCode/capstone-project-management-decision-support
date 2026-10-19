@@ -72,6 +72,7 @@ test('manager can update project details and audit trail records changes', funct
             'start_date' => now()->format('Y-m-d'),
             'target_completion_date' => now()->addMonths(3)->format('Y-m-d'),
             'contract_price' => 750000.00,
+            'update_notes' => 'Routine scope update and modernization details',
             'status' => 'completed',
         ])
         ->assertRedirect(route('projects.show', $project));
@@ -87,6 +88,81 @@ test('manager can update project details and audit trail records changes', funct
     $latestHistory = $project->fresh()->statusHistory->first();
     expect($latestHistory->notes)->toContain('Project name changed')
         ->and($latestHistory->notes)->toContain('Contract price updated');
+});
+
+test('editing project renders reason for update notes field and stores justification in audit trail', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+    $project = Project::factory()->create(['name' => 'Original Name']);
+
+    $this->actingAs($manager)
+        ->get(route('projects.edit', $project))
+        ->assertOk()
+        ->assertSee('Reason for Update & Audit Notes')
+        ->assertSee('update_notes');
+
+    $this->actingAs($manager)
+        ->put(route('projects.update', $project), [
+            'name' => 'Renamed Elevator Project',
+            'client_name' => $project->client_name,
+            'address' => $project->address,
+            'barangay' => $project->barangay,
+            'city' => $project->city,
+            'project_type' => $project->project_type,
+            'payment_status' => $project->payment_status,
+            'start_date' => $project->start_date ? $project->start_date->format('Y-m-d') : now()->format('Y-m-d'),
+            'target_completion_date' => now()->addMonths(2)->format('Y-m-d'),
+            'contract_price' => $project->contract_price,
+            'update_notes' => 'Client requested project name change due to building rebranding',
+        ])
+        ->assertRedirect(route('projects.show', $project));
+
+    $latestHistory = $project->fresh()->statusHistory->first();
+    expect($latestHistory->notes)->toContain('Client requested project name change due to building rebranding')
+        ->and($latestHistory->notes)->toContain('Project name changed');
+});
+
+test('updating project requires reason for update and audit notes', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+    $project = Project::factory()->create(['name' => 'Existing Tower Project']);
+
+    // Attempt update without update_notes
+    $this->actingAs($manager)
+        ->from(route('projects.edit', $project))
+        ->put(route('projects.update', $project), [
+            'name' => 'Changed Project Name',
+            'client_name' => $project->client_name,
+            'address' => $project->address,
+            'barangay' => $project->barangay,
+            'city' => $project->city,
+            'project_type' => $project->project_type,
+            'payment_status' => $project->payment_status,
+            'start_date' => $project->start_date ? $project->start_date->format('Y-m-d') : now()->format('Y-m-d'),
+            'target_completion_date' => now()->addMonths(2)->format('Y-m-d'),
+            'contract_price' => $project->contract_price,
+        ])
+        ->assertRedirect(route('projects.edit', $project))
+        ->assertSessionHasErrors(['update_notes' => 'Reason for update / audit note is required.']);
+
+    // Attempt update with empty whitespace update_notes
+    $this->actingAs($manager)
+        ->from(route('projects.edit', $project))
+        ->put(route('projects.update', $project), [
+            'name' => 'Changed Project Name',
+            'client_name' => $project->client_name,
+            'address' => $project->address,
+            'barangay' => $project->barangay,
+            'city' => $project->city,
+            'project_type' => $project->project_type,
+            'payment_status' => $project->payment_status,
+            'start_date' => $project->start_date ? $project->start_date->format('Y-m-d') : now()->format('Y-m-d'),
+            'target_completion_date' => now()->addMonths(2)->format('Y-m-d'),
+            'contract_price' => $project->contract_price,
+            'update_notes' => '   ',
+        ])
+        ->assertRedirect(route('projects.edit', $project))
+        ->assertSessionHasErrors(['update_notes' => 'Reason for update / audit note is required.']);
 });
 
 test('creating a project rejects past start dates', function () {
@@ -630,6 +706,7 @@ test('updating project info and managing manpower creates detailed audit trail r
         'description' => 'Updated high-rise project scope',
         'start_date' => '2026-09-01',
         'target_completion_date' => '2027-03-31',
+        'update_notes' => 'Scope adjustment for Skyrise Tower',
     ])->assertRedirect(route('projects.show', $project));
 
     $histories = $project->fresh()->statusHistory;

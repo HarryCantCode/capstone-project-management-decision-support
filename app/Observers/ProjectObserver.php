@@ -97,12 +97,20 @@ class ProjectObserver
             $changes[] = "Warranty period updated to '{$project->warranty_period}'";
         }
 
-        if (!empty($changes)) {
+        $userNotes = request()->input('update_notes') ?? request()->input('notes');
+        if (!empty($changes) || !empty($userNotes)) {
+            $historyNotes = implode(' · ', $changes);
+            if (!empty($userNotes)) {
+                $historyNotes = !empty($historyNotes)
+                    ? "Reason: {$userNotes} · ({$historyNotes})"
+                    : "Update Reason: {$userNotes}";
+            }
+
             ProjectStatusHistory::create([
                 'project_id'  => $project->id,
                 'from_status' => $fromStatus,
                 'to_status'   => $toStatus,
-                'notes'       => implode(' · ', $changes),
+                'notes'       => $historyNotes,
                 'changed_by'  => Auth::id() ?? $project->updated_by,
                 'changed_at'  => now(),
             ]);
@@ -124,6 +132,10 @@ class ProjectObserver
             'changed_by' => Auth::id() ?? $project->created_by,
             'changed_at' => now(),
         ]);
+
+        if ($project->tasks()->count() === 0) {
+            app(\App\Services\ProjectService::class)->createDefaultPermitTask($project, $project->created_by);
+        }
     }
 
     /**

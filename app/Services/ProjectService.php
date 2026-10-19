@@ -92,6 +92,11 @@ class ProjectService
      */
     public function createDefaultPermitTask(Project $project, ?int $userId = null): ProjectTask
     {
+        $existing = $project->tasks()->where('task_name', 'Pre-construction & Regulatory Compliance')->first();
+        if ($existing) {
+            return $existing;
+        }
+
         $startDate = $project->start_date ? Carbon::parse($project->start_date) : now();
         $endDate = $startDate->copy()->addDays(6);
 

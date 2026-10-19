@@ -28,194 +28,7 @@
 @endphp
 
 @section('content')
-<div x-data="{
-    timelineMode: 'minimized',
-    addCostModalOpen: false,
-    assignModalOpen: false,
-    createMajorTaskModalOpen: false,
-    editMajorTaskModalOpen: false,
-    editSubtaskModalOpen: false,
-    activeTaskId: {{ $project->tasks->first()?->id ?? 'null' }},
-    initialSubtasks: [{ title: '', due_date: '{{ $defaultStartDate->format('Y-m-d') }}' }],
-    editingTask: {
-        id: null,
-        task_name: '',
-        start_date: '',
-        end_date: '',
-        description: '',
-        updateUrl: ''
-    },
-    newTask: {
-        start_date: '{{ $defaultStartDate->format('Y-m-d') }}',
-        end_date: '{{ $defaultEndDate->format('Y-m-d') }}'
-    },
-    editingSubtask: {
-        id: null,
-        task_id: null,
-        title: '',
-        due_date: '',
-        min_date: '',
-        max_date: '',
-        updateUrl: ''
-    },
-    openEditTaskModal(task) {
-        this.editingTask = {
-            id: task.id,
-            task_name: task.task_name,
-            start_date: (task.start_date || '').substring(0, 10),
-            end_date: (task.end_date || '').substring(0, 10),
-            description: task.description || '',
-            updateUrl: '/projects/{{ $project->id }}/tasks/' + task.id
-        };
-        this.editMajorTaskModalOpen = true;
-    },
-    openEditSubtaskModal(taskId, subtaskId, currentTitle, currentDate = '', minDate = '', maxDate = '') {
-        this.editingSubtask = {
-            id: subtaskId,
-            task_id: taskId,
-            title: currentTitle,
-            due_date: currentDate || '',
-            min_date: minDate || '',
-            max_date: maxDate || '',
-            updateUrl: '/projects/{{ $project->id }}/tasks/' + taskId + '/subtasks/' + subtaskId
-        };
-        this.editSubtaskModalOpen = true;
-    },
-    addSubtaskField() {
-        this.initialSubtasks.push({ title: '', due_date: this.newTask.start_date || '' });
-    },
-    removeSubtaskField(index) {
-        if (this.initialSubtasks.length > 1) {
-            this.initialSubtasks.splice(index, 1);
-        } else {
-            this.initialSubtasks[0] = { title: '', due_date: this.newTask.start_date || '' };
-        }
-    },
-    toggleTimeline() {
-        this.timelineMode = (this.timelineMode === 'minimized') ? 'expanded' : 'minimized';
-    },
-    scrollCarousel(direction) {
-        const track = document.getElementById('timeline-carousel-track');
-        if (track) {
-            const scrollAmount = track.clientWidth * 0.75;
-            track.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
-        }
-    },
-    toggleSubtask(projectId, taskId, subtaskId, checkboxEl) {
-        const url = `/projects/${projectId}/tasks/${taskId}/subtasks/${subtaskId}/toggle`;
-        fetch(url, {
-            method: 'PATCH',
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({})
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                // Keep all checkboxes for this subtask in sync (card checklist & expanded view)
-                const checkboxes = document.querySelectorAll(`.subtask-check-${subtaskId}`);
-                checkboxes.forEach(cb => { cb.checked = data.is_completed; });
-
-                const titleEls = document.querySelectorAll(`.subtask-title-${subtaskId}`);
-                titleEls.forEach(el => {
-                    if (data.is_completed) {
-                        el.style.textDecoration = 'line-through';
-                        el.style.color = 'var(--color-muted)';
-                    } else {
-                        el.style.textDecoration = 'none';
-                        el.style.color = 'var(--color-ink)';
-                    }
-                });
-
-                const color = data.progress === 100 
-                    ? 'var(--color-success)' 
-                    : (data.progress > 0 ? 'var(--color-accent)' : 'var(--color-border)');
-
-                // 1. Update Carousel Card Progress Bar, Percentage & Count
-                const cardProgressText = document.getElementById(`card-progress-text-${taskId}`);
-                const cardProgressBar = document.getElementById(`card-progress-bar-${taskId}`);
-                const cardTaskCount = document.getElementById(`card-task-count-${taskId}`);
-                if (cardProgressText) cardProgressText.textContent = `${data.progress}%`;
-                if (cardProgressBar) {
-                    cardProgressBar.style.width = `${data.progress}%`;
-                    cardProgressBar.style.background = color;
-                }
-                if (cardTaskCount) {
-                    cardTaskCount.textContent = `${data.completed_count}/${data.total_count} tasks`;
-                }
-
-                // 2. Update Status Pills (Card & Detail)
-                const statusLabel = data.status === 'completed' ? 'Completed' : (data.status === 'in_progress' ? 'In Progress' : 'Scheduled');
-                const statusClass = data.status === 'completed' ? 'completed' : (data.status === 'in_progress' ? 'ongoing' : 'pending');
-
-                const cardPill = document.getElementById(`card-status-pill-${taskId}`);
-                if (cardPill) {
-                    cardPill.textContent = statusLabel;
-                    cardPill.className = `status-pill status-pill--${statusClass}`;
-                }
-
-                const detailPill = document.getElementById(`detail-status-pill-${taskId}`);
-                if (detailPill) {
-                    detailPill.textContent = statusLabel;
-                    detailPill.className = `status-pill status-pill--${statusClass}`;
-                }
-
-                // 3. Update Expanded View Progress Bar, Text, Count, Status Pill & Dot
-                const expProgressBar = document.getElementById(`expanded-progress-bar-${taskId}`);
-                const expProgressText = document.getElementById(`expanded-progress-text-${taskId}`);
-                const expProgressCount = document.getElementById(`expanded-progress-count-${taskId}`);
-                const expStatusPill = document.getElementById(`expanded-status-pill-${taskId}`);
-                const expDot = document.getElementById(`expanded-week-dot-${taskId}`);
-
-                if (expProgressBar) {
-                    expProgressBar.style.width = `${data.progress}%`;
-                    expProgressBar.style.background = color;
-                }
-                if (expProgressText) expProgressText.textContent = `${data.progress}%`;
-                if (expProgressCount) expProgressCount.textContent = `Progress (${data.completed_count}/${data.total_count} tasks)`;
-                if (expStatusPill) {
-                    expStatusPill.textContent = statusLabel;
-                    expStatusPill.className = `status-pill status-pill--${statusClass}`;
-                }
-                if (expDot) {
-                    if (data.status === 'completed') {
-                        expDot.className = 'timeline-week-dot timeline-week-dot--passed';
-                        expDot.textContent = '✓';
-                    } else if (data.status === 'in_progress') {
-                        expDot.className = 'timeline-week-dot timeline-week-dot--current';
-                        expDot.textContent = expDot.getAttribute('data-week-num') || '';
-                    } else {
-                        expDot.className = 'timeline-week-dot';
-                        expDot.textContent = expDot.getAttribute('data-week-num') || '';
-                    }
-                }
-
-                // 4. Update Overall Project Progress in Timeline Card Header
-                const overallContainer = document.getElementById('project-overall-progress-container');
-                const overallProgressText = document.getElementById('project-overall-progress-text');
-                const overallCountText = document.getElementById('project-overall-count-text');
-                if (overallContainer) overallContainer.style.display = '';
-                if (overallProgressText && data.overall_progress !== undefined) {
-                    overallProgressText.textContent = `${data.overall_progress}%`;
-                    overallProgressText.style.color = data.overall_progress === 100 ? 'var(--color-success)' : 'var(--color-accent)';
-                }
-                if (overallCountText && data.completed_subtasks_across_project !== undefined) {
-                    overallCountText.textContent = `(${data.completed_subtasks_across_project}/${data.total_subtasks_across_project} tasks)`;
-                }
-            }
-        })
-        .catch(err => {
-            console.error('Error toggling subtask:', err);
-            if (checkboxEl) {
-                checkboxEl.checked = !checkboxEl.checked;
-            }
-        });
-    }
-}">
+<div x-data="projectDetail()">
 
     {{-- Page Header --}}
     <div class="page-header">
@@ -252,7 +65,7 @@
         <section class="card card-glass" aria-labelledby="project-overview-heading">
             <div class="card-header">
                 <h2 id="project-overview-heading">Overview</h2>
-                <x-status-pill :status="$project->status" />
+                <x-status-pill :status="$project->status" id="project-overview-status-pill" />
             </div>
             <div class="card-body detail-list">
                 <div><dt>Client</dt><dd>{{ $project->client_name }}</dd></div>
@@ -1022,53 +835,12 @@
         @endif
     </section>
 
-    {{-- ─── Status Transition & Status History ────────────────────────────────── --}}
+    {{-- ─── Status & Activity Audit Trail History ──────────────────────────── --}}
     <div class="project-detail-grid">
-        
-        {{-- Status Transition --}}
-        @can('transition', $project)
-            <section class="card card-glass" aria-labelledby="status-update-heading">
-                <div class="card-header">
-                    <h2 id="status-update-heading">Update Project Status</h2>
-                    <x-status-pill :status="$project->status" />
-                </div>
-                <form method="POST" action="{{ route('projects.transition', $project) }}" class="card-body">
-                    @csrf
-                    @method('PATCH')
-                    <div class="form-group form-group-premium">
-                        <label for="status" class="form-label">New Status</label>
-                        <select id="status" name="status" class="form-control @error('status') is-invalid @enderror" required>
-                            <option value="">-- Select Status --</option>
-                            @if ($project->status !== 'ongoing')
-                                <option value="ongoing">Ongoing</option>
-                            @endif
-                            @if ($project->status !== 'delayed')
-                                <option value="delayed">Delayed</option>
-                            @endif
-                            @if ($project->status !== 'completed')
-                                <option value="completed">Completed</option>
-                            @endif
-                            @if ($project->status !== 'pending')
-                                <option value="pending">Pending</option>
-                            @endif
-                        </select>
-                        @error('status')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
-                    </div>
-                    <div class="form-group form-group-premium">
-                        <label for="notes" class="form-label">Status Update Reason / Notes <span class="text-muted">(optional)</span></label>
-                        <textarea id="notes" name="notes" class="form-control @error('notes') is-invalid @enderror" rows="3" maxlength="500" placeholder="e.g. Work started on site, delayed due to weather/permits, or project completed.">{{ old('notes') }}</textarea>
-                        @error('notes')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
-                    </div>
-                    <button type="submit" class="btn btn-primary">Update Status</button>
-                </form>
-            </section>
-        @endcan
-
-        {{-- Status & Activity History Trailing --}}
-        <section class="card card-glass" aria-labelledby="status-history-heading" style="{{ !auth()->user()->can('transition', $project) ? 'grid-column: 1 / -1;' : '' }}">
+        <section class="card card-glass" aria-labelledby="status-history-heading" style="grid-column: 1 / -1;">
             <div class="card-header">
-                <h2 id="status-history-heading">Audit Trail & Status History</h2>
-                <span class="text-muted" style="font-size: 0.8125rem;">{{ $project->statusHistory->count() }} {{ Str::plural('event', $project->statusHistory->count()) }}</span>
+                <h2 id="status-history-heading">Audit Trail &amp; Status History</h2>
+                <span id="audit-trail-count" class="text-muted" style="font-size: 0.8125rem;">{{ $project->statusHistory->count() }} {{ Str::plural('event', $project->statusHistory->count()) }}</span>
             </div>
             <div class="table-wrapper" style="max-height: 290px; overflow-y: auto; position: relative;">
                 <table class="data-table">
@@ -1081,7 +853,7 @@
                             <th scope="col" style="background: var(--color-surface);">Activity & Changes</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="audit-trail-tbody">
                         @forelse ($project->statusHistory as $history)
                             <tr>
                                 <td class="font-mono" style="font-size: 0.8125rem; white-space: nowrap;">
@@ -1098,7 +870,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr>
+                            <tr id="audit-trail-empty-row">
                                 <td colspan="4" class="text-center text-muted" style="padding: var(--space-4);">No history records logged yet.</td>
                             </tr>
                         @endforelse
@@ -1659,4 +1431,258 @@
 
 .mb-6 { margin-bottom: 1.5rem; }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('projectDetail', projectDetail);
+});
+
+function projectDetail() {
+    return {
+        timelineMode: 'minimized',
+        addCostModalOpen: false,
+        assignModalOpen: false,
+        createMajorTaskModalOpen: false,
+        editMajorTaskModalOpen: false,
+        editSubtaskModalOpen: false,
+        activeTaskId: {{ $project->tasks->first()?->id ?? 'null' }},
+        initialSubtasks: [{ title: '', due_date: '{{ $defaultStartDate->format('Y-m-d') }}' }],
+        editingTask: {
+            id: null,
+            task_name: '',
+            start_date: '',
+            end_date: '',
+            description: '',
+            updateUrl: ''
+        },
+        newTask: {
+            start_date: '{{ $defaultStartDate->format('Y-m-d') }}',
+            end_date: '{{ $defaultEndDate->format('Y-m-d') }}'
+        },
+        editingSubtask: {
+            id: null,
+            task_id: null,
+            title: '',
+            due_date: '',
+            min_date: '',
+            max_date: '',
+            updateUrl: ''
+        },
+        openEditTaskModal(task) {
+            this.editingTask = {
+                id: task.id,
+                task_name: task.task_name,
+                start_date: (task.start_date || '').substring(0, 10),
+                end_date: (task.end_date || '').substring(0, 10),
+                description: task.description || '',
+                updateUrl: '/projects/{{ $project->id }}/tasks/' + task.id
+            };
+            this.editMajorTaskModalOpen = true;
+        },
+        openEditSubtaskModal(taskId, subtaskId, currentTitle, currentDate = '', minDate = '', maxDate = '') {
+            this.editingSubtask = {
+                id: subtaskId,
+                task_id: taskId,
+                title: currentTitle,
+                due_date: currentDate || '',
+                min_date: minDate || '',
+                max_date: maxDate || '',
+                updateUrl: '/projects/{{ $project->id }}/tasks/' + taskId + '/subtasks/' + subtaskId
+            };
+            this.editSubtaskModalOpen = true;
+        },
+        addSubtaskField() {
+            this.initialSubtasks.push({ title: '', due_date: this.newTask.start_date || '' });
+        },
+        removeSubtaskField(index) {
+            if (this.initialSubtasks.length > 1) {
+                this.initialSubtasks.splice(index, 1);
+            } else {
+                this.initialSubtasks[0] = { title: '', due_date: this.newTask.start_date || '' };
+            }
+        },
+        toggleTimeline() {
+            this.timelineMode = (this.timelineMode === 'minimized') ? 'expanded' : 'minimized';
+        },
+        scrollCarousel(direction) {
+            const track = document.getElementById('timeline-carousel-track');
+            if (track) {
+                const scrollAmount = track.clientWidth * 0.75;
+                track.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+            }
+        },
+        toggleSubtask(projectId, taskId, subtaskId, checkboxEl) {
+            const url = `/projects/${projectId}/tasks/${taskId}/subtasks/${subtaskId}/toggle`;
+            fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Keep all checkboxes for this subtask in sync (card checklist & expanded view)
+                    const checkboxes = document.querySelectorAll(`.subtask-check-${subtaskId}`);
+                    checkboxes.forEach(cb => { cb.checked = data.is_completed; });
+
+                    const titleEls = document.querySelectorAll(`.subtask-title-${subtaskId}`);
+                    titleEls.forEach(el => {
+                        if (data.is_completed) {
+                            el.style.textDecoration = 'line-through';
+                            el.style.color = 'var(--color-muted)';
+                        } else {
+                            el.style.textDecoration = 'none';
+                            el.style.color = 'var(--color-ink)';
+                        }
+                    });
+
+                    const color = data.progress === 100 
+                        ? 'var(--color-success)' 
+                        : (data.progress > 0 ? 'var(--color-accent)' : 'var(--color-border)');
+
+                    // 1. Update Carousel Card Progress Bar, Percentage & Count
+                    const cardProgressText = document.getElementById(`card-progress-text-${taskId}`);
+                    const cardProgressBar = document.getElementById(`card-progress-bar-${taskId}`);
+                    const cardTaskCount = document.getElementById(`card-task-count-${taskId}`);
+                    if (cardProgressText) cardProgressText.textContent = `${data.progress}%`;
+                    if (cardProgressBar) {
+                        cardProgressBar.style.width = `${data.progress}%`;
+                        cardProgressBar.style.background = color;
+                    }
+                    if (cardTaskCount) {
+                        cardTaskCount.textContent = `${data.completed_count}/${data.total_count} tasks`;
+                    }
+
+                    // 2. Update Status Pills (Card & Detail)
+                    const statusLabel = data.status === 'completed' ? 'Completed' : (data.status === 'in_progress' ? 'In Progress' : 'Scheduled');
+                    const statusClass = data.status === 'completed' ? 'completed' : (data.status === 'in_progress' ? 'ongoing' : 'pending');
+
+                    const cardPill = document.getElementById(`card-status-pill-${taskId}`);
+                    if (cardPill) {
+                        cardPill.textContent = statusLabel;
+                        cardPill.className = `status-pill status-pill--${statusClass}`;
+                    }
+
+                    const detailPill = document.getElementById(`detail-status-pill-${taskId}`);
+                    if (detailPill) {
+                        detailPill.textContent = statusLabel;
+                        detailPill.className = `status-pill status-pill--${statusClass}`;
+                    }
+
+                    // 3. Update Expanded View Progress Bar, Text, Count, Status Pill & Dot
+                    const expProgressBar = document.getElementById(`expanded-progress-bar-${taskId}`);
+                    const expProgressText = document.getElementById(`expanded-progress-text-${taskId}`);
+                    const expProgressCount = document.getElementById(`expanded-progress-count-${taskId}`);
+                    const expStatusPill = document.getElementById(`expanded-status-pill-${taskId}`);
+                    const expDot = document.getElementById(`expanded-week-dot-${taskId}`);
+
+                    if (expProgressBar) {
+                        expProgressBar.style.width = `${data.progress}%`;
+                        expProgressBar.style.background = color;
+                    }
+                    if (expProgressText) expProgressText.textContent = `${data.progress}%`;
+                    if (expProgressCount) expProgressCount.textContent = `Progress (${data.completed_count}/${data.total_count} tasks)`;
+                    if (expStatusPill) {
+                        expStatusPill.textContent = statusLabel;
+                        expStatusPill.className = `status-pill status-pill--${statusClass}`;
+                    }
+                    if (expDot) {
+                        if (data.status === 'completed') {
+                            expDot.className = 'timeline-week-dot timeline-week-dot--passed';
+                            expDot.textContent = '✓';
+                        } else if (data.status === 'in_progress') {
+                            expDot.className = 'timeline-week-dot timeline-week-dot--current';
+                            expDot.textContent = expDot.getAttribute('data-week-num') || '';
+                        } else {
+                            expDot.className = 'timeline-week-dot';
+                            expDot.textContent = expDot.getAttribute('data-week-num') || '';
+                        }
+                    }
+
+                    // 4. Update Overall Project Progress in Timeline Card Header
+                    const overallContainer = document.getElementById('project-overall-progress-container');
+                    const overallProgressText = document.getElementById('project-overall-progress-text');
+                    const overallCountText = document.getElementById('project-overall-count-text');
+                    if (overallContainer) overallContainer.style.display = '';
+                    if (overallProgressText && data.overall_progress !== undefined) {
+                        overallProgressText.textContent = `${data.overall_progress}%`;
+                        overallProgressText.style.color = data.overall_progress === 100 ? 'var(--color-success)' : 'var(--color-accent)';
+                    }
+                    if (overallCountText && data.completed_subtasks_across_project !== undefined) {
+                        overallCountText.textContent = `(${data.completed_subtasks_across_project}/${data.total_subtasks_across_project} tasks)`;
+                    }
+
+                    // 5. Refresh project status badge in overview header if updated
+                    if (data.project_status) {
+                        const projectPill = document.getElementById('project-overview-status-pill');
+                        if (projectPill) {
+                            projectPill.textContent = data.project_status_label;
+                            const pillClass = (data.project_status === 'ongoing' || data.project_status === 'in_progress') ? 'ongoing' : data.project_status;
+                            projectPill.className = `status-pill status-pill--${pillClass}`;
+                        }
+                    }
+
+                    // 6. Dynamically update Audit Trail & Status History table
+                    const tbody = document.getElementById('audit-trail-tbody');
+                    if (tbody) {
+                        const appendAuditRow = (entry) => {
+                            const emptyRow = document.getElementById('audit-trail-empty-row');
+                            if (emptyRow) {
+                                emptyRow.remove();
+                            }
+                            const tr = document.createElement('tr');
+                            const pillClass = (entry.status === 'ongoing' || entry.status === 'in_progress') ? 'ongoing' : entry.status;
+                            tr.innerHTML = `
+                                <td class="font-mono" style="font-size: 0.8125rem; white-space: nowrap;">
+                                    ${entry.date_time}
+                                </td>
+                                <td>
+                                    <span class="status-pill status-pill--${pillClass}">
+                                        <span class="status-dot"></span>
+                                        ${entry.status_label}
+                                    </span>
+                                </td>
+                                <td>
+                                    <strong>${entry.user_name}</strong>
+                                </td>
+                                <td>
+                                    ${entry.notes}
+                                </td>
+                            `;
+                            tbody.prepend(tr);
+                        };
+
+                        if (data.transition_audit_entry) {
+                            appendAuditRow(data.transition_audit_entry);
+                        }
+                        if (data.audit_entry) {
+                            appendAuditRow(data.audit_entry);
+                        }
+
+                        const countEl = document.getElementById('audit-trail-count');
+                        if (countEl) {
+                            const currentRows = tbody.querySelectorAll('tr').length;
+                            countEl.textContent = `${currentRows} ${currentRows === 1 ? 'event' : 'events'}`;
+                        }
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Error toggling subtask:', err);
+                if (checkboxEl) {
+                    checkboxEl.checked = !checkboxEl.checked;
+                }
+            });
+        }
+    };
+}
+window.projectDetail = projectDetail;
+</script>
 @endpush

@@ -192,6 +192,40 @@
         </div>
     </div>
 
+    @if ($isEditing)
+        {{-- Card 4: Reason for Update / Audit Notes --}}
+        <div class="card card-glass">
+            <div class="card-header" style="font-weight: 700; font-size: 0.9375rem; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <svg style="width: 18px; height: 18px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Reason for Update &amp; Audit Notes
+                </div>
+                <span class="text-muted" style="font-size: 0.75rem;">Recorded in audit trail</span>
+            </div>
+            <div class="card-body">
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="update_notes" class="form-label">
+                        Reason / Notes for Updating Project Information <span class="text-danger">*</span>
+                    </label>
+                    <textarea
+                        id="update_notes"
+                        name="update_notes"
+                        rows="3"
+                        class="form-control @error('update_notes') is-invalid @enderror"
+                        maxlength="1000"
+                        required
+                        placeholder="Please state the reason or notes for updating this project's information (e.g., Client requested change in target completion date, updated site address, revised contract price)..."
+                    >{{ old('update_notes') }}</textarea>
+                    <p class="form-hint">A reason or audit note is required and will be logged into the audit trail history for traceability.</p>
+                    @error('update_notes')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+            </div>
+        </div>
+    @endif
+
 </div>
 
 {{-- ─── RIGHT COLUMN: Financials, Live Intelligence & Action Panel ──────── --}}

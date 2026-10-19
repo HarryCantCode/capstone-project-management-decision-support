@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Services\ProjectService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -76,6 +77,10 @@ class ProjectController extends Controller
     public function show(Project $project): View
     {
         $this->authorize('view', $project);
+
+        if ($project->tasks()->count() === 0) {
+            $this->projectService->createDefaultPermitTask($project, Auth::id() ?? $project->created_by);
+        }
 
         $project->load([
             'creator',

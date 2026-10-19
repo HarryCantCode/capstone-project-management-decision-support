@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdatePersonnelRequest;
 use App\Models\Personnel;
 use App\Models\Project;
+use App\Services\PersonnelService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -18,6 +21,14 @@ use Illuminate\View\View;
  */
 class SchedulingController extends Controller implements HasMiddleware
 {
+    /**
+     * Create a new controller instance.
+     */
+    public function __construct(
+        protected PersonnelService $personnelService,
+    ) {
+    }
+
     /**
      * Get the middleware that should be assigned to the controller.
      */
@@ -67,7 +78,9 @@ class SchedulingController extends Controller implements HasMiddleware
             ->orderBy('name')
             ->get();
 
-        return view('scheduling.index', compact('personnel', 'activeProjects', 'search', 'expertise', 'status'));
+        $expertiseOptions = ['Site Engineer', 'Foreman', 'Safety Officer', 'Worker'];
+
+        return view('scheduling.index', compact('personnel', 'activeProjects', 'search', 'expertise', 'status', 'expertiseOptions'));
     }
 
     /**
@@ -308,5 +321,113 @@ class SchedulingController extends Controller implements HasMiddleware
         return redirect()
             ->route('scheduling.index')
             ->with('status', $message);
+    }
+
+    /**
+     * Display the comprehensive personnel roster (active and inactive).
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\View\View
+     */
+    public function roster(Request $request): View
+    {
+        $this->authorize('viewAny', Personnel::class);
+
+        $filters = [
+            'tab'        => $request->query('tab', 'all'),
+            'search'     => $request->query('search'),
+            'expertise'  => $request->query('expertise'),
+            'project_id' => $request->query('project_id'),
+        ];
+
+        $personnel = $this->personnelService->getRosterQuery($filters)
+            ->paginate(15)
+            ->withQueryString();
+
+        $stats = $this->personnelService->getRosterStatistics();
+
+        $activeProjects = Project::query()
+            ->where('status', '!=', 'completed')
+            ->orderBy('name')
+            ->get();
+
+        $expertiseOptions = ['Site Engineer', 'Foreman', 'Safety Officer', 'Worker'];
+
+        return view('scheduling.roster', compact('personnel', 'stats', 'activeProjects', 'expertiseOptions', 'filters'));
+    }
+
+    /**
+     * Show the form for configuring/editing a personnel record.
+     *
+     * @param \App\Models\Personnel $personnel
+     * @return \Illuminate\View\View
+     */
+    public function edit(Personnel $personnel): View
+    {
+        $this->authorize('update', $personnel);
+
+        $activeProjects = Project::query()
+            ->where('status', '!=', 'completed')
+            ->orderBy('name')
+            ->get();
+
+        $expertiseOptions = ['Site Engineer', 'Foreman', 'Safety Officer', 'Worker'];
+
+        return view('scheduling.edit', compact('personnel', 'activeProjects', 'expertiseOptions'));
+    }
+
+    /**
+     * Update an existing personnel profile and handle optional archiving.
+     *
+     * @param \App\Http\Requests\UpdatePersonnelRequest $request
+     * @param \App\Models\Personnel $personnel
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function update(UpdatePersonnelRequest $request, Personnel $personnel): RedirectResponse
+    {
+        $this->authorize('update', $personnel);
+
+        $wasArchived = !empty($request->validated()['archive_profile']);
+        $updated = $this->personnelService->updatePersonnel($personnel, $request->validated(), auth()->id());
+
+        $message = $wasArchived
+            ? "Personnel {$updated->employee_id} ({$updated->full_name}) has been archived and moved to the inactive roster."
+            : "Personnel {$updated->employee_id} ({$updated->full_name}) information updated successfully.";
+
+        return back()->with('status', $message);
+    }
+
+    /**
+     * Archive the specified personnel profile (soft delete) and release assignments.
+     *
+     * @param \App\Models\Personnel $personnel
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function destroy(Personnel $personnel): RedirectResponse
+    {
+        $this->authorize('delete', $personnel);
+
+        $empId = $personnel->employee_id;
+        $name = $personnel->full_name;
+
+        $this->personnelService->archivePersonnel($personnel, auth()->id());
+
+        return back()->with('status', "Personnel {$empId} ({$name}) has been archived and moved to the inactive roster.");
+    }
+
+    /**
+     * Restore an archived personnel profile back to the active roster.
+     *
+     * @param int|string $id
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function restore($id): RedirectResponse
+    {
+        $personnel = Personnel::onlyTrashed()->findOrFail($id);
+        $this->authorize('restore', $personnel);
+
+        $this->personnelService->restorePersonnel($personnel, auth()->id());
+
+        return back()->with('status', "Personnel {$personnel->employee_id} ({$personnel->full_name}) has been activated and restored to the active roster.");
     }
 }

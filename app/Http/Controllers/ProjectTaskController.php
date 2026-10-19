@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\ProjectStatusHistory;
 use App\Models\ProjectSubtask;
 use App\Models\ProjectTask;
 use App\Services\ProjectService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,6 +61,32 @@ class ProjectTaskController extends Controller
                 'created_by' => Auth::id(),
             ]);
 
+            $startFormatted = Carbon::parse($task->start_date)->format('M j, Y');
+            $endFormatted = Carbon::parse($task->end_date)->format('M j, Y');
+            $majorTaskNote = "Created major task: '{$task->task_name}' ({$startFormatted} to {$endFormatted})";
+
+            ProjectStatusHistory::create([
+                'project_id'  => $project->id,
+                'from_status' => $project->status,
+                'to_status'   => $project->status,
+                'notes'       => $majorTaskNote,
+                'changed_by'  => Auth::id() ?? $project->created_by ?? 1,
+                'changed_at'  => now(),
+            ]);
+
+            if (function_exists('activity')) {
+                activity('project')
+                    ->performedOn($project)
+                    ->causedBy(Auth::user())
+                    ->withProperties([
+                        'task_id' => $task->id,
+                        'task_name' => $task->task_name,
+                        'start_date' => $task->start_date->toDateString(),
+                        'end_date' => $task->end_date->toDateString(),
+                    ])
+                    ->log($majorTaskNote);
+            }
+
             $subtasksInput = !empty($validated['subtasks']) ? $validated['subtasks'] : ($validated['baby_tasks'] ?? []);
             $datesInput = !empty($validated['subtask_dates']) ? $validated['subtask_dates'] : ($request->input('baby_task_dates', []));
 
@@ -68,12 +96,38 @@ class ProjectTaskController extends Controller
                     $trimmed = trim((string) $title);
                     if ($trimmed !== '') {
                         $dueDate = ! empty($datesInput[$idx]) ? $datesInput[$idx] : null;
-                        $task->subtasks()->create([
+                        $subtask = $task->subtasks()->create([
                             'title' => $trimmed,
                             'due_date' => $dueDate,
                             'is_completed' => false,
                             'sort_order' => $subtaskOrder++,
                         ]);
+
+                        $dueDateNote = $dueDate ? ' (Due: ' . Carbon::parse($dueDate)->format('M j, Y') . ')' : '';
+                        $minorTaskNote = "Created minor task: '{$subtask->title}'{$dueDateNote} under '{$task->task_name}'";
+
+                        ProjectStatusHistory::create([
+                            'project_id'  => $project->id,
+                            'from_status' => $project->status,
+                            'to_status'   => $project->status,
+                            'notes'       => $minorTaskNote,
+                            'changed_by'  => Auth::id() ?? $project->created_by ?? 1,
+                            'changed_at'  => now(),
+                        ]);
+
+                        if (function_exists('activity')) {
+                            activity('project')
+                                ->performedOn($project)
+                                ->causedBy(Auth::user())
+                                ->withProperties([
+                                    'task_id' => $task->id,
+                                    'task_name' => $task->task_name,
+                                    'subtask_id' => $subtask->id,
+                                    'subtask_title' => $subtask->title,
+                                    'due_date' => $dueDate,
+                                ])
+                                ->log($minorTaskNote);
+                        }
                     }
                 }
             }
@@ -185,6 +239,32 @@ class ProjectTaskController extends Controller
             'sort_order' => $nextOrder,
         ]);
 
+        $dueDateNote = $subtask->due_date ? ' (Due: ' . $subtask->due_date->format('M j, Y') . ')' : '';
+        $minorTaskNote = "Created minor task: '{$subtask->title}'{$dueDateNote} under '{$task->task_name}'";
+
+        $history = ProjectStatusHistory::create([
+            'project_id'  => $project->id,
+            'from_status' => $project->status,
+            'to_status'   => $project->status,
+            'notes'       => $minorTaskNote,
+            'changed_by'  => Auth::id() ?? $project->created_by ?? 1,
+            'changed_at'  => now(),
+        ]);
+
+        if (function_exists('activity')) {
+            activity('project')
+                ->performedOn($project)
+                ->causedBy(Auth::user())
+                ->withProperties([
+                    'task_id' => $task->id,
+                    'task_name' => $task->task_name,
+                    'subtask_id' => $subtask->id,
+                    'subtask_title' => $subtask->title,
+                    'due_date' => $subtask->due_date?->toDateString(),
+                ])
+                ->log($minorTaskNote);
+        }
+
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
@@ -192,6 +272,13 @@ class ProjectTaskController extends Controller
                 'subtask' => $subtask,
                 'progress' => $task->fresh('subtasks')->progress_percentage,
                 'status' => $task->fresh('subtasks')->computed_status,
+                'audit_entry' => [
+                    'date_time' => $history->changed_at->format('M j, Y · g:i A'),
+                    'status' => $project->status,
+                    'status_label' => in_array($project->status, ['ongoing', 'in_progress']) ? 'In Progress' : ucfirst($project->status),
+                    'user_name' => Auth::user()?->name ?? 'System',
+                    'notes' => $minorTaskNote,
+                ],
             ], 201);
         }
 
@@ -220,6 +307,61 @@ class ProjectTaskController extends Controller
             'status' => $task->computed_status,
         ]);
 
+        $statusTransitionedToOngoing = false;
+        $statusTransitionedToPending = false;
+        $firstMajorTask = $project->tasks()->orderBy('sort_order')->orderBy('id')->first();
+
+        // If ticking a subtask from the first major task, transition pending project to ongoing (in-progress)
+        if ($newCompleted && $firstMajorTask && $task->id === $firstMajorTask->id && $project->status === 'pending') {
+            $project->update([
+                'status' => 'ongoing',
+            ]);
+            $statusTransitionedToOngoing = true;
+
+            ProjectStatusHistory::create([
+                'project_id'  => $project->id,
+                'from_status' => 'pending',
+                'to_status'   => 'ongoing',
+                'notes'       => 'Status transitioned from Pending to Ongoing',
+                'changed_by'  => Auth::id() ?? $project->created_by ?? 1,
+                'changed_at'  => now(),
+            ]);
+
+            if (function_exists('activity')) {
+                activity('project')
+                    ->performedOn($project)
+                    ->causedBy(Auth::user())
+                    ->withProperties(['from_status' => 'pending', 'to_status' => 'ongoing'])
+                    ->log('Status transitioned from Pending to Ongoing');
+            }
+        } elseif (! $newCompleted && $firstMajorTask && $task->id === $firstMajorTask->id && in_array($project->status, ['ongoing', 'in_progress'])) {
+            // If unticking and no completed subtasks remain across the project, revert project to pending
+            $hasAnyCompleted = $project->tasks()->whereHas('subtasks', fn ($q) => $q->where('is_completed', true))->exists();
+            if (! $hasAnyCompleted) {
+                $project->update([
+                    'status' => 'pending',
+                ]);
+                $statusTransitionedToPending = true;
+
+                ProjectStatusHistory::create([
+                    'project_id'  => $project->id,
+                    'from_status' => 'ongoing',
+                    'to_status'   => 'pending',
+                    'notes'       => 'Status transitioned from Ongoing to Pending',
+                    'changed_by'  => Auth::id() ?? $project->created_by ?? 1,
+                    'changed_at'  => now(),
+                ]);
+
+                if (function_exists('activity')) {
+                    activity('project')
+                        ->performedOn($project)
+                        ->causedBy(Auth::user())
+                        ->withProperties(['from_status' => 'ongoing', 'to_status' => 'pending'])
+                        ->log('Status transitioned from Ongoing to Pending');
+                }
+            }
+        }
+
         $project->load('tasks.subtasks');
         $allTasks = $project->tasks;
         $totalSubtasksAcrossProject = $allTasks->sum(fn ($t) => $t->subtasks->count());
@@ -228,8 +370,38 @@ class ProjectTaskController extends Controller
             ? (int) round(($completedSubtasksAcrossProject / $totalSubtasksAcrossProject) * 100)
             : ($project->status === 'completed' ? 100 : 0);
 
+        $projectStatus = $project->fresh()->status;
+        $projectStatusLabel = in_array($projectStatus, ['ongoing', 'in_progress']) ? 'In Progress' : ucfirst($projectStatus);
+
+        $actionNote = $newCompleted
+            ? "Ticked checkbox: completed sub task '{$subtask->title}' under '{$task->task_name}'"
+            : "Unticked checkbox: marked sub task '{$subtask->title}' as incomplete under '{$task->task_name}'";
+
+        $history = ProjectStatusHistory::create([
+            'project_id'  => $project->id,
+            'from_status' => $projectStatus,
+            'to_status'   => $projectStatus,
+            'notes'       => $actionNote,
+            'changed_by'  => Auth::id() ?? $project->created_by ?? 1,
+            'changed_at'  => now(),
+        ]);
+
+        if (function_exists('activity')) {
+            activity('project')
+                ->performedOn($project)
+                ->causedBy(Auth::user())
+                ->withProperties([
+                    'task_id' => $task->id,
+                    'task_name' => $task->task_name,
+                    'subtask_id' => $subtask->id,
+                    'subtask_title' => $subtask->title,
+                    'is_completed' => $newCompleted,
+                ])
+                ->log($actionNote);
+        }
+
         if ($request->wantsJson() || $request->ajax()) {
-            return response()->json([
+            $responsePayload = [
                 'success' => true,
                 'is_completed' => $subtask->is_completed,
                 'progress' => $task->progress_percentage,
@@ -239,7 +411,36 @@ class ProjectTaskController extends Controller
                 'overall_progress' => $overallProgress,
                 'total_subtasks_across_project' => $totalSubtasksAcrossProject,
                 'completed_subtasks_across_project' => $completedSubtasksAcrossProject,
-            ]);
+                'project_status' => $projectStatus,
+                'project_status_label' => $projectStatusLabel,
+                'audit_entry' => [
+                    'date_time' => $history->changed_at->format('M j, Y · g:i A'),
+                    'status' => $projectStatus,
+                    'status_label' => $projectStatusLabel,
+                    'user_name' => Auth::user()?->name ?? 'System',
+                    'notes' => $actionNote,
+                ],
+            ];
+
+            if ($statusTransitionedToOngoing) {
+                $responsePayload['transition_audit_entry'] = [
+                    'date_time' => now()->format('M j, Y · g:i A'),
+                    'status' => 'ongoing',
+                    'status_label' => 'In Progress',
+                    'user_name' => Auth::user()?->name ?? 'System',
+                    'notes' => 'Status transitioned from Pending to Ongoing',
+                ];
+            } elseif ($statusTransitionedToPending) {
+                $responsePayload['transition_audit_entry'] = [
+                    'date_time' => now()->format('M j, Y · g:i A'),
+                    'status' => 'pending',
+                    'status_label' => 'Pending',
+                    'user_name' => Auth::user()?->name ?? 'System',
+                    'notes' => 'Status transitioned from Ongoing to Pending',
+                ];
+            }
+
+            return response()->json($responsePayload);
         }
 
         return redirect()

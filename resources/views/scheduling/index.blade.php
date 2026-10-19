@@ -28,6 +28,66 @@
     },
     isAllSelected() {
         return this.visibleIds.length > 0 && this.selectedIds.length === this.visibleIds.length;
+    },
+    editModalOpen: false,
+    editForm: {
+        id: null,
+        employee_id: '',
+        first_name: '',
+        middle_name: '',
+        last_name: '',
+        date_of_birth: '',
+        expertise: 'Worker',
+        address: '',
+        project_id: '',
+        archive_profile: false,
+        actionUrl: '',
+    },
+    personnelMap: {
+        @foreach ($personnel as $p)
+        {{ $p->id }}: {
+            id: {{ $p->id }},
+            employee_id: @js($p->employee_id),
+            first_name: @js($p->first_name),
+            middle_name: @js($p->middle_name ?? ''),
+            last_name: @js($p->last_name),
+            date_of_birth: @js($p->date_of_birth ? $p->date_of_birth->format('Y-m-d') : ''),
+            expertise: @js($p->expertise),
+            address: @js($p->address),
+            project_id: @js($p->project_id ?? ''),
+            actionUrl: '{{ route('scheduling.update', $p->id) }}',
+        },
+        @endforeach
+    },
+    openEditModal(id) {
+        const item = this.personnelMap[id];
+        if (!item) return;
+        this.editForm = {
+            id: item.id,
+            employee_id: item.employee_id,
+            first_name: item.first_name,
+            middle_name: item.middle_name,
+            last_name: item.last_name,
+            date_of_birth: item.date_of_birth,
+            expertise: item.expertise,
+            address: item.address,
+            project_id: item.project_id || '',
+            archive_profile: false,
+            actionUrl: item.actionUrl,
+        };
+        this.editModalOpen = true;
+    },
+    openEditModalFromSelected() {
+        if (this.selectedIds.length === 1) {
+            this.openEditModal(this.selectedIds[0]);
+        }
+    },
+    archiveDirectly(id, name) {
+        if (confirm('Archive personnel profile for ' + name + '? They will be unassigned and moved to the inactive roster.')) {
+            const form = document.getElementById('standalone-archive-form');
+            form.action = '/scheduling/' + id;
+            form.submit();
+        }
     }
 }">
     <div class="page-header">
@@ -35,7 +95,14 @@
             <h1>Manpower Management</h1>
             <p class="page-header__description">Track field personnel, select multiple workers, and manage project assignments in bulk.</p>
         </div>
-        <div class="page-actions">
+        <div class="page-actions" style="display: flex; gap: 0.5rem; align-items: center;">
+            <a href="{{ route('scheduling.roster') }}" class="btn btn-secondary btn-sm" id="btn-manage-roster">
+                <svg style="width: 14px; height: 14px; margin-right: 4px;" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                </svg>
+                Manage Roster
+            </a>
             <a href="{{ route('scheduling.create') }}" class="btn btn-primary" id="btn-add-personnel">+ Add New Personnel</a>
         </div>
     </div>
@@ -141,6 +208,21 @@
                     Unassign Selected
                 </button>
             </form>
+
+            {{-- Configure Selected Personnel --}}
+            <button
+                type="button"
+                class="btn btn-secondary btn-sm bulk-toolbar__btn"
+                id="btn-configure-selected"
+                :disabled="selectedIds.length !== 1"
+                @click="openEditModalFromSelected()"
+                :title="selectedIds.length === 1 ? 'Configure information of selected personnel' : 'Select a single personnel to configure'"
+            >
+                <svg style="width: 14px; height: 14px; margin-right: 4px;" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+                Configure Info
+            </button>
         </div>
     </div>
 
@@ -229,14 +311,24 @@
                                         <span class="text-muted">—</span>
                                     @endif
                                 </td>
-                                <td class="text-right">
-                                    <button
-                                        type="button"
-                                        class="btn btn-secondary btn-sm btn-reassign"
-                                        @click="openReassignModal({{ $person->id }}, '{{ $person->employee_id }}', '{{ addslashes($person->full_name) }}', {{ $person->project_id ?? "''" }})"
-                                    >
-                                        Reassign
-                                    </button>
+                                <td class="text-right" style="white-space: nowrap;">
+                                    <div style="display: inline-flex; gap: 0.375rem; align-items: center; justify-content: flex-end;">
+                                        <button
+                                            type="button"
+                                            class="btn btn-secondary btn-sm btn-reassign"
+                                            @click="openReassignModal({{ $person->id }}, '{{ $person->employee_id }}', '{{ addslashes($person->full_name) }}', {{ $person->project_id ?? "''" }})"
+                                        >
+                                            Reassign
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="btn btn-secondary btn-sm btn-configure"
+                                            @click="openEditModal({{ $person->id }})"
+                                            title="Configure personnel information"
+                                        >
+                                            Configure
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -282,5 +374,9 @@
             </form>
         </div>
     </div>
+
+    {{-- Configure Personnel Modal --}}
+    @include('scheduling.partials.configure-modal')
 </div>
 @endsection
+
