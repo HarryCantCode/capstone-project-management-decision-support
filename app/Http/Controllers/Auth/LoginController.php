@@ -43,6 +43,11 @@ class LoginController extends Controller
             return redirect()->route('auth.two-factor');
         }
 
+        // Mandatory first-login password change check
+        if ($user->must_change_password) {
+            return redirect()->route('password.first-login');
+        }
+
         // Staff cannot access the dashboard
         if ($user->hasRole('Staff')) {
             return redirect()->route('resources.index');

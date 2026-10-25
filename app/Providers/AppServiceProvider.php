@@ -39,6 +39,11 @@ class AppServiceProvider extends ServiceProvider
             EnsureTwoFactorVerified::class,
         );
 
+        $this->app['router']->aliasMiddleware(
+            'must-change-password',
+            \App\Http\Middleware\EnsurePasswordIsChanged::class,
+        );
+
         $this->app['router']->aliasMiddleware('role', \Spatie\Permission\Middleware\RoleMiddleware::class);
         $this->app['router']->aliasMiddleware('permission', \Spatie\Permission\Middleware\PermissionMiddleware::class);
         $this->app['router']->aliasMiddleware('role_or_permission', \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class);

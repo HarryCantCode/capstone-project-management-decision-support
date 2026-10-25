@@ -143,7 +143,7 @@
                     >
                 </div>
                 <p class="form-hint" style="margin-top: 0.5rem; margin-bottom: 0;">
-                    Password pattern: <code>@ + lastname + DEX + birthyear</code> (e.g. <code>@smithDEX2000</code>). This password is automatically generated and assigned upon account creation.
+                    Password pattern: <code>@ + lastname + DEX + birthyear</code> (e.g. <code>@smithDEX2000</code>). This temporary password is automatically generated upon account creation. <strong>The user will be required to change and update their password upon their first login.</strong>
                 </p>
             </div>
         </div>

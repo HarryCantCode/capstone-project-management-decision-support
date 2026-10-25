@@ -108,6 +108,7 @@ class AccountUserController extends Controller implements HasMiddleware
             'account_number' => $accountNumber,
             'job_title' => $jobTitle,
             'password' => Hash::make($plainPassword),
+            'must_change_password' => true,
             'created_by' => auth()->id(),
             'updated_by' => auth()->id(),
         ]);
@@ -116,7 +117,7 @@ class AccountUserController extends Controller implements HasMiddleware
 
         return redirect()->route('account.settings')->with(
             'status',
-            "User account for {$fullName} ({$employeeNumber}, Acc: {$accountNumber}) created successfully. Default password is: {$plainPassword}",
+            "User account for {$fullName} ({$employeeNumber}, Acc: {$accountNumber}) created successfully. Default password is: {$plainPassword}. The user will be required to change their password upon first login.",
         );
     }
 

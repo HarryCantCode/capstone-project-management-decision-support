@@ -58,6 +58,10 @@ class TwoFactorController extends Controller
 
         $request->session()->put('2fa_verified', true);
 
+        if ($user->must_change_password) {
+            return redirect()->route('password.first-login');
+        }
+
         return redirect()->intended(route('dashboard'));
     }
 

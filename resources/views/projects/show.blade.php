@@ -134,6 +134,55 @@
 
     </div>
 
+    {{-- ─── Elevator Technical Specifications ───────────────────────────────────── --}}
+    <section class="card card-glass mb-6" aria-labelledby="elevator-specs-heading">
+        <div class="card-header">
+            <h2 id="elevator-specs-heading" style="margin: 0; font-size: 1.0625rem; font-weight: 700;">Elevator Technical Specifications</h2>
+        </div>
+        <div class="card-body">
+            <div class="detail-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
+                <div>
+                    <dt style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink); margin-bottom: 2px;">Rated Capacity</dt>
+                    <dd class="font-mono" style="font-size: 0.9375rem; font-weight: normal; color: var(--color-ink);">{{ $project->rated_capacity ?: 'Not specified' }}</dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink); margin-bottom: 2px;">Lifting Speed</dt>
+                    <dd class="font-mono" style="font-size: 0.9375rem; font-weight: normal; color: var(--color-ink);">{{ $project->lifting_speed ?: 'Not specified' }}</dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink); margin-bottom: 2px;">No. of Stops</dt>
+                    <dd class="font-mono" style="font-size: 0.9375rem; font-weight: normal; color: var(--color-ink);">{{ $project->no_of_stops ? $project->no_of_stops . ' Stops' : 'Not specified' }}</dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink); margin-bottom: 2px;">Cage Dimension</dt>
+                    <dd class="font-mono" style="font-size: 0.9375rem; font-weight: normal; color: var(--color-ink);">{{ $project->cage_dimension ?: 'Not specified' }}</dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink); margin-bottom: 2px;">Door Operation</dt>
+                    <dd style="font-size: 0.9375rem; font-weight: normal; color: var(--color-ink);">{{ $project->door_operation ?: 'Not specified' }}</dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink); margin-bottom: 2px;">Power Source</dt>
+                    <dd class="font-mono" style="font-size: 0.9375rem; font-weight: normal; color: var(--color-ink);">{{ $project->power_source ?: 'Not specified' }}</dd>
+                </div>
+                <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--color-border);">
+                    <div>
+                        <dt style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink); margin-bottom: 2px;">Operation</dt>
+                        <dd style="font-size: 0.9375rem; font-weight: normal; color: var(--color-ink);">{{ $project->operation ?: 'Not specified' }}</dd>
+                    </div>
+                    <div>
+                        <dt style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink); margin-bottom: 2px;">Wall and Ceiling</dt>
+                        <dd style="font-size: 0.9375rem; font-weight: normal; color: var(--color-ink);">{{ $project->wall_and_ceiling ?: 'Not specified' }}</dd>
+                    </div>
+                    <div>
+                        <dt style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink); margin-bottom: 2px;">Flooring</dt>
+                        <dd style="font-size: 0.9375rem; font-weight: normal; color: var(--color-ink);">{{ $project->flooring ?: 'Not specified' }}</dd>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     {{-- ─── Expenditures Table (3 Recent Entries Shortcut) ────────────────────── --}}
     <section class="card card-glass mb-6" aria-labelledby="project-expenditures-heading">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);">

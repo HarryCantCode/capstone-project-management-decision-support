@@ -49,6 +49,8 @@ class User extends Authenticatable
         'job_title',
         'failed_login_attempts',
         'locked_until',
+        'must_change_password',
+        'password_changed_at',
         'created_by',
         'updated_by',
     ];
@@ -177,6 +179,8 @@ class User extends Authenticatable
             'two_factor_enabled' => 'boolean',
             'failed_login_attempts' => 'integer',
             'locked_until' => 'datetime',
+            'must_change_password' => 'boolean',
+            'password_changed_at' => 'datetime',
         ];
     }
 

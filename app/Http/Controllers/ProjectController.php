@@ -29,23 +29,34 @@ class ProjectController extends Controller
     }
 
     /**
-     * Display a paginated list of projects with optional status filter.
+     * Display a paginated list of projects with optional status filter and multi-field search.
      * Eager-loads creator to avoid N+1 on the list view.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', Project::class);
 
-        $status = request()->query('status');
+        $status = $request->query('status');
+        $search = trim((string) $request->query('search', ''));
 
         $projects = Project::query()
             ->with(['creator'])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('project_code', 'like', "%{$search}%")
+                        ->orWhere('client_name', 'like', "%{$search}%")
+                        ->orWhereHas('creator', function ($creatorQuery) use ($search) {
+                            $creatorQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
             ->when($status, fn ($q) => $q->where('status', $status))
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
 
-        return view('projects.index', compact('projects', 'status'));
+        return view('projects.index', compact('projects', 'status', 'search'));
     }
 
     /** Show the create project form. */

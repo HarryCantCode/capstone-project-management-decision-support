@@ -25,6 +25,15 @@ test('manager can create a project with contract price, site address, project ty
             'barangay' => 'Bel-Air',
             'city' => 'Makati City',
             'project_type' => 'Commercial',
+            'rated_capacity' => '1000 kg',
+            'lifting_speed' => '60 m/min',
+            'no_of_stops' => 12,
+            'cage_dimension' => '1.6mW x 1.5mD x 2.3mH',
+            'wall_and_ceiling' => 'Hairline Stainless Steel walls, LED downlights',
+            'flooring' => 'Granite Tile',
+            'door_operation' => 'Automatic Center Opening (2-Panel)',
+            'power_source' => '220V, 3 Phase, 60Hz',
+            'operation' => 'Simplex Full Collective',
             'payment_status' => 'Paid',
             'warranty_period' => '1 Year',
             'description' => 'Modernize the passenger lift controls and doors.',
@@ -43,6 +52,15 @@ test('manager can create a project with contract price, site address, project ty
         ->and($project->barangay)->toBe('Bel-Air')
         ->and($project->city)->toBe('Makati City')
         ->and($project->project_type)->toBe('Commercial')
+        ->and($project->rated_capacity)->toBe('1000 kg')
+        ->and($project->lifting_speed)->toBe('60 m/min')
+        ->and($project->no_of_stops)->toBe(12)
+        ->and($project->cage_dimension)->toBe('1.6mW x 1.5mD x 2.3mH')
+        ->and($project->wall_and_ceiling)->toBe('Hairline Stainless Steel walls, LED downlights')
+        ->and($project->flooring)->toBe('Granite Tile')
+        ->and($project->door_operation)->toBe('Automatic Center Opening (2-Panel)')
+        ->and($project->power_source)->toBe('220V, 3 Phase, 60Hz')
+        ->and($project->operation)->toBe('Simplex Full Collective')
         ->and($project->payment_status)->toBe('Paid')
         ->and($project->warranty_period)->toBe('1 Year')
         ->and($project->warranty_end_date->format('Y-m-d'))->toBe(now()->addYear()->format('Y-m-d'))
@@ -67,6 +85,15 @@ test('manager can update project details and audit trail records changes', funct
             'barangay' => 'San Antonio',
             'city' => 'Pasig City',
             'project_type' => 'Industrial',
+            'rated_capacity' => '1600 kg',
+            'lifting_speed' => '90 m/min',
+            'no_of_stops' => 15,
+            'cage_dimension' => '1.8mW x 1.7mD x 2.4mH',
+            'wall_and_ceiling' => 'Textured Stainless Steel walls',
+            'flooring' => 'Aluminum Checker Plate',
+            'door_operation' => 'Automatic Side Opening (2-Panel Telescopic)',
+            'power_source' => '380V, 3 Phase, 60Hz',
+            'operation' => 'Duplex Collective',
             'payment_status' => 'Partial',
             'description' => 'Updated project scope.',
             'start_date' => now()->format('Y-m-d'),
@@ -81,6 +108,11 @@ test('manager can update project details and audit trail records changes', funct
         ->and($project->fresh()->status)->toBe('pending')
         ->and($project->fresh()->address)->toBe('123 New Address St')
         ->and($project->fresh()->project_type)->toBe('Industrial')
+        ->and($project->fresh()->rated_capacity)->toBe('1600 kg')
+        ->and($project->fresh()->lifting_speed)->toBe('90 m/min')
+        ->and($project->fresh()->no_of_stops)->toBe(15)
+        ->and($project->fresh()->cage_dimension)->toBe('1.8mW x 1.7mD x 2.4mH')
+        ->and($project->fresh()->door_operation)->toBe('Automatic Side Opening (2-Panel Telescopic)')
         ->and($project->fresh()->payment_status)->toBe('Partial')
         ->and((float) $project->fresh()->contract_price)->toBe(750000.00);
 
@@ -109,6 +141,15 @@ test('editing project renders reason for update notes field and stores justifica
             'barangay' => $project->barangay,
             'city' => $project->city,
             'project_type' => $project->project_type,
+            'rated_capacity' => $project->rated_capacity,
+            'lifting_speed' => $project->lifting_speed,
+            'no_of_stops' => $project->no_of_stops,
+            'cage_dimension' => $project->cage_dimension,
+            'wall_and_ceiling' => $project->wall_and_ceiling,
+            'flooring' => $project->flooring,
+            'door_operation' => $project->door_operation,
+            'power_source' => $project->power_source,
+            'operation' => $project->operation,
             'payment_status' => $project->payment_status,
             'start_date' => $project->start_date ? $project->start_date->format('Y-m-d') : now()->format('Y-m-d'),
             'target_completion_date' => now()->addMonths(2)->format('Y-m-d'),
@@ -137,6 +178,15 @@ test('updating project requires reason for update and audit notes', function () 
             'barangay' => $project->barangay,
             'city' => $project->city,
             'project_type' => $project->project_type,
+            'rated_capacity' => $project->rated_capacity,
+            'lifting_speed' => $project->lifting_speed,
+            'no_of_stops' => $project->no_of_stops,
+            'cage_dimension' => $project->cage_dimension,
+            'wall_and_ceiling' => $project->wall_and_ceiling,
+            'flooring' => $project->flooring,
+            'door_operation' => $project->door_operation,
+            'power_source' => $project->power_source,
+            'operation' => $project->operation,
             'payment_status' => $project->payment_status,
             'start_date' => $project->start_date ? $project->start_date->format('Y-m-d') : now()->format('Y-m-d'),
             'target_completion_date' => now()->addMonths(2)->format('Y-m-d'),
@@ -155,6 +205,15 @@ test('updating project requires reason for update and audit notes', function () 
             'barangay' => $project->barangay,
             'city' => $project->city,
             'project_type' => $project->project_type,
+            'rated_capacity' => $project->rated_capacity,
+            'lifting_speed' => $project->lifting_speed,
+            'no_of_stops' => $project->no_of_stops,
+            'cage_dimension' => $project->cage_dimension,
+            'wall_and_ceiling' => $project->wall_and_ceiling,
+            'flooring' => $project->flooring,
+            'door_operation' => $project->door_operation,
+            'power_source' => $project->power_source,
+            'operation' => $project->operation,
             'payment_status' => $project->payment_status,
             'start_date' => $project->start_date ? $project->start_date->format('Y-m-d') : now()->format('Y-m-d'),
             'target_completion_date' => now()->addMonths(2)->format('Y-m-d'),
@@ -180,6 +239,15 @@ test('creating a project rejects past start dates', function () {
             'barangay' => 'Barangay 1',
             'city' => 'Taguig City',
             'project_type' => 'Residential',
+            'rated_capacity' => '1000 kg',
+            'lifting_speed' => '60 m/min',
+            'no_of_stops' => 5,
+            'cage_dimension' => '1.5mW x 1.5mD x 2.2mH',
+            'wall_and_ceiling' => 'Stainless Steel',
+            'flooring' => 'Granite',
+            'door_operation' => 'Automatic Center Opening (2-Panel)',
+            'power_source' => '220V, 3 Phase, 60Hz',
+            'operation' => 'Simplex Full Collective',
             'payment_status' => 'Partial',
             'start_date' => $pastDate,
             'target_completion_date' => $targetDate,
@@ -200,7 +268,51 @@ test('creating a project requires site address, project type, and payment status
             'target_completion_date' => now()->addMonth()->format('Y-m-d'),
             'contract_price' => 100000.00,
         ])
-        ->assertSessionHasErrors(['address', 'barangay', 'city', 'project_type', 'payment_status']);
+        ->assertSessionHasErrors([
+            'address',
+            'barangay',
+            'city',
+            'project_type',
+            'payment_status',
+            'rated_capacity',
+            'lifting_speed',
+            'no_of_stops',
+            'cage_dimension',
+            'wall_and_ceiling',
+            'flooring',
+            'door_operation',
+            'power_source',
+            'operation',
+        ]);
+});
+
+test('creating a project validates number of stops must be integer', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $this->actingAs($manager)
+        ->post(route('projects.store'), [
+            'name' => 'Invalid Stops Project',
+            'client_name' => 'Acme Corp',
+            'address' => '123 Test St',
+            'barangay' => 'Test Brgy',
+            'city' => 'Makati',
+            'project_type' => 'Commercial',
+            'rated_capacity' => '1000 kg',
+            'lifting_speed' => '60 m/min',
+            'no_of_stops' => 'not-a-number',
+            'cage_dimension' => '1.5mW x 1.5mD x 2.2mH',
+            'wall_and_ceiling' => 'Stainless Steel',
+            'flooring' => 'Granite',
+            'door_operation' => 'Automatic Center Opening (2-Panel)',
+            'power_source' => '220V, 3 Phase, 60Hz',
+            'operation' => 'Simplex Full Collective',
+            'payment_status' => 'Paid',
+            'start_date' => now()->format('Y-m-d'),
+            'target_completion_date' => now()->addMonth()->format('Y-m-d'),
+            'contract_price' => 500000.00,
+        ])
+        ->assertSessionHasErrors(['no_of_stops']);
 });
 
 test('manager can render project create and edit pages with new fields', function () {
@@ -212,6 +324,15 @@ test('manager can render project create and edit pages with new fields', functio
         'barangay' => 'Barangka',
         'city' => 'Mandaluyong City',
         'project_type' => 'Commercial',
+        'rated_capacity' => '1000 kg (13 Persons)',
+        'lifting_speed' => '60 m/min (1.0 m/s)',
+        'no_of_stops' => 10,
+        'cage_dimension' => '1.6mW x 1.5mD x 2.3mH',
+        'wall_and_ceiling' => 'Hairline Stainless Steel walls',
+        'flooring' => 'Heavy-duty Granite Tile',
+        'door_operation' => 'Automatic Center Opening (2-Panel)',
+        'power_source' => '220V, 3 Phase, 60Hz',
+        'operation' => 'Simplex Full Collective',
         'payment_status' => 'Paid',
     ]);
 
@@ -219,6 +340,16 @@ test('manager can render project create and edit pages with new fields', functio
         ->get(route('projects.create'))
         ->assertOk()
         ->assertSee('Site Address / Project Location')
+        ->assertSee('Elevator Technical Specifications')
+        ->assertSee('Rated Capacity')
+        ->assertSee('Lifting Speed')
+        ->assertSee('No. of Stops')
+        ->assertSee('Cage Dimension')
+        ->assertSee('Door Operation')
+        ->assertSee('Power Source')
+        ->assertSee('Operation')
+        ->assertSee('Wall and Ceiling')
+        ->assertSee('Flooring')
         ->assertSee('Project Type')
         ->assertSee('Payment Status')
         ->assertSee('Warranty Period');
@@ -227,11 +358,25 @@ test('manager can render project create and edit pages with new fields', functio
         ->get(route('projects.edit', $project))
         ->assertOk()
         ->assertSee('Site Address / Project Location')
+        ->assertSee('Elevator Technical Specifications')
         ->assertSee('456 Pioneer St')
         ->assertSee('Barangka')
         ->assertSee('Mandaluyong City')
+        ->assertSee('1000 kg (13 Persons)')
+        ->assertSee('60 m/min (1.0 m/s)')
+        ->assertSee('10')
+        ->assertSee('1.6mW x 1.5mD x 2.3mH')
         ->assertSee('Commercial')
         ->assertSee('Paid');
+
+    $this->actingAs($manager)
+        ->get(route('projects.show', $project))
+        ->assertOk()
+        ->assertSee('Elevator Technical Specifications')
+        ->assertSee('1000 kg (13 Persons)')
+        ->assertSee('60 m/min (1.0 m/s)')
+        ->assertSee('10 Stops')
+        ->assertSee('1.6mW x 1.5mD x 2.3mH');
 });
 
 test('manager can add and delete itemized project costs with automatic spend recalculation', function () {
@@ -413,6 +558,15 @@ test('staff cannot create a project', function () {
             'barangay' => 'Test Barangay',
             'city' => 'Test City',
             'project_type' => 'Commercial',
+            'rated_capacity' => '1000 kg',
+            'lifting_speed' => '60 m/min',
+            'no_of_stops' => 10,
+            'cage_dimension' => '1.6mW x 1.5mD x 2.3mH',
+            'wall_and_ceiling' => 'Hairline Stainless Steel',
+            'flooring' => 'Granite Tile',
+            'door_operation' => 'Automatic Center Opening (2-Panel)',
+            'power_source' => '220V, 3 Phase, 60Hz',
+            'operation' => 'Simplex Full Collective',
             'payment_status' => 'Partial',
             'start_date' => now()->format('Y-m-d'),
             'target_completion_date' => now()->addMonth()->format('Y-m-d'),
@@ -701,6 +855,15 @@ test('updating project info and managing manpower creates detailed audit trail r
         'barangay' => 'Fort Bonifacio',
         'city' => 'Taguig City',
         'project_type' => 'Commercial',
+        'rated_capacity' => '1000 kg',
+        'lifting_speed' => '60 m/min',
+        'no_of_stops' => 15,
+        'cage_dimension' => '1.6mW x 1.5mD x 2.3mH',
+        'wall_and_ceiling' => 'Hairline Stainless Steel',
+        'flooring' => 'Granite Tile',
+        'door_operation' => 'Automatic Center Opening (2-Panel)',
+        'power_source' => '220V, 3 Phase, 60Hz',
+        'operation' => 'Simplex Full Collective',
         'payment_status' => 'Paid',
         'contract_price' => 1500000.00,
         'description' => 'Updated high-rise project scope',
@@ -826,4 +989,78 @@ test('creator and audit trail names remain visible even after user account is ar
         ->assertOk()
         ->assertSee('Dominic Toretto')
         ->assertSee('Ground excavation started');
+});
+
+test('manager can search projects by project name, project code, client name, and creator', function () {
+    $creatorA = User::factory()->create([
+        'name' => 'Harry Aga',
+        'first_name' => 'Harry',
+        'last_name' => 'Aga',
+    ]);
+    $creatorA->assignRole('Manager');
+
+    $creatorB = User::factory()->create([
+        'name' => 'Charles Balanon',
+        'first_name' => 'Charles',
+        'last_name' => 'Balanon',
+    ]);
+    $creatorB->assignRole('Manager');
+
+    $project1 = Project::factory()->create([
+        'name' => 'Coca-Cola Warehouse Lift',
+        'project_code' => 'DEX-2026-012',
+        'client_name' => 'Coca Cola Bottlers Philippines',
+        'status' => 'ongoing',
+        'created_by' => $creatorA->id,
+    ]);
+
+    $project2 = Project::factory()->create([
+        'name' => 'SMDC Tower 2 Crane Installation',
+        'project_code' => 'DEX-2026-005',
+        'client_name' => 'SM Prime Holdings',
+        'status' => 'completed',
+        'created_by' => $creatorB->id,
+    ]);
+
+    // 1. Search by Project name
+    $this->actingAs($creatorA)
+        ->get(route('projects.index', ['search' => 'Coca-Cola']))
+        ->assertOk()
+        ->assertSee('Coca-Cola Warehouse Lift')
+        ->assertDontSee('SMDC Tower 2 Crane Installation');
+
+    // 2. Search by Project code
+    $this->actingAs($creatorA)
+        ->get(route('projects.index', ['search' => 'DEX-2026-005']))
+        ->assertOk()
+        ->assertSee('SMDC Tower 2 Crane Installation')
+        ->assertDontSee('Coca-Cola Warehouse Lift');
+
+    // 3. Search by Client name
+    $this->actingAs($creatorA)
+        ->get(route('projects.index', ['search' => 'SM Prime']))
+        ->assertOk()
+        ->assertSee('SMDC Tower 2 Crane Installation')
+        ->assertDontSee('Coca-Cola Warehouse Lift');
+
+    // 4. Search by Created By (Creator Name)
+    $this->actingAs($creatorA)
+        ->get(route('projects.index', ['search' => 'Harry Aga']))
+        ->assertOk()
+        ->assertSee('Coca-Cola Warehouse Lift')
+        ->assertDontSee('SMDC Tower 2 Crane Installation');
+
+    // 5. Combined search and status filter
+    $this->actingAs($creatorA)
+        ->get(route('projects.index', ['search' => 'DEX-2026', 'status' => 'completed']))
+        ->assertOk()
+        ->assertSee('SMDC Tower 2 Crane Installation')
+        ->assertDontSee('Coca-Cola Warehouse Lift');
+
+    // 6. Non-matching search displays empty state
+    $this->actingAs($creatorA)
+        ->get(route('projects.index', ['search' => 'NonExistentProjectQuery']))
+        ->assertOk()
+        ->assertSee('No projects found')
+        ->assertSee('Clear Search & Filters');
 });

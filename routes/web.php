@@ -30,19 +30,21 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [LoginController::class, 'store'])->name('login.store');
 });
 
-// ─── 2FA challenge (must be logged in, but not yet 2FA-verified) ──────────────
+// ─── 2FA challenge & First-login password change (must be logged in) ──────────
 
 Route::middleware(['auth'])->group(function () {
+    Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
+
     Route::get('/two-factor', [TwoFactorController::class, 'create'])->name('auth.two-factor');
     Route::post('/two-factor', [TwoFactorController::class, 'store'])->name('auth.two-factor.store');
+
+    Route::get('/first-login/change-password', [\App\Http\Controllers\Auth\FirstLoginPasswordController::class, 'create'])->name('password.first-login');
+    Route::post('/first-login/change-password', [\App\Http\Controllers\Auth\FirstLoginPasswordController::class, 'update'])->name('password.first-login.update');
 });
 
-// ─── Main application (authenticated + 2FA verified) ─────────────────────────
+// ─── Main application (authenticated + 2FA verified + password rotated) ──────
 
-Route::middleware(['auth', 'two-factor'])->group(function () {
-
-    // Logout
-    Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
+Route::middleware(['auth', 'two-factor', 'must-change-password'])->group(function () {
 
     // Dashboard — accessible to Admin and Manager (hard 403 for Inventory Staff)
     Route::get('/dashboard', DashboardController::class)->name('dashboard');

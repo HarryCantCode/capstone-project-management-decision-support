@@ -36,9 +36,6 @@
         <section class="card card-glass" aria-labelledby="project-finances-heading">
             <div class="card-header">
                 <h2 id="project-finances-heading">Financial Overview</h2>
-                <span class="badge-condition {{ $project->costing_status === 'On Track' ? 'badge-condition--good' : ($project->costing_status === 'At Risk' ? 'badge-condition--fair' : 'badge-condition--needs_repair') }}">
-                    {{ $project->costing_status }}
-                </span>
             </div>
             <div class="card-body" style="display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-4);">
                 <div class="financial-stats-grid">

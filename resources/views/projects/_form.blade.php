@@ -58,7 +58,268 @@
         </div>
     </div>
 
-    {{-- Card 2: Site Address & Location --}}
+    {{-- Card 2: Elevator Technical Specifications --}}
+    <div class="card card-glass">
+        <div class="card-header" style="font-weight: 700; font-size: 0.9375rem; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                Elevator Technical Specifications
+            </div>
+            <span class="text-muted" style="font-size: 0.75rem; font-weight: normal;">Mechanical, Electrical &amp; Finishes</span>
+        </div>
+        <div class="card-body">
+            <p class="form-hint" style="margin-bottom: var(--space-4); margin-top: 0;">Core engineering parameters, elevator cab interior finishes, and operating mechanisms.</p>
+
+            {{-- Row 1: Rated Capacity, Lifting Speed, No. of Stops --}}
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="rated_capacity" class="form-label">Rated Capacity <span class="text-danger">*</span></label>
+                    <input
+                        id="rated_capacity"
+                        name="rated_capacity"
+                        type="text"
+                        list="rated_capacity_options"
+                        class="form-control font-mono @error('rated_capacity') is-invalid @enderror"
+                        value="{{ old('rated_capacity', $project->rated_capacity ?? '') }}"
+                        maxlength="100"
+                        required
+                        placeholder="e.g. 500 kgs"
+                    >
+                    <datalist id="rated_capacity_options">
+                        <option value="300 kgs">
+                        <option value="500 kgs">
+                        <option value="800 kgs">
+                        <option value="1000 kgs">
+                        <option value="1250 kgs">
+                        <option value="1600 kgs">
+                        <option value="2000 kgs">
+                        <option value="2500 kgs">
+                        <option value="3000 kgs">
+                    </datalist>
+                    <p class="form-hint">Payload capacity in kgs (e.g. 500 kgs).</p>
+                    @error('rated_capacity')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="lifting_speed" class="form-label">Lifting Speed <span class="text-danger">*</span></label>
+                    <input
+                        id="lifting_speed"
+                        name="lifting_speed"
+                        type="text"
+                        list="lifting_speed_options"
+                        class="form-control font-mono @error('lifting_speed') is-invalid @enderror"
+                        value="{{ old('lifting_speed', $project->lifting_speed ?? '') }}"
+                        maxlength="100"
+                        required
+                        placeholder="e.g. 6.0 m/min."
+                    >
+                    <datalist id="lifting_speed_options">
+                        <option value="6.0 m/min.">
+                        <option value="9.0 m/min.">
+                        <option value="12.0 m/min.">
+                        <option value="15.0 m/min.">
+                        <option value="20.0 m/min.">
+                        <option value="30.0 m/min.">
+                        <option value="45.0 m/min.">
+                        <option value="60.0 m/min.">
+                        <option value="90.0 m/min.">
+                        <option value="105.0 m/min.">
+                        <option value="120.0 m/min.">
+                    </datalist>
+                    <p class="form-hint">Travel speed in m/min (e.g. 6.0 m/min.).</p>
+                    @error('lifting_speed')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="no_of_stops" class="form-label">No. of Stops <span class="text-danger">*</span></label>
+                    <input
+                        id="no_of_stops"
+                        name="no_of_stops"
+                        type="number"
+                        min="1"
+                        max="500"
+                        step="1"
+                        class="form-control font-mono @error('no_of_stops') is-invalid @enderror"
+                        value="{{ old('no_of_stops', $project->no_of_stops ?? '') }}"
+                        required
+                        placeholder="e.g. 3"
+                    >
+                    <p class="form-hint">Total landings / stops served (e.g. 3 stops).</p>
+                    @error('no_of_stops')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+            </div>
+
+            {{-- Row 2: Cage Dimension & Door Operation --}}
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="cage_dimension" class="form-label">Cage Dimension <span class="text-danger">*</span></label>
+                    <input
+                        id="cage_dimension"
+                        name="cage_dimension"
+                        type="text"
+                        list="cage_dimension_options"
+                        class="form-control font-mono @error('cage_dimension') is-invalid @enderror"
+                        value="{{ old('cage_dimension', $project->cage_dimension ?? '') }}"
+                        maxlength="255"
+                        required
+                        placeholder="e.g. 1.3 mW x 1.5 mD x 1.8 mH"
+                    >
+                    <datalist id="cage_dimension_options">
+                        <option value="1.1 mW x 1.3 mD x 1.8 mH">
+                        <option value="1.2 mW x 1.4 mD x 1.8 mH">
+                        <option value="1.3 mW x 1.5 mD x 1.8 mH">
+                        <option value="1.4 mW x 1.6 mD x 2.0 mH">
+                        <option value="1.5 mW x 1.7 mD x 2.2 mH">
+                        <option value="1.6 mW x 1.8 mD x 2.3 mH">
+                        <option value="1.8 mW x 2.0 mD x 2.4 mH">
+                        <option value="2.0 mW x 2.2 mD x 2.5 mH">
+                    </datalist>
+                    <p class="form-hint">Car width, depth, and height (mW x mD x mH).</p>
+                    @error('cage_dimension')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="door_operation" class="form-label">Door Operation <span class="text-danger">*</span></label>
+                    @php
+                        $selectedDoorOp = old('door_operation', $project->door_operation ?? '');
+                        $doorOptions = [
+                            'Up Sliding Manual Operation Panel Door',
+                            'Up Sliding Vertical Bi-Parting Door',
+                            'Automatic Center Opening Panel Door (2-Panel)',
+                            'Automatic Center Opening Panel Door (4-Panel)',
+                            'Automatic Side Opening Panel Door (2-Panel Telescopic)',
+                            'Automatic Side Opening Panel Door (3-Panel Telescopic)',
+                            'Manual Swing Panel Door',
+                            'Semi-Automatic Swing / Slide Panel Door',
+                            'Collapsible Accordion Gate Door',
+                        ];
+                    @endphp
+                    <select id="door_operation" name="door_operation" class="form-control @error('door_operation') is-invalid @enderror" required>
+                        <option value="" disabled {{ $selectedDoorOp === '' ? 'selected' : '' }}>Select Door Operation</option>
+                        @foreach($doorOptions as $option)
+                            <option value="{{ $option }}" {{ $selectedDoorOp === $option ? 'selected' : '' }}>{{ $option }}</option>
+                        @endforeach
+                    </select>
+                    <p class="form-hint">Door opening mechanism and automation method.</p>
+                    @error('door_operation')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+            </div>
+
+            {{-- Row 3: Power Source & Operation --}}
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="power_source" class="form-label">Power Source <span class="text-danger">*</span></label>
+                    <input
+                        id="power_source"
+                        name="power_source"
+                        type="text"
+                        list="power_source_options"
+                        class="form-control font-mono @error('power_source') is-invalid @enderror"
+                        value="{{ old('power_source', $project->power_source ?? '') }}"
+                        maxlength="100"
+                        required
+                        placeholder="e.g. 220V, 3 phase, 60 hz"
+                    >
+                    <datalist id="power_source_options">
+                        <option value="220V, 3 phase, 60 hz">
+                        <option value="220V, single phase, 60 hz">
+                        <option value="230V, single phase, 60 hz">
+                        <option value="380V, 3 phase, 60 hz">
+                        <option value="380V, 3 phase, 50 hz">
+                        <option value="400V, 3 phase, 50 hz">
+                        <option value="440V, 3 phase, 60 hz">
+                        <option value="460V, 3 phase, 60 hz">
+                        <option value="480V, 3 phase, 60 hz">
+                    </datalist>
+                    <p class="form-hint">Electrical power supply rating (volts, phase, hz).</p>
+                    @error('power_source')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="operation" class="form-label">Operation <span class="text-danger">*</span></label>
+                    <input
+                        id="operation"
+                        name="operation"
+                        type="text"
+                        list="operation_options"
+                        class="form-control @error('operation') is-invalid @enderror"
+                        value="{{ old('operation', $project->operation ?? '') }}"
+                        maxlength="100"
+                        required
+                        placeholder="e.g. Push Button Control on each floor"
+                    >
+                    <datalist id="operation_options">
+                        <option value="Push Button Control on each floor">
+                        <option value="Simplex Full Collective Control">
+                        <option value="Simplex Down Collective Control">
+                        <option value="Duplex Collective Control (2-Car Group)">
+                        <option value="Triplex / Group Supervisory Control">
+                        <option value="Destination Dispatch Control">
+                        <option value="Attendant Service / Independent Manual Operation">
+                        <option value="Hospital / Emergency Bed Service Priority">
+                        <option value="Firefighter Emergency Operation">
+                        <option value="Inspection / Maintenance Manual Operation">
+                    </datalist>
+                    <p class="form-hint">Elevator control and dispatch supervisory system.</p>
+                    @error('operation')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+            </div>
+
+            {{-- Row 4: Wall and Ceiling and Flooring --}}
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="wall_and_ceiling" class="form-label">Wall and Ceiling <span class="text-danger">*</span></label>
+                    <input
+                        id="wall_and_ceiling"
+                        name="wall_and_ceiling"
+                        type="text"
+                        list="wall_ceiling_options"
+                        class="form-control @error('wall_and_ceiling') is-invalid @enderror"
+                        value="{{ old('wall_and_ceiling', $project->wall_and_ceiling ?? '') }}"
+                        maxlength="255"
+                        required
+                        placeholder="e.g. Painted Steel Panel"
+                    >
+                    <datalist id="wall_ceiling_options">
+                        <option value="Painted Steel Panel">
+                        <option value="Hairline Stainless Steel Panel">
+                        <option value="Mirror Stainless Steel Panel">
+                        <option value="Etched Stainless Steel Panel">
+                        <option value="Powder Coated Steel Panel">
+                        <option value="Stainless Steel &amp; Wood Laminate Panel">
+                    </datalist>
+                    <p class="form-hint">Car enclosure wall finishes &amp; ceiling architecture.</p>
+                    @error('wall_and_ceiling')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="flooring" class="form-label">Flooring <span class="text-danger">*</span></label>
+                    <input
+                        id="flooring"
+                        name="flooring"
+                        type="text"
+                        list="flooring_options"
+                        class="form-control @error('flooring') is-invalid @enderror"
+                        value="{{ old('flooring', $project->flooring ?? '') }}"
+                        maxlength="255"
+                        required
+                        placeholder="e.g. Checkered Plate Flooring"
+                    >
+                    <datalist id="flooring_options">
+                        <option value="Checkered Plate Flooring">
+                        <option value="Granite Tile Flooring">
+                        <option value="Heavy-duty Vinyl Tile Flooring">
+                        <option value="Anti-Slip Rubber Flooring">
+                        <option value="Marble Flooring">
+                        <option value="Aluminum Checker Plate Flooring">
+                    </datalist>
+                    <p class="form-hint">Car platform floor surface material.</p>
+                    @error('flooring')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Card 3: Site Address & Location --}}
     <div class="card card-glass">
         <div class="card-header" style="font-weight: 700; font-size: 0.9375rem; display: flex; align-items: center; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: var(--space-2);">
@@ -294,6 +555,10 @@
                     <span class="font-mono font-bold" id="preview-code">{{ $project->project_code ?? 'DEX-' . now()->year . '-NEW' }}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border);">
+                    <span class="text-muted">Elevator Specs</span>
+                    <span class="font-mono font-bold" id="preview-specs">{{ (isset($project) && $project->no_of_stops) ? $project->no_of_stops . ' Stops · ' . ($project->rated_capacity ?? '') : 'Specs pending' }}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border);">
                     <span class="text-muted">Est. Duration</span>
                     <span class="font-mono font-bold" id="preview-duration" style="color: var(--color-accent);">8 Weeks</span>
                 </div>
@@ -423,6 +688,25 @@
             previewLocation.textContent = parts.length > 0 ? parts.join(', ') : 'Address pending';
         }
 
+        const stopsInput = document.getElementById('no_of_stops');
+        const capacityInput = document.getElementById('rated_capacity');
+        const previewSpecs = document.getElementById('preview-specs');
+
+        function updateElevatorSpecs() {
+            if (!previewSpecs) return;
+            const stops = stopsInput ? stopsInput.value.trim() : '';
+            const cap = capacityInput ? capacityInput.value.trim() : '';
+            if (stops && cap) {
+                previewSpecs.textContent = `${stops} Stops · ${cap}`;
+            } else if (stops) {
+                previewSpecs.textContent = `${stops} Stops`;
+            } else if (cap) {
+                previewSpecs.textContent = cap;
+            } else {
+                previewSpecs.textContent = 'Specs pending';
+            }
+        }
+
         if (startDateInput) {
             startDateInput.addEventListener('change', updateDatesAndWarranty);
             startDateInput.addEventListener('input', updateDatesAndWarranty);
@@ -444,9 +728,17 @@
             }
         });
 
+        [stopsInput, capacityInput].forEach(function (input) {
+            if (input) {
+                input.addEventListener('input', updateElevatorSpecs);
+                input.addEventListener('change', updateElevatorSpecs);
+            }
+        });
+
         // Initialize live values
         calculateDuration();
         updatePaymentPill();
         updateLocation();
+        updateElevatorSpecs();
     });
 </script>
