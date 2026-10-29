@@ -36,11 +36,17 @@ class ProjectController extends Controller
     {
         $this->authorize('viewAny', Project::class);
 
+        $tab = $request->query('tab', 'active');
         $status = $request->query('status');
         $search = trim((string) $request->query('search', ''));
 
-        $projects = Project::query()
-            ->with(['creator'])
+        $query = Project::query()->with(['creator']);
+
+        if ($tab === 'archived') {
+            $query->onlyTrashed();
+        }
+
+        $projects = $query
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -56,7 +62,10 @@ class ProjectController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return view('projects.index', compact('projects', 'status', 'search'));
+        $activeCount = Project::count();
+        $archivedCount = Project::onlyTrashed()->count();
+
+        return view('projects.index', compact('projects', 'status', 'search', 'tab', 'activeCount', 'archivedCount'));
     }
 
     /** Show the create project form. */
@@ -149,6 +158,47 @@ class ProjectController extends Controller
         return redirect()
             ->route('projects.index')
             ->with('status', "Project {$projectName} has been deleted.");
+    }
+
+    /**
+     * Archive a completed project.
+     */
+    public function archive(Project $project): RedirectResponse
+    {
+        $this->authorize('archive', $project);
+
+        try {
+            $projectName = $project->name;
+            $this->projectService->archive($project);
+
+            return redirect()
+                ->route('projects.index', ['tab' => 'archived'])
+                ->with('status', "Project {$projectName} has been archived.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $msg = $e->validator->errors()->first('project') ?? 'Only completed projects can be archived.';
+
+            return redirect()
+                ->back()
+                ->with('error', $msg);
+        }
+    }
+
+    /**
+     * Restore an archived project.
+     */
+    public function restore(Request $request, $id): RedirectResponse
+    {
+        $project = Project::onlyTrashed()->findOrFail($id);
+        $this->authorize('restore', $project);
+
+        $projectName = $project->name;
+        $this->projectService->restore($project);
+
+        $redirect = $request->header('referer') && str_contains($request->header('referer'), '/projects/' . $project->id)
+            ? redirect()->route('projects.show', $project)
+            : redirect()->route('projects.index');
+
+        return $redirect->with('status', "Project {$projectName} has been restored from archive.");
     }
 
     /**

@@ -105,7 +105,7 @@ test('manager can update project details and audit trail records changes', funct
         ->assertRedirect(route('projects.show', $project));
 
     expect($project->fresh()->name)->toBe('Updated Lift Modernization')
-        ->and($project->fresh()->status)->toBe('pending')
+        ->and($project->fresh()->status)->toBe('completed')
         ->and($project->fresh()->address)->toBe('123 New Address St')
         ->and($project->fresh()->project_type)->toBe('Industrial')
         ->and($project->fresh()->rated_capacity)->toBe('1600 kg')
@@ -254,6 +254,67 @@ test('creating a project rejects past start dates', function () {
             'contract_price' => 500000.00,
         ])
         ->assertSessionHasErrors(['start_date']);
+});
+
+test('creating a project rejects target completion date less than 1 month from now or start date', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $startDate = now()->format('Y-m-d');
+    // 2 weeks from now is less than 1 month
+    $tooEarlyTargetDate = now()->addWeeks(2)->format('Y-m-d');
+
+    $this->actingAs($manager)
+        ->post(route('projects.store'), [
+            'name' => 'Early End Project',
+            'client_name' => 'Acme Corp',
+            'address' => '123 Future St',
+            'barangay' => 'Barangay 1',
+            'city' => 'Taguig City',
+            'project_type' => 'Residential',
+            'rated_capacity' => '1000 kg',
+            'lifting_speed' => '60 m/min',
+            'no_of_stops' => 5,
+            'cage_dimension' => '1.5mW x 1.5mD x 2.2mH',
+            'wall_and_ceiling' => 'Stainless Steel',
+            'flooring' => 'Granite',
+            'door_operation' => 'Automatic Center Opening (2-Panel)',
+            'power_source' => '220V, 3 Phase, 60Hz',
+            'operation' => 'Simplex Full Collective',
+            'payment_status' => 'Partial',
+            'start_date' => $startDate,
+            'target_completion_date' => $tooEarlyTargetDate,
+            'contract_price' => 500000.00,
+        ])
+        ->assertSessionHasErrors(['target_completion_date']);
+
+    // Future start date: 2 months from now, but end date only 2 weeks after start date
+    $futureStart = now()->addMonths(2)->format('Y-m-d');
+    $invalidEndAfterFutureStart = now()->addMonths(2)->addDays(10)->format('Y-m-d');
+
+    $this->actingAs($manager)
+        ->post(route('projects.store'), [
+            'name' => 'Future Short Project',
+            'client_name' => 'Acme Corp',
+            'address' => '123 Future St',
+            'barangay' => 'Barangay 1',
+            'city' => 'Taguig City',
+            'project_type' => 'Residential',
+            'rated_capacity' => '1000 kg',
+            'lifting_speed' => '60 m/min',
+            'no_of_stops' => 5,
+            'cage_dimension' => '1.5mW x 1.5mD x 2.2mH',
+            'wall_and_ceiling' => 'Stainless Steel',
+            'flooring' => 'Granite',
+            'door_operation' => 'Automatic Center Opening (2-Panel)',
+            'power_source' => '220V, 3 Phase, 60Hz',
+            'operation' => 'Simplex Full Collective',
+            'payment_status' => 'Partial',
+            'start_date' => $futureStart,
+            'target_completion_date' => $invalidEndAfterFutureStart,
+            'contract_price' => 500000.00,
+        ])
+        ->assertSessionHasErrors(['target_completion_date']);
 });
 
 test('creating a project requires site address, project type, and payment status', function () {
@@ -836,6 +897,38 @@ test('manager and admin can assign multiple personnel simultaneously from projec
     expect($project->fresh()->personnel)->toHaveCount(2);
 });
 
+test('assign manpower modal displays expert estimation rules, left-aligned checkboxes, and warning indicators', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create(['name' => 'BGC Grand Tower', 'status' => 'ongoing']);
+
+    $available = \App\Models\Personnel::create([
+        'employee_id' => 'EMP-2026111',
+        'first_name' => 'Roberto',
+        'last_name' => 'Gomez',
+        'date_of_birth' => '1992-04-10',
+        'address' => 'Taguig City',
+        'expertise' => 'Project Manager',
+        'created_by' => $manager->id,
+    ]);
+
+    $this->actingAs($manager)
+        ->get(route('projects.show', $project))
+        ->assertOk()
+        ->assertSee('Project Expert Estimation Guide:')
+        ->assertSee('Technician: <strong>1-2</strong>', false)
+        ->assertSee('Project Manager: <strong>1</strong>', false)
+        ->assertSee('QA Inspector: <strong>1</strong>', false)
+        ->assertSee('Site Engineer: <strong>1</strong>', false)
+        ->assertSee('Worker / Installation: <strong>4-6</strong>', false)
+        ->assertSee('Safety Officer: <strong>1</strong>', false)
+        ->assertSee('Foreman: <strong>1</strong>', false)
+        ->assertSee('Estimation Requirement Exceeded:')
+        ->assertSee('Roberto Gomez')
+        ->assertSee('EMP-2026111');
+});
+
 test('updating project info and managing manpower creates detailed audit trail records', function () {
     $admin = User::factory()->create();
     $admin->assignRole('Admin');
@@ -1063,4 +1156,101 @@ test('manager can search projects by project name, project code, client name, an
         ->assertOk()
         ->assertSee('No projects found')
         ->assertSee('Clear Search & Filters');
+});
+
+test('completed project can be archived and restored, and tabs display active vs archived projects', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $activeProject = Project::factory()->create(['name' => 'Active Highrise Installation', 'status' => 'ongoing']);
+    $completedProject = Project::factory()->create(['name' => 'Completed Elevator Overhaul', 'status' => 'completed']);
+
+    // 1. Initial list shows active project and completed project under active tab
+    $this->actingAs($manager)
+        ->get(route('projects.index'))
+        ->assertOk()
+        ->assertSee('Active Highrise Installation')
+        ->assertSee('Completed Elevator Overhaul')
+        ->assertSee('Active Work (2)')
+        ->assertSee('Archived Projects (0)');
+
+    // 2. Cannot archive a project that is not completed
+    $this->actingAs($manager)
+        ->post(route('projects.archive', $activeProject))
+        ->assertSessionHas('error');
+
+    expect($activeProject->fresh()->trashed())->toBeFalse();
+
+    // 3. Archive completed project
+    $this->actingAs($manager)
+        ->post(route('projects.archive', $completedProject))
+        ->assertRedirect(route('projects.index', ['tab' => 'archived']))
+        ->assertSessionHas('status', "Project {$completedProject->name} has been archived.");
+
+    expect($completedProject->fresh()->trashed())->toBeTrue();
+
+    // 4. Active tab shows active project in table and not in active project table
+    $responseActive = $this->actingAs($manager)
+        ->get(route('projects.index', ['tab' => 'active']))
+        ->assertOk()
+        ->assertSee('Active Highrise Installation')
+        ->assertSee('Active Work (1)')
+        ->assertSee('Archived Projects (1)')
+        ->assertDontSee("id=\"project-row-{$completedProject->id}\"", false);
+
+    // 5. Viewing archived tab shows completedProject
+    $responseArchived = $this->actingAs($manager)
+        ->get(route('projects.index', ['tab' => 'archived']))
+        ->assertOk()
+        ->assertDontSee("id=\"project-row-{$activeProject->id}\"", false)
+        ->assertSee("id=\"project-row-{$completedProject->id}\"", false)
+        ->assertSee('Restore');
+
+    // 6. Restore the archived project
+    $this->actingAs($manager)
+        ->post(route('projects.restore', $completedProject->id))
+        ->assertRedirect(route('projects.index'))
+        ->assertSessionHas('status', "Project {$completedProject->name} has been restored from archive.");
+
+    expect($completedProject->fresh()->trashed())->toBeFalse();
+});
+
+test('completed project status can be reversed to ongoing via project update', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create([
+        'name' => 'Completed Modernization Project',
+        'status' => 'completed',
+        'start_date' => now()->format('Y-m-d'),
+        'target_completion_date' => now()->addMonths(2)->format('Y-m-d'),
+    ]);
+
+    $this->actingAs($manager)
+        ->put(route('projects.update', $project), [
+            'name' => 'Completed Modernization Project',
+            'client_name' => $project->client_name,
+            'address' => $project->address,
+            'barangay' => $project->barangay,
+            'city' => $project->city,
+            'project_type' => $project->project_type,
+            'rated_capacity' => $project->rated_capacity,
+            'lifting_speed' => $project->lifting_speed,
+            'no_of_stops' => $project->no_of_stops,
+            'cage_dimension' => $project->cage_dimension,
+            'wall_and_ceiling' => $project->wall_and_ceiling,
+            'flooring' => $project->flooring,
+            'door_operation' => $project->door_operation,
+            'power_source' => $project->power_source,
+            'operation' => $project->operation,
+            'payment_status' => $project->payment_status,
+            'start_date' => $project->start_date->format('Y-m-d'),
+            'target_completion_date' => $project->target_completion_date->format('Y-m-d'),
+            'contract_price' => $project->contract_price,
+            'status' => 'ongoing',
+            'update_notes' => 'Client requested minor adjustments before final handover',
+        ])
+        ->assertRedirect(route('projects.show', $project));
+
+    expect($project->fresh()->status)->toBe('ongoing');
 });

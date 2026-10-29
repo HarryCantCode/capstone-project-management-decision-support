@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
@@ -78,7 +79,7 @@ class SchedulingController extends Controller implements HasMiddleware
             ->orderBy('name')
             ->get();
 
-        $expertiseOptions = ['Site Engineer', 'Foreman', 'Safety Officer', 'Worker'];
+        $expertiseOptions = Personnel::EXPERTISE_OPTIONS;
 
         return view('scheduling.index', compact('personnel', 'activeProjects', 'search', 'expertise', 'status', 'expertiseOptions'));
     }
@@ -94,7 +95,7 @@ class SchedulingController extends Controller implements HasMiddleware
 
         $nextEmployeeId = Personnel::generateEmployeeId();
         $projects = Project::orderBy('name')->get();
-        $expertiseOptions = ['Site Engineer', 'Foreman', 'Safety Officer', 'Worker'];
+        $expertiseOptions = Personnel::EXPERTISE_OPTIONS;
 
         return view('scheduling.create', compact('nextEmployeeId', 'projects', 'expertiseOptions'));
     }
@@ -115,7 +116,7 @@ class SchedulingController extends Controller implements HasMiddleware
             'last_name'     => ['required', 'string', 'max:255'],
             'date_of_birth' => ['required', 'date', 'before:today'],
             'address'       => ['required', 'string', 'max:1000'],
-            'expertise'     => ['required', 'string', 'in:Site Engineer,Foreman,Safety Officer,Worker'],
+            'expertise'     => ['required', 'string', Rule::in(Personnel::EXPERTISE_OPTIONS)],
             'assign_project' => ['nullable', 'boolean'],
             'project_id'    => ['nullable', 'required_if:assign_project,1', 'exists:projects,id'],
         ]);
@@ -351,7 +352,7 @@ class SchedulingController extends Controller implements HasMiddleware
             ->orderBy('name')
             ->get();
 
-        $expertiseOptions = ['Site Engineer', 'Foreman', 'Safety Officer', 'Worker'];
+        $expertiseOptions = Personnel::EXPERTISE_OPTIONS;
 
         return view('scheduling.roster', compact('personnel', 'stats', 'activeProjects', 'expertiseOptions', 'filters'));
     }
@@ -371,7 +372,7 @@ class SchedulingController extends Controller implements HasMiddleware
             ->orderBy('name')
             ->get();
 
-        $expertiseOptions = ['Site Engineer', 'Foreman', 'Safety Officer', 'Worker'];
+        $expertiseOptions = Personnel::EXPERTISE_OPTIONS;
 
         return view('scheduling.edit', compact('personnel', 'activeProjects', 'expertiseOptions'));
     }

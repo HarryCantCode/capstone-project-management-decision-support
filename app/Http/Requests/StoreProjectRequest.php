@@ -48,7 +48,42 @@ class StoreProjectRequest extends FormRequest
             'warranty_end_date' => ['nullable', 'date'],
             'payment_status' => ['required', 'string', 'in:Paid,Partial'],
             'start_date' => ['required', 'date', 'after_or_equal:today'],
-            'target_completion_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'target_completion_date' => [
+                'required',
+                'date',
+                'after_or_equal:start_date',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (!$value) {
+                        return;
+                    }
+
+                    try {
+                        $targetDate = \Carbon\Carbon::parse($value)->startOfDay();
+                    } catch (\Throwable) {
+                        return;
+                    }
+
+                    $startDateVal = $this->input('start_date');
+                    $baseDate = now()->startOfDay();
+
+                    if ($startDateVal) {
+                        try {
+                            $parsedStart = \Carbon\Carbon::parse($startDateVal)->startOfDay();
+                            if ($parsedStart->gt($baseDate)) {
+                                $baseDate = $parsedStart;
+                            }
+                        } catch (\Throwable) {
+                            // Handled by date rule on start_date
+                        }
+                    }
+
+                    $minAllowedDate = $baseDate->copy()->addMonth();
+
+                    if ($targetDate->lt($minAllowedDate)) {
+                        $fail('The target completion date must be at least 1 month from now or the project start date.');
+                    }
+                },
+            ],
             'contract_price' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
         ];
     }

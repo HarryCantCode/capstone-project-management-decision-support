@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Personnel;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 /**
  * UpdatePersonnelRequest
@@ -33,7 +35,7 @@ class UpdatePersonnelRequest extends FormRequest
             'last_name'       => ['required', 'string', 'max:255'],
             'date_of_birth'   => ['required', 'date', 'before:today'],
             'address'         => ['required', 'string', 'max:1000'],
-            'expertise'       => ['required', 'string', 'in:Site Engineer,Foreman,Safety Officer,Worker'],
+            'expertise'       => ['required', 'string', Rule::in(Personnel::EXPERTISE_OPTIONS)],
             'project_id'      => ['nullable', 'exists:projects,id'],
             'archive_profile' => ['nullable', 'boolean'],
         ];
@@ -53,7 +55,7 @@ class UpdatePersonnelRequest extends FormRequest
             'date_of_birth.before'   => 'Date of birth must be a past date.',
             'address.required'       => 'Address is required.',
             'expertise.required'     => 'Expertise / role is required.',
-            'expertise.in'           => 'Expertise must be Site Engineer, Foreman, Safety Officer, or Worker.',
+            'expertise.in'           => 'Expertise must be one of: ' . implode(', ', Personnel::EXPERTISE_OPTIONS) . '.',
             'project_id.exists'      => 'The selected project does not exist.',
         ];
     }

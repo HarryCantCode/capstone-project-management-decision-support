@@ -518,6 +518,15 @@ body {
     letter-spacing: -0.01em;
 }
 
+.sidebar-brand-icon {
+    width: 28px;
+    height: 28px;
+    object-fit: cover;
+    border-radius: 8px;
+    flex-shrink: 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
 .sidebar-brand:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
@@ -605,6 +614,18 @@ body {
     background: var(--color-surface-alt);
     color: var(--color-muted);
     border: 1px solid var(--color-border);
+}
+
+.nav-link--disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
+    user-select: none;
+}
+
+.nav-link--disabled:hover {
+    background-color: transparent;
+    color: var(--color-ink);
 }
 
 /* ==========================================================================
@@ -852,6 +873,15 @@ body {
     align-items: center;
     gap: var(--space-3);
     margin-bottom: var(--space-6);
+}
+
+.auth-brand-icon {
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+    border-radius: 9px;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .auth-brand-text {
@@ -2015,9 +2045,9 @@ input::-ms-clear {
 }
 
 .financial-stat-card {
-    background: var(--color-surface-alt);
-    padding: var(--space-3) var(--space-2);
-    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    padding: var(--space-4) var(--space-3);
+    border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
     min-width: 0;
     display: flex;
@@ -2027,15 +2057,22 @@ input::-ms-clear {
     text-align: center;
     box-sizing: border-box;
     overflow: hidden;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.financial-stat-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.06);
 }
 
 .financial-stat-card__label {
     font-size: 0.6875rem;
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     color: var(--color-muted);
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2044,13 +2081,12 @@ input::-ms-clear {
 
 .financial-stat-card__value {
     font-family: var(--font-mono);
-    font-size: clamp(0.8125rem, 1.15vw, 1.0625rem);
+    font-size: clamp(0.875rem, 1.2vw, 1.125rem);
     font-weight: 700;
     line-height: 1.25;
     word-break: break-word;
     overflow-wrap: anywhere;
     max-width: 100%;
-    margin-top: 2px;
 }
 
 .detail-list {
@@ -2612,4 +2648,524 @@ input::-ms-clear {
         flex: 1;
     }
 }
+
+/* ==========================================================================
+   Costing Module Modern Minimalist Value Cards
+   ========================================================================== */
+
+.costing-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-5);
+    margin-bottom: var(--space-6);
+}
+
+@media (max-width: 900px) {
+    .costing-kpi-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+    }
+}
+
+.costing-kpi-card {
+    position: relative;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-5) var(--space-6);
+    box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
+    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 156px;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+/* Ambient Glow Top Bar */
+.costing-kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    z-index: 2;
+}
+
+/* Ambient Radial Glow Highlight behind card */
+.costing-kpi-card::after {
+    content: '';
+    position: absolute;
+    top: -30px;
+    right: -30px;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    filter: blur(40px);
+    opacity: 0.18;
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+.costing-kpi-card:hover::after {
+    opacity: 0.32;
+    transform: scale(1.15);
+}
+
+.costing-kpi-card--contract::before {
+    background: linear-gradient(90deg, #2563EB, #38BDF8);
+    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4);
+}
+.costing-kpi-card--contract::after {
+    background: #3B82F6;
+}
+
+.costing-kpi-card--spend::before {
+    background: linear-gradient(90deg, #F59E0B, #EA580C);
+    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.35);
+}
+.costing-kpi-card--spend::after {
+    background: #F59E0B;
+}
+
+.costing-kpi-card--remaining-positive::before {
+    background: linear-gradient(90deg, #10B981, #059669);
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+}
+.costing-kpi-card--remaining-positive::after {
+    background: #10B981;
+}
+
+.costing-kpi-card--remaining-negative::before {
+    background: linear-gradient(90deg, #EF4444, #DC2626);
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
+}
+.costing-kpi-card--remaining-negative::after {
+    background: #EF4444;
+}
+
+.costing-kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 32px -10px rgba(0, 0, 0, 0.08), 0 6px 12px -3px rgba(0, 0, 0, 0.04);
+}
+
+.costing-kpi-card--contract:hover {
+    border-color: rgba(37, 99, 235, 0.4);
+}
+
+.costing-kpi-card--spend:hover {
+    border-color: rgba(245, 158, 11, 0.45);
+}
+
+.costing-kpi-card--remaining-positive:hover {
+    border-color: rgba(16, 185, 129, 0.45);
+}
+
+.costing-kpi-card--remaining-negative:hover {
+    border-color: rgba(239, 68, 68, 0.45);
+}
+
+.costing-kpi-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    position: relative;
+    z-index: 1;
+}
+
+.costing-kpi-card__label-wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.costing-kpi-card__label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--color-muted);
+}
+
+.costing-kpi-card__icon-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-lg);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.costing-kpi-card:hover .costing-kpi-card__icon-badge {
+    transform: scale(1.08) rotate(-2deg);
+}
+
+.costing-kpi-card__icon-badge--contract {
+    background: rgba(37, 99, 235, 0.12);
+    color: #2563EB;
+    border: 1px solid rgba(37, 99, 235, 0.2);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12);
+}
+
+.costing-kpi-card__icon-badge--spend {
+    background: rgba(245, 158, 11, 0.12);
+    color: #D97706;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.12);
+}
+
+.costing-kpi-card__icon-badge--remaining-positive {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.12);
+}
+
+.costing-kpi-card__icon-badge--remaining-negative {
+    background: rgba(239, 68, 68, 0.12);
+    color: #DC2626;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.12);
+}
+
+.costing-kpi-card__body {
+    margin-bottom: var(--space-3);
+    position: relative;
+    z-index: 1;
+}
+
+.costing-kpi-card__value {
+    font-family: var(--font-mono);
+    font-size: clamp(1.45rem, 1.85vw, 1.85rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    color: var(--color-ink);
+}
+
+.costing-kpi-card__value--success {
+    color: var(--color-success);
+}
+
+.costing-kpi-card__value--danger {
+    color: var(--color-danger);
+}
+
+.costing-kpi-card__description {
+    font-size: 0.8125rem;
+    color: var(--color-muted);
+    margin-top: var(--space-2);
+    line-height: 1.45;
+}
+
+[data-theme="dark"] .costing-kpi-card__description {
+    color: #94A3B8;
+}
+
+.costing-kpi-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    font-size: 0.75rem;
+    color: var(--color-muted);
+    padding-top: var(--space-3);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    position: relative;
+    z-index: 1;
+}
+
+.costing-kpi-card__tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+
+.costing-kpi-card__tag-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.75;
+}
+
+.costing-kpi-card__pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: var(--radius-pill);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.01em;
+}
+
+.costing-kpi-card__pill-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.costing-kpi-card__pill--neutral {
+    background: var(--color-surface-alt);
+    color: var(--color-muted);
+    border: 1px solid var(--color-border);
+}
+
+.costing-kpi-card__pill--success {
+    background: rgba(16, 185, 129, 0.12);
+    color: #047857;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.costing-kpi-card__pill--danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: #B91C1C;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.costing-kpi-card__pill--warning {
+    background: rgba(245, 158, 11, 0.12);
+    color: #B45309;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* Background watermark icon for extra pop */
+.costing-kpi-card__watermark {
+    position: absolute;
+    right: -10px;
+    bottom: -15px;
+    width: 90px;
+    height: 90px;
+    opacity: 0.04;
+    pointer-events: none;
+    z-index: 0;
+    transition: transform var(--transition-base), opacity var(--transition-base);
+}
+
+.costing-kpi-card:hover .costing-kpi-card__watermark {
+    transform: scale(1.1) rotate(6deg);
+    opacity: 0.08;
+}
+
+/* Dark theme overrides for costing cards */
+[data-theme="dark"] .costing-kpi-card {
+    background: #131B28;
+    border-color: #243042;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .costing-kpi-card::after {
+    opacity: 0.12;
+}
+
+[data-theme="dark"] .costing-kpi-card:hover::after {
+    opacity: 0.24;
+}
+
+[data-theme="dark"] .costing-kpi-card--contract:hover {
+    border-color: #38BDF8;
+    box-shadow: 0 14px 28px -6px rgba(37, 99, 235, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card--spend:hover {
+    border-color: #FBBF24;
+    box-shadow: 0 14px 28px -6px rgba(245, 158, 11, 0.3);
+}
+
+[data-theme="dark"] .costing-kpi-card--remaining-positive:hover {
+    border-color: #34D399;
+    box-shadow: 0 14px 28px -6px rgba(16, 185, 129, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card--remaining-negative:hover {
+    border-color: #F87171;
+    box-shadow: 0 14px 28px -6px rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card__footer {
+    border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .costing-kpi-card__icon-badge--contract {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93C5FD;
+    border-color: rgba(59, 130, 246, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card__icon-badge--spend {
+    background: rgba(245, 158, 11, 0.2);
+    color: #FCD34D;
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card__icon-badge--remaining-positive {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6EE7B7;
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card__icon-badge--remaining-negative {
+    background: rgba(239, 68, 68, 0.2);
+    color: #FCA5A5;
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card__pill--neutral {
+    background: #1B2433;
+    color: #94A3B8;
+    border-color: #2D3A4F;
+}
+
+[data-theme="dark"] .costing-kpi-card__pill--success {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6EE7B7;
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card__pill--danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #FCA5A5;
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card__pill--warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #FDE68A;
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card__watermark {
+    opacity: 0.05;
+}
+
+[data-theme="dark"] .costing-kpi-card:hover .costing-kpi-card__watermark {
+    opacity: 0.12;
+}
+
+/* Dashboard 4-Column Status Grid Modifier */
+.dashboard-stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+    .dashboard-stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .dashboard-stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Interactive link cards */
+.costing-kpi-card--interactive {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+.costing-kpi-card__arrow {
+    display: inline-block;
+    transition: transform var(--transition-fast);
+}
+
+.costing-kpi-card--interactive:hover .costing-kpi-card__arrow {
+    transform: translateX(4px);
+}
+
+/* Specific status accent styles for ongoing, pending, completed */
+.costing-kpi-card--ongoing::before {
+    background: linear-gradient(90deg, #2563EB, #60A5FA);
+    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4);
+}
+.costing-kpi-card--ongoing::after {
+    background: #3B82F6;
+}
+.costing-kpi-card--ongoing:hover {
+    border-color: rgba(37, 99, 235, 0.4);
+}
+.costing-kpi-card__icon-badge--ongoing {
+    background: rgba(37, 99, 235, 0.12);
+    color: #2563EB;
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12);
+}
+
+.costing-kpi-card--pending::before {
+    background: linear-gradient(90deg, #D97706, #F59E0B);
+    box-shadow: 0 2px 10px rgba(217, 119, 6, 0.35);
+}
+.costing-kpi-card--pending::after {
+    background: #F59E0B;
+}
+.costing-kpi-card--pending:hover {
+    border-color: rgba(217, 119, 6, 0.45);
+}
+.costing-kpi-card__icon-badge--pending {
+    background: rgba(217, 119, 6, 0.12);
+    color: #D97706;
+    border: 1px solid rgba(217, 119, 6, 0.25);
+    box-shadow: 0 2px 6px rgba(217, 119, 6, 0.12);
+}
+
+.costing-kpi-card--completed::before {
+    background: linear-gradient(90deg, #10B981, #059669);
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
+}
+.costing-kpi-card--completed::after {
+    background: #10B981;
+}
+.costing-kpi-card--completed:hover {
+    border-color: rgba(16, 185, 129, 0.45);
+}
+.costing-kpi-card__icon-badge--completed {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.12);
+}
+
+/* Dark mode overrides for status cards */
+[data-theme="dark"] .costing-kpi-card--ongoing:hover {
+    border-color: #60A5FA;
+    box-shadow: 0 14px 28px -6px rgba(37, 99, 235, 0.35);
+}
+[data-theme="dark"] .costing-kpi-card--pending:hover {
+    border-color: #FBBF24;
+    box-shadow: 0 14px 28px -6px rgba(217, 119, 6, 0.35);
+}
+[data-theme="dark"] .costing-kpi-card--completed:hover {
+    border-color: #34D399;
+    box-shadow: 0 14px 28px -6px rgba(16, 185, 129, 0.35);
+}
+
+[data-theme="dark"] .costing-kpi-card__icon-badge--ongoing {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93C5FD;
+    border-color: rgba(59, 130, 246, 0.35);
+}
+[data-theme="dark"] .costing-kpi-card__icon-badge--pending {
+    background: rgba(245, 158, 11, 0.2);
+    color: #FCD34D;
+    border-color: rgba(245, 158, 11, 0.35);
+}
+[data-theme="dark"] .costing-kpi-card__icon-badge--completed {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6EE7B7;
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+
 

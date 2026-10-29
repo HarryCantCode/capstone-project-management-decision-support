@@ -15,33 +15,155 @@
     </div>
 
     {{-- Financial Summary KPI Cards --}}
-    <div class="dashboard-stats mb-6" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4);">
-        <div class="stat-card card-glass" style="border-left: 4px solid var(--color-success);">
-            <div class="stat-card__value numeric text-success" style="font-size: 1.5rem; font-weight: 700;">
-                ₱{{ number_format($totalAllocated, 2) }}
+    <div class="costing-kpi-grid">
+        {{-- Card 1: Total Allocated Contract Value --}}
+        <div class="costing-kpi-card costing-kpi-card--contract">
+            {{-- Background Watermark Icon --}}
+            <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+
+            <div>
+                <div class="costing-kpi-card__header">
+                    <span class="costing-kpi-card__label">Total Allocated Contract Value</span>
+                    <span class="costing-kpi-card__icon-badge costing-kpi-card__icon-badge--contract" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                        </svg>
+                    </span>
+                </div>
+                <div class="costing-kpi-card__body">
+                    <div class="costing-kpi-card__value numeric">
+                        ₱{{ number_format($totalAllocated, 2) }}
+                    </div>
+                    <p class="costing-kpi-card__description">
+                        Total contract baseline across all registered projects in the portfolio.
+                    </p>
+                </div>
             </div>
-            <div class="stat-card__label" style="font-weight: 600; color: var(--color-muted);">Total Allocated Contract Value</div>
-            <span class="text-muted" style="font-size: 0.75rem;">Across {{ $projects->total() }} registered {{ Str::plural('project', $projects->total()) }}</span>
+            <div class="costing-kpi-card__footer">
+                <span class="costing-kpi-card__tag">
+                    <span class="costing-kpi-card__tag-icon" aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                    </span>
+                    Portfolio Scope
+                </span>
+                <span class="costing-kpi-card__pill costing-kpi-card__pill--neutral">
+                    <span class="costing-kpi-card__pill-icon" aria-hidden="true">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                    </span>
+                    {{ $projects->total() }} {{ Str::plural('Project', $projects->total()) }}
+                </span>
+            </div>
         </div>
 
-        <div class="stat-card card-glass" style="border-left: 4px solid var(--color-accent);">
-            <div class="stat-card__value numeric" style="font-size: 1.5rem; font-weight: 700; color: var(--color-ink);">
-                ₱{{ number_format($totalSpent, 2) }}
+        {{-- Card 2: Total Actual Spend --}}
+        <div class="costing-kpi-card costing-kpi-card--spend">
+            {{-- Background Watermark Icon --}}
+            <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+
+            <div>
+                <div class="costing-kpi-card__header">
+                    <span class="costing-kpi-card__label">Total Actual Spend</span>
+                    <span class="costing-kpi-card__icon-badge costing-kpi-card__icon-badge--spend" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                    </span>
+                </div>
+                <div class="costing-kpi-card__body">
+                    <div class="costing-kpi-card__value numeric">
+                        ₱{{ number_format($totalSpent, 2) }}
+                    </div>
+                    <p class="costing-kpi-card__description">
+                        Cumulative expenses recorded for materials, labor, and operations.
+                    </p>
+                </div>
             </div>
-            <div class="stat-card__label" style="font-weight: 600; color: var(--color-muted);">Total Actual Spend</div>
-            <span class="text-muted" style="font-size: 0.75rem;">
-                {{ $totalAllocated > 0 ? round(($totalSpent / $totalAllocated) * 100, 1) : 0 }}% of total portfolio value
-            </span>
+            <div class="costing-kpi-card__footer">
+                <span class="costing-kpi-card__tag">
+                    <span class="costing-kpi-card__tag-icon" aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                            <polyline points="17 6 23 6 23 12"></polyline>
+                        </svg>
+                    </span>
+                    Actual Outflow
+                </span>
+                @php
+                    $spendRate = $totalAllocated > 0 ? round(($totalSpent / $totalAllocated) * 100, 1) : 0;
+                @endphp
+                <span class="costing-kpi-card__pill {{ $spendRate > 100 ? 'costing-kpi-card__pill--danger' : ($spendRate > 85 ? 'costing-kpi-card__pill--warning' : 'costing-kpi-card__pill--neutral') }}">
+                    <span class="costing-kpi-card__pill-icon" aria-hidden="true">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </span>
+                    {{ $spendRate }}% Used
+                </span>
+            </div>
         </div>
 
-        <div class="stat-card card-glass" style="border-left: 4px solid {{ $totalRemaining >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }};">
-            <div class="stat-card__value numeric {{ $totalRemaining >= 0 ? 'text-success' : 'text-danger' }}" style="font-size: 1.5rem; font-weight: 700;">
-                ₱{{ number_format($totalRemaining, 2) }}
+        {{-- Card 3: Total Remaining Budget --}}
+        <div class="costing-kpi-card {{ $totalRemaining >= 0 ? 'costing-kpi-card--remaining-positive' : 'costing-kpi-card--remaining-negative' }}">
+            {{-- Background Watermark Icon --}}
+            <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+
+            <div>
+                <div class="costing-kpi-card__header">
+                    <span class="costing-kpi-card__label">Total Remaining Budget</span>
+                    <span class="costing-kpi-card__icon-badge {{ $totalRemaining >= 0 ? 'costing-kpi-card__icon-badge--remaining-positive' : 'costing-kpi-card__icon-badge--remaining-negative' }}" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            <polyline points="9 12 11 14 15 10"></polyline>
+                        </svg>
+                    </span>
+                </div>
+                <div class="costing-kpi-card__body">
+                    <div class="costing-kpi-card__value numeric {{ $totalRemaining >= 0 ? 'costing-kpi-card__value--success' : 'costing-kpi-card__value--danger' }}">
+                        ₱{{ number_format($totalRemaining, 2) }}
+                    </div>
+                    <p class="costing-kpi-card__description">
+                        Net available funds remaining before reaching project contract limits.
+                    </p>
+                </div>
             </div>
-            <div class="stat-card__label" style="font-weight: 600; color: var(--color-muted);">Total Remaining Budget</div>
-            <span class="text-muted" style="font-size: 0.75rem;">
-                {{ $totalRemaining >= 0 ? 'Healthy overall portfolio balance' : 'Deficit across projects' }}
-            </span>
+            <div class="costing-kpi-card__footer">
+                <span class="costing-kpi-card__tag">
+                    <span class="costing-kpi-card__tag-icon" aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                    </span>
+                    Available Capital
+                </span>
+                @php
+                    $remPercentage = $totalAllocated > 0 ? round(($totalRemaining / $totalAllocated) * 100, 1) : 0;
+                @endphp
+                <span class="costing-kpi-card__pill {{ $totalRemaining >= 0 ? 'costing-kpi-card__pill--neutral' : 'costing-kpi-card__pill--danger' }}">
+                    <span class="costing-kpi-card__pill-icon" aria-hidden="true">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                    </span>
+                    {{ $remPercentage }}% Left
+                </span>
+            </div>
         </div>
     </div>
 

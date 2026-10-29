@@ -18,9 +18,14 @@ class ResourceFactory extends Factory
 
         return [
             'name' => fake()->words(3, true),
-            'resource_code' => 'RES-'.fake()->unique()->numerify('####'),
+            'resource_code' => 'DEX-MAT' . fake()->unique()->numberBetween(100, 999),
             'type' => 'material',
+            'model' => fake()->sentence(4),
             'quantity_available' => fake()->numberBetween(1, 100),
+            'price' => fake()->randomFloat(2, 50000, 500000),
+            'unit_cost' => fake()->randomFloat(2, 40000, 450000),
+            'demand_status' => fake()->randomElement(['fast-moving', 'slow-moving']),
+            'description' => fake()->sentence(8),
             'condition' => 'good',
             'created_by' => $user,
             'updated_by' => $user,

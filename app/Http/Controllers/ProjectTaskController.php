@@ -309,6 +309,7 @@ class ProjectTaskController extends Controller
 
         $statusTransitionedToOngoing = false;
         $statusTransitionedToPending = false;
+        $statusTransitionedFromCompleted = false;
         $firstMajorTask = $project->tasks()->orderBy('sort_order')->orderBy('id')->first();
 
         // If ticking a subtask from the first major task, transition pending project to ongoing (in-progress)
@@ -360,6 +361,21 @@ class ProjectTaskController extends Controller
                         ->log('Status transitioned from Ongoing to Pending');
                 }
             }
+        } elseif (! $newCompleted && $project->status === 'completed') {
+            // Reverse the state of a completed project back to ongoing / in progress when final task / checklist is unticked
+            request()->merge(['notes' => 'Status reversed from Completed back to In Progress due to unchecked task']);
+            $project->update([
+                'status' => 'ongoing',
+            ]);
+            $statusTransitionedFromCompleted = true;
+
+            if (function_exists('activity')) {
+                activity('project')
+                    ->performedOn($project)
+                    ->causedBy(Auth::user())
+                    ->withProperties(['from_status' => 'completed', 'to_status' => 'ongoing'])
+                    ->log('Status reversed from Completed back to In Progress due to unchecked task');
+            }
         }
 
         $project->load('tasks.subtasks');
@@ -369,6 +385,9 @@ class ProjectTaskController extends Controller
         $overallProgress = $totalSubtasksAcrossProject > 0
             ? (int) round(($completedSubtasksAcrossProject / $totalSubtasksAcrossProject) * 100)
             : ($project->status === 'completed' ? 100 : 0);
+
+        // Check if all tasks/subtasks across the project are completed and project is not yet marked completed
+        $promptCompletion = ($newCompleted && $totalSubtasksAcrossProject > 0 && $completedSubtasksAcrossProject === $totalSubtasksAcrossProject && $project->status !== 'completed');
 
         $projectStatus = $project->fresh()->status;
         $projectStatusLabel = in_array($projectStatus, ['ongoing', 'in_progress']) ? 'In Progress' : ucfirst($projectStatus);
@@ -413,6 +432,7 @@ class ProjectTaskController extends Controller
                 'completed_subtasks_across_project' => $completedSubtasksAcrossProject,
                 'project_status' => $projectStatus,
                 'project_status_label' => $projectStatusLabel,
+                'prompt_completion' => $promptCompletion,
                 'audit_entry' => [
                     'date_time' => $history->changed_at->format('M j, Y · g:i A'),
                     'status' => $projectStatus,
@@ -437,6 +457,14 @@ class ProjectTaskController extends Controller
                     'status_label' => 'Pending',
                     'user_name' => Auth::user()?->name ?? 'System',
                     'notes' => 'Status transitioned from Ongoing to Pending',
+                ];
+            } elseif ($statusTransitionedFromCompleted) {
+                $responsePayload['transition_audit_entry'] = [
+                    'date_time' => now()->format('M j, Y · g:i A'),
+                    'status' => 'ongoing',
+                    'status_label' => 'In Progress',
+                    'user_name' => Auth::user()?->name ?? 'System',
+                    'notes' => 'Status reversed from Completed back to In Progress due to unchecked task',
                 ];
             }
 

@@ -7,7 +7,7 @@
     <div class="page-header">
         <div>
             <h1>Edit Project</h1>
-            <p class="page-header__description"><span class="font-mono">{{ $project->project_code }}</span> · Status changes are managed separately.</p>
+            <p class="page-header__description"><span class="font-mono">{{ $project->project_code }}</span> · Update project specifications, schedule, and lifecycle status.</p>
         </div>
     </div>
 

@@ -15,9 +15,31 @@
     </div>
 
     <div class="card card-glass">
-        <div class="card-header">
-            <span>All Projects</span>
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);">
+            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                <span style="font-weight: 700; font-size: 1rem;">{{ $tab === 'archived' ? 'Archived Projects' : 'All Projects' }}</span>
+                <div class="btn-group" role="group" aria-label="Project category filter" style="display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden;">
+                    <a
+                        href="{{ route('projects.index', array_filter(['tab' => 'active', 'search' => $search, 'status' => $status])) }}"
+                        class="btn btn-sm {{ $tab !== 'archived' ? 'btn-primary' : 'btn-secondary' }}"
+                        style="padding: 0.35rem 0.85rem; border: none; font-size: 0.8125rem;"
+                        id="tab-active-projects"
+                    >
+                        Active Work ({{ $activeCount }})
+                    </a>
+                    <a
+                        href="{{ route('projects.index', array_filter(['tab' => 'archived', 'search' => $search, 'status' => $status])) }}"
+                        class="btn btn-sm {{ $tab === 'archived' ? 'btn-primary' : 'btn-secondary' }}"
+                        style="padding: 0.35rem 0.85rem; border: none; font-size: 0.8125rem;"
+                        id="tab-archived-projects"
+                    >
+                        Archived Projects ({{ $archivedCount }})
+                    </a>
+                </div>
+            </div>
+
             <form method="GET" action="{{ route('projects.index') }}" class="project-header-actions" role="search">
+                <input type="hidden" name="tab" value="{{ $tab }}">
                 <div class="project-search-wrapper">
                     <label for="project-search" class="visually-hidden">Search projects</label>
                     <svg class="project-search-icon" width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" style="width: 16px; height: 16px; flex-shrink: 0;">
@@ -33,7 +55,7 @@
                         title="Search by project name, project code, client name, or creator"
                     >
                     @if (!empty($search))
-                        <a href="{{ route('projects.index', array_filter(['status' => $status])) }}" class="project-search-clear" title="Clear search" aria-label="Clear search">
+                        <a href="{{ route('projects.index', array_filter(['tab' => $tab, 'status' => $status])) }}" class="project-search-clear" title="Clear search" aria-label="Clear search">
                             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width: 12px; height: 12px;">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 4l8 8M12 4l-8 8" />
                             </svg>
@@ -41,7 +63,7 @@
                     @endif
                 </div>
 
-                <div class="project-status-wrapper">
+                <div class="project-status-wrapper" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: nowrap;">
                     <label for="status" class="visually-hidden">Filter projects by status</label>
                     <select id="status" name="status" class="form-control form-control--compact project-status-select" onchange="this.form.submit()">
                         <option value="">All statuses</option>
@@ -50,16 +72,14 @@
                         <option value="delayed" @selected($status === 'delayed')>Delayed</option>
                         <option value="completed" @selected($status === 'completed')>Completed</option>
                     </select>
-                </div>
 
-                @if (!empty($search) || !empty($status))
-                    <a href="{{ route('projects.index') }}" class="btn btn-secondary btn-sm project-filter-reset" title="Clear all filters and search">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" class="project-filter-reset__icon" aria-hidden="true" style="width: 12px; height: 12px;">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4l8 8M12 4l-8 8" />
+                    <button type="submit" class="btn btn-primary btn-sm" id="btn-projects-filter" style="display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
+                        <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd" />
                         </svg>
-                        <span>Clear</span>
-                    </a>
-                @endif
+                        Filter
+                    </button>
+                </div>
             </form>
         </div>
 
@@ -77,12 +97,16 @@
                             No projects match "{{ $search }}".
                         @elseif (!empty($status))
                             No projects match this status filter.
+                        @elseif ($tab === 'archived')
+                            No archived projects found in the repository.
                         @else
                             Start tracking work by creating the first project.
                         @endif
                     </p>
                     @if (!empty($search) || !empty($status))
-                        <a href="{{ route('projects.index') }}" class="btn btn-secondary btn-sm">Clear Search &amp; Filters</a>
+                        <a href="{{ route('projects.index', ['tab' => $tab]) }}" class="btn btn-secondary btn-sm">Clear Search &amp; Filters</a>
+                    @elseif ($tab === 'archived')
+                        <a href="{{ route('projects.index') }}" class="btn btn-secondary btn-sm">← Back to Active Projects</a>
                     @else
                         @can('create', App\Models\Project::class)
                             <a href="{{ route('projects.create') }}" class="btn btn-primary">Create First Project</a>

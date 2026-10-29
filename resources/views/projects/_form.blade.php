@@ -5,6 +5,10 @@
         ? $project->start_date->format('Y-m-d')
         : $todayStr;
     $currentStartDate = old('start_date', isset($project) && $project->start_date ? $project->start_date->format('Y-m-d') : $todayStr);
+    $baseDate = \Carbon\Carbon::parse($currentStartDate)->gt(now()->startOfDay())
+        ? \Carbon\Carbon::parse($currentStartDate)
+        : now()->startOfDay();
+    $minTargetCompletionDate = $baseDate->copy()->addMonth()->format('Y-m-d');
     $currentTargetDate = old('target_completion_date', isset($project) && $project->target_completion_date ? $project->target_completion_date->format('Y-m-d') : now()->addWeeks(8)->format('Y-m-d'));
     $calculatedWarrantyEnd = \Carbon\Carbon::parse($currentStartDate)->addYear()->format('Y-m-d');
 ?>
@@ -420,12 +424,12 @@
                         id="target_completion_date"
                         name="target_completion_date"
                         type="date"
-                        min="{{ $currentStartDate }}"
+                        min="{{ $minTargetCompletionDate }}"
                         class="form-control @error('target_completion_date') is-invalid @enderror font-mono"
                         value="{{ $currentTargetDate }}"
                         required
                     >
-                    <p class="form-hint">Drives weekly progress & timeline milestones.</p>
+                    <p class="form-hint">At least 1 month from now or start date.</p>
                     @error('target_completion_date')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                 </div>
 
@@ -454,6 +458,52 @@
     </div>
 
     @if ($isEditing)
+        {{-- Card: Project Status Configuration --}}
+        <div class="card card-glass">
+            <div class="card-header" style="font-weight: 700; font-size: 0.9375rem; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <svg style="width: 18px; height: 18px; color: var(--color-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Project Status / Lifecycle
+                </div>
+                <x-status-pill :status="$project->status ?? 'pending'" />
+            </div>
+            <div class="card-body">
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="status" class="form-label">Project Status <span class="text-danger">*</span></label>
+                    <select id="status" name="status" class="form-control @error('status') is-invalid @enderror">
+                        @php
+                            $currStatus = old('status', $project->status ?? 'pending');
+                        @endphp
+                        @if ($project->status === 'completed')
+                            <option value="completed" @selected($currStatus === 'completed')>Completed</option>
+                            <option value="ongoing" @selected($currStatus === 'ongoing')>In Progress (Ongoing)</option>
+                            <option value="delayed" @selected($currStatus === 'delayed')>Delayed</option>
+                        @elseif ($project->status === 'delayed')
+                            <option value="delayed" @selected($currStatus === 'delayed')>Delayed</option>
+                            <option value="ongoing" @selected($currStatus === 'ongoing')>In Progress (Ongoing)</option>
+                            <option value="completed" @selected($currStatus === 'completed')>Completed</option>
+                            <option value="pending" @selected($currStatus === 'pending')>Pending</option>
+                        @elseif ($project->status === 'ongoing')
+                            <option value="ongoing" @selected($currStatus === 'ongoing')>In Progress (Ongoing)</option>
+                            <option value="completed" @selected($currStatus === 'completed')>Completed</option>
+                            <option value="delayed" @selected($currStatus === 'delayed')>Delayed</option>
+                            <option value="pending" @selected($currStatus === 'pending')>Pending</option>
+                        @else
+                            <option value="pending" @selected($currStatus === 'pending')>Pending</option>
+                            <option value="ongoing" @selected($currStatus === 'ongoing')>In Progress (Ongoing)</option>
+                            <option value="delayed" @selected($currStatus === 'delayed')>Delayed</option>
+                            <option value="completed" @selected($currStatus === 'completed')>Completed</option>
+                        @endif
+                    </select>
+                    <p class="form-hint">You can reverse a completed project back to In Progress / Ongoing or adjust status as needed.</p>
+                    @error('status')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+            </div>
+        </div>
+
         {{-- Card 4: Reason for Update / Audit Notes --}}
         <div class="card card-glass">
             <div class="card-header" style="font-weight: 700; font-size: 0.9375rem; display: flex; align-items: center; justify-content: space-between;">
@@ -611,16 +661,42 @@
         const cityInput = document.getElementById('city');
         const previewLocation = document.getElementById('preview-location');
 
+        function getMinTargetCompletionDate(startDateStr) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let baseDate = new Date(today);
+            if (startDateStr) {
+                const [sY, sM, sD] = startDateStr.split('-').map(Number);
+                if (sY && sM && sD) {
+                    const start = new Date(sY, sM - 1, sD);
+                    start.setHours(0, 0, 0, 0);
+                    if (start > baseDate) {
+                        baseDate = start;
+                    }
+                }
+            }
+
+            const minDate = new Date(baseDate);
+            minDate.setMonth(minDate.getMonth() + 1);
+
+            const y = minDate.getFullYear();
+            const m = String(minDate.getMonth() + 1).padStart(2, '0');
+            const d = String(minDate.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
         function updateDatesAndWarranty() {
             if (!startDateInput || !startDateInput.value) return;
 
             const selectedDateVal = startDateInput.value;
             
-            // Sync target completion date min
+            // Sync target completion date min (at least 1 month from now or start date)
             if (targetCompletionInput) {
-                targetCompletionInput.min = selectedDateVal;
-                if (targetCompletionInput.value && targetCompletionInput.value < selectedDateVal) {
-                    targetCompletionInput.value = selectedDateVal;
+                const minTargetVal = getMinTargetCompletionDate(selectedDateVal);
+                targetCompletionInput.min = minTargetVal;
+                if (targetCompletionInput.value && targetCompletionInput.value < minTargetVal) {
+                    targetCompletionInput.value = minTargetVal;
                 }
             }
 
@@ -736,6 +812,7 @@
         });
 
         // Initialize live values
+        updateDatesAndWarranty();
         calculateDuration();
         updatePaymentPill();
         updateLocation();

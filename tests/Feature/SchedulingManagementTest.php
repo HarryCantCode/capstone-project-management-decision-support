@@ -190,7 +190,7 @@ test('manager can place personnel profile to archive using archive_profile check
         'last_name' => 'Bautista',
         'date_of_birth' => '1991-04-18',
         'address' => 'Makati Avenue',
-        'expertise' => 'Worker',
+        'expertise' => 'Worker / Installation Personnel',
         'created_by' => $manager->id,
         'updated_by' => $manager->id,
     ]);
@@ -200,7 +200,7 @@ test('manager can place personnel profile to archive using archive_profile check
         'last_name' => 'Bautista',
         'date_of_birth' => '1991-04-18',
         'address' => 'Makati Avenue',
-        'expertise' => 'Worker',
+        'expertise' => 'Worker / Installation Personnel',
         'archive_profile' => '1',
     ]);
 
@@ -248,7 +248,7 @@ test('staff cannot update, archive, or restore personnel', function () {
         'last_name' => 'Worker',
         'date_of_birth' => '1994-08-12',
         'address' => 'Sample Address',
-        'expertise' => 'Worker',
+        'expertise' => 'Worker / Installation Personnel',
     ]);
 
     $this->actingAs($staff)
@@ -257,7 +257,7 @@ test('staff cannot update, archive, or restore personnel', function () {
             'last_name' => 'Worker',
             'date_of_birth' => '1994-08-12',
             'address' => 'Sample Address',
-            'expertise' => 'Worker',
+            'expertise' => 'Worker / Installation Personnel',
         ])
         ->assertForbidden();
 
@@ -270,4 +270,46 @@ test('staff cannot update, archive, or restore personnel', function () {
     $this->actingAs($staff)
         ->post(route('scheduling.restore', $personnel->id))
         ->assertForbidden();
+});
+
+test('personnel expertise options accept technician, project manager, qa inspector, elevator control, and worker / installation personnel', function () {
+    $admin = User::factory()->create();
+    $admin->assignRole('Admin');
+
+    $allExpertise = [
+        'Site Engineer',
+        'Foreman',
+        'Safety Officer',
+        'Technician',
+        'Project Manager',
+        'QA Inspector',
+        'Elevator Control',
+        'Worker / Installation Personnel',
+    ];
+
+    foreach ($allExpertise as $expertise) {
+        $response = $this->actingAs($admin)->post(route('scheduling.store'), [
+            'first_name'    => 'Test',
+            'last_name'     => 'Expertise',
+            'date_of_birth' => '1990-01-01',
+            'address'       => 'Test Address',
+            'expertise'     => $expertise,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('personnel', [
+            'expertise' => $expertise,
+        ]);
+    }
+
+    // Assert that deprecated 'Worker' fails validation
+    $invalidResponse = $this->actingAs($admin)->post(route('scheduling.store'), [
+        'first_name'    => 'Old',
+        'last_name'     => 'Worker',
+        'date_of_birth' => '1990-01-01',
+        'address'       => 'Test Address',
+        'expertise'     => 'Worker',
+    ]);
+
+    $invalidResponse->assertSessionHasErrors(['expertise']);
 });

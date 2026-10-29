@@ -97,9 +97,6 @@ Route::middleware(['auth', 'two-factor', 'must-change-password'])->group(functio
     // Phase 5: Reports & Dashboard
     require __DIR__ . '/modules/reports.php';
 
-    // Phase 5C: Equipment Records
-    require __DIR__ . '/modules/equipment.php';
-
     // Phase 6: Decision Support
     require __DIR__ . '/modules/decision-support.php';
 });

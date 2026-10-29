@@ -40,6 +40,29 @@
             </p>
         </div>
         <div class="page-actions">
+            @if ($project->trashed())
+                @can('restore', $project)
+                    <form method="POST" action="{{ route('projects.restore', $project->id) }}" class="inline-form" onsubmit="return confirm('Restore archived project back to active work?');">
+                        @csrf
+                        <button type="submit" class="btn btn-primary">Restore Project</button>
+                    </form>
+                @endcan
+            @elseif ($project->status === 'completed')
+                @can('archive', $project)
+                    <form method="POST" action="{{ route('projects.archive', $project) }}" class="inline-form" onsubmit="return confirm('Move project {{ addslashes($project->name) }} to archived projects?');">
+                        @csrf
+                        <button type="submit" class="btn btn-secondary" style="color: var(--color-muted); border-color: var(--color-border);">
+                            Archive Project
+                        </button>
+                    </form>
+                @endcan
+            @else
+                @can('transition', $project)
+                    <button type="button" class="btn btn-secondary" @click="markCompletedModalOpen = true" style="color: var(--color-success); border-color: var(--color-success);" id="btn-header-mark-completed">
+                        ✓ Mark as Completed
+                    </button>
+                @endcan
+            @endif
             @can('update', $project)
                 <a href="{{ route('projects.edit', $project) }}" class="btn btn-secondary">Edit Project</a>
             @endcan
@@ -304,6 +327,21 @@
                 </span>
             </div>
             <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
+                @if ($projectTargetDate && $projectTargetDate->isPast() && $project->status !== 'completed')
+                    @can('transition', $project)
+                        <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            @click="markCompletedModalOpen = true"
+                            style="background: #ecfdf5; color: var(--color-success); border-color: #a7f3d0; font-weight: 600;"
+                            id="btn-timeline-mark-completed"
+                            title="Target completion date reached. Click to mark project as completed."
+                        >
+                            ✓ Target Date Reached · Complete Project?
+                        </button>
+                    @endcan
+                @endif
+
                 @can('update', $project)
                     <button
                         type="button"
@@ -328,6 +366,30 @@
                 @endif
             </div>
         </div>
+
+        @if ($projectTargetDate && $projectTargetDate->isPast() && $project->status !== 'completed')
+            <div style="background: #f0fdf4; border-bottom: 1px solid #bbf7d0; padding: var(--space-3) var(--space-6); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);" id="timeline-target-date-alert">
+                <div style="display: flex; align-items: center; gap: var(--space-2); font-size: 0.875rem; color: #166534;">
+                    <svg style="width: 18px; height: 18px; flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 14 14"></polyline>
+                    </svg>
+                    <span>
+                        <strong>Timeline Target Date Reached:</strong> Scheduled completion date was <strong>{{ $projectTargetDate->format('M j, Y') }}</strong>. Review tasks below or confirm completion.
+                    </span>
+                </div>
+                @can('transition', $project)
+                    <button
+                        type="button"
+                        class="btn btn-primary btn-sm"
+                        @click="markCompletedModalOpen = true"
+                        style="background: var(--color-success); border-color: var(--color-success); white-space: nowrap;"
+                    >
+                        Mark Project as Completed
+                    </button>
+                @endcan
+            </div>
+        @endif
 
         <div class="card-body">
             @if ($tasks->isEmpty())
@@ -785,7 +847,7 @@
                             @foreach ($project->personnelHistory as $history)
                                 @if ($history->personnel)
                                     <tr>
-                                        <td><span class="font-mono font-bold">{{ $history->personnel->employee_id }}</span></td>
+                                        <td><span class="font-mono font-bold" style="color: var(--color-accent);">{{ $history->personnel->employee_id }}</span></td>
                                         <td><strong>{{ $history->personnel->full_name }}</strong></td>
                                         <td>{{ $history->personnel->expertise }}</td>
                                         <td class="font-mono">
@@ -850,7 +912,7 @@
                         <tbody>
                             @foreach ($project->personnel as $person)
                                 <tr id="personnel-row-{{ $person->id }}">
-                                    <td><span class="font-mono font-bold">{{ $person->employee_id }}</span></td>
+                                    <td><span class="font-mono font-bold" style="color: var(--color-accent);">{{ $person->employee_id }}</span></td>
                                     <td><strong>{{ $person->full_name }}</strong></td>
                                     <td>{{ $person->expertise }}</td>
                                     <td>
@@ -1014,12 +1076,82 @@
     {{-- ─── Modal 2: Assign Personnel to Project (Multi-Select) ───────────────── --}}
     <div class="reassign-modal-overlay" style="display: none;" x-show="assignModalOpen" x-cloak>
         <div class="reassign-modal-backdrop" @click="assignModalOpen = false"></div>
-        <div class="reassign-modal-content card" x-show="assignModalOpen" x-transition style="max-width: 540px;">
+        <div class="reassign-modal-content card" x-show="assignModalOpen" x-transition style="max-width: 560px;">
             <div class="card-header">
                 <span>Assign Field Personnel (Select Multiple)</span>
                 <button type="button" class="flash-close" @click="assignModalOpen = false" aria-label="Close modal">&times;</button>
             </div>
-            <form action="{{ route('projects.assign-personnel', $project) }}" method="POST" x-data="{ selectedAvail: [], allAvailIds: [{{ $availablePersonnel->pluck('id')->implode(',') }}], toggleAll() { this.selectedAvail = (this.selectedAvail.length === this.allAvailIds.length) ? [] : [...this.allAvailIds]; } }">
+            @php
+                $existingRoles = $project->personnel->groupBy('expertise')->map->count()->toArray();
+                $availData = $availablePersonnel->map(fn($p) => [
+                    'id' => $p->id,
+                    'full_name' => $p->full_name,
+                    'employee_id' => $p->employee_id,
+                    'expertise' => $p->expertise,
+                ])->values();
+            @endphp
+            <form 
+                action="{{ route('projects.assign-personnel', $project) }}" 
+                method="POST" 
+                x-data="{
+                    selectedAvail: [],
+                    allAvailIds: [{{ $availablePersonnel->pluck('id')->implode(',') }}],
+                    availList: {{ Js::from($availData) }},
+                    assignedCounts: {{ Js::from($existingRoles) }},
+                    limits: {
+                        'Technician': { min: 1, max: 2, label: '1-2' },
+                        'Project Manager': { min: 1, max: 1, label: '1' },
+                        'QA Inspector': { min: 1, max: 1, label: '1' },
+                        'Site Engineer': { min: 1, max: 1, label: '1' },
+                        'Worker / Installation Personnel': { min: 4, max: 6, label: '4-6' },
+                        'Safety Officer': { min: 1, max: 1, label: '1' },
+                        'Foreman': { min: 1, max: 1, label: '1' }
+                    },
+                    toggleAll() {
+                        this.selectedAvail = (this.selectedAvail.length === this.allAvailIds.length) ? [] : [...this.allAvailIds];
+                    },
+                    getExceededRoles() {
+                        const newCounts = {};
+                        this.selectedAvail.forEach(id => {
+                            const p = this.availList.find(item => item.id === id);
+                            if (p && p.expertise) {
+                                newCounts[p.expertise] = (newCounts[p.expertise] || 0) + 1;
+                            }
+                        });
+                        const warnings = [];
+                        for (const [role, rule] of Object.entries(this.limits)) {
+                            const current = this.assignedCounts[role] || 0;
+                            const adding = newCounts[role] || 0;
+                            const total = current + adding;
+                            if (total > rule.max) {
+                                warnings.push({
+                                    role: role,
+                                    current: current,
+                                    adding: adding,
+                                    total: total,
+                                    max: rule.max,
+                                    recommended: rule.label
+                                });
+                            }
+                        }
+                        return warnings;
+                    },
+                    handleSubmit(e) {
+                        const exceeded = this.getExceededRoles();
+                        if (exceeded.length > 0) {
+                            const details = exceeded.map(item => 
+                                `• ${item.role}: ${item.total} total (${item.current} already assigned + ${item.adding} new) exceeds recommended ${item.recommended}`
+                            ).join('\n');
+                            const confirmMsg = `Notice: The following expert role(s) exceed the project estimation:\n\n${details}\n\nAre you sure you want to proceed with assigning?`;
+                            if (!confirm(confirmMsg)) {
+                                e.preventDefault();
+                                return false;
+                            }
+                        }
+                    }
+                }"
+                @submit="handleSubmit($event)"
+            >
                 @csrf
                 <div class="card-body">
                     <p class="text-muted" style="font-size: 0.875rem; margin-bottom: var(--space-4);">
@@ -1031,6 +1163,43 @@
                             All personnel in the roster are currently assigned to projects. You can add new personnel from the Manpower module or unassign workers from other projects.
                         </div>
                     @else
+                        {{-- Estimation Guide Banner --}}
+                        <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-3); font-size: 0.75rem;">
+                            <div style="font-weight: 600; color: var(--color-ink); margin-bottom: 2px;">
+                                Project Expert Estimation Guide:
+                            </div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--color-muted);">
+                                <span>Technician: <strong>1-2</strong></span>
+                                <span>Project Manager: <strong>1</strong></span>
+                                <span>QA Inspector: <strong>1</strong></span>
+                                <span>Site Engineer: <strong>1</strong></span>
+                                <span>Worker / Installation: <strong>4-6</strong></span>
+                                <span>Safety Officer: <strong>1</strong></span>
+                                <span>Foreman: <strong>1</strong></span>
+                            </div>
+                        </div>
+
+                        {{-- Real-time Exceeded Warning Banner --}}
+                        <template x-if="getExceededRoles().length > 0">
+                            <div class="alert alert-warning" style="margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3); font-size: 0.8125rem; border-left: 3px solid #f59e0b; background: rgba(245, 158, 11, 0.08);">
+                                <div style="display: flex; align-items: flex-start; gap: 6px;">
+                                    <svg style="width: 16px; height: 16px; color: #d97706; flex-shrink: 0; margin-top: 2px;" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                    <div>
+                                        <strong style="color: #92400e;">Estimation Requirement Exceeded:</strong>
+                                        <ul style="margin: 4px 0 0 16px; padding: 0; list-style-type: disc;">
+                                            <template x-for="item in getExceededRoles()" :key="item.role">
+                                                <li style="color: #92400e; margin-bottom: 2px;">
+                                                    <span x-text="item.role"></span>: total of <strong x-text="item.total"></strong> (<span x-text="item.current"></span> assigned + <span x-text="item.adding"></span> selected) exceeds recommended max of <strong x-text="item.recommended"></strong>.
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
                             <span class="form-label" style="margin-bottom: 0;">Choose Personnel (<span x-text="selectedAvail.length"></span> of {{ $availablePersonnel->count() }} selected):</span>
                             <button type="button" class="btn btn-secondary btn-sm" @click="toggleAll()" style="font-size: 0.75rem; padding: 2px 8px;">
@@ -1038,21 +1207,29 @@
                             </button>
                         </div>
 
-                        <div style="max-height: 260px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface);">
+                        <div class="personnel-select-list" style="max-height: 260px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface);">
                             @foreach ($availablePersonnel as $avail)
-                                <label style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-surface-alt); cursor: pointer; transition: background var(--transition-fast);" :style="selectedAvail.includes({{ $avail->id }}) ? 'background: var(--color-surface-alt);' : ''">
-                                    <input
-                                        type="checkbox"
-                                        name="personnel_ids[]"
-                                        value="{{ $avail->id }}"
-                                        x-model.number="selectedAvail"
-                                    >
-                                    <div style="flex: 1; display: flex; justify-content: space-between; align-items: center;">
-                                        <div>
-                                            <strong style="font-size: 0.875rem;">{{ $avail->full_name }}</strong>
-                                            <span class="font-mono text-muted" style="font-size: 0.75rem; margin-left: var(--space-1);">{{ $avail->employee_id }}</span>
+                                <label 
+                                    class="personnel-select-row"
+                                    for="personnel_check_{{ $avail->id }}"
+                                    :class="{ 'is-selected': selectedAvail.includes({{ $avail->id }}) }"
+                                >
+                                    <div class="personnel-select-checkbox-cell">
+                                        <input
+                                            type="checkbox"
+                                            name="personnel_ids[]"
+                                            id="personnel_check_{{ $avail->id }}"
+                                            value="{{ $avail->id }}"
+                                            x-model.number="selectedAvail"
+                                            class="personnel-select-checkbox form-check-input"
+                                        >
+                                    </div>
+                                    <div class="personnel-select-info-cell">
+                                        <div class="personnel-select-name-wrap">
+                                            <strong class="personnel-select-name">{{ $avail->full_name }}</strong>
+                                            <span class="font-mono text-muted personnel-select-id">{{ $avail->employee_id }}</span>
                                         </div>
-                                        <span class="badge" style="background: var(--color-surface-alt); font-size: 0.6875rem; font-weight: 600;">
+                                        <span class="badge personnel-select-badge">
                                             {{ $avail->expertise }}
                                         </span>
                                     </div>
@@ -1338,6 +1515,55 @@
         </div>
     </div>
 
+    {{-- ─── Modal 6: Mark Project as Completed Confirmation ───────────── --}}
+    <div class="reassign-modal-overlay" style="display: none;" x-show="markCompletedModalOpen" x-cloak>
+        <div class="reassign-modal-backdrop" @click="markCompletedModalOpen = false"></div>
+        <div class="reassign-modal-content card" x-show="markCompletedModalOpen" x-transition style="max-width: 500px; border-top: 4px solid var(--color-success);">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <svg style="width: 20px; height: 20px; color: var(--color-success);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                    <span style="font-weight: 700; font-size: 1rem;">Mark Project as Completed?</span>
+                </div>
+                <button type="button" class="flash-close" @click="markCompletedModalOpen = false" aria-label="Close modal">&times;</button>
+            </div>
+            <form action="{{ route('projects.transition', $project) }}" method="POST">
+                @csrf
+                @method('PATCH')
+                <input type="hidden" name="status" value="completed">
+                <div class="card-body" style="padding: var(--space-5);">
+                    <p style="margin-top: 0; margin-bottom: var(--space-3); font-size: 0.9375rem; color: var(--color-ink);">
+                        All timeline checklist tasks and milestones for <strong>{{ $project->name }}</strong> have been finished (100% completion reached).
+                    </p>
+                    <div style="background: var(--color-surface-alt); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); margin-bottom: var(--space-4); font-size: 0.8125rem;">
+                        <ul style="margin: 0; padding-left: var(--space-4); color: var(--color-muted);">
+                            <li>Transitions status to <strong>Completed</strong>.</li>
+                            <li>Automatically releases all currently assigned manpower back to the available pool.</li>
+                            <li>Enables option to archive this project from the project registry.</li>
+                        </ul>
+                    </div>
+                    <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                        <label for="completion_notes" class="form-label">Completion Notes / Client Sign-off <span class="text-muted">(optional)</span></label>
+                        <textarea
+                            id="completion_notes"
+                            name="notes"
+                            rows="2"
+                            class="form-control"
+                            maxlength="500"
+                            placeholder="e.g. All elevator installation checklists verified and certified complete."
+                        ></textarea>
+                    </div>
+                </div>
+                <div class="card-footer" style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                    <button type="button" class="btn btn-secondary" @click="markCompletedModalOpen = false">Keep In Progress</button>
+                    <button type="submit" class="btn btn-primary" style="background: var(--color-success); border-color: var(--color-success);">Yes, Mark Completed</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </div>
 @endsection
 
@@ -1479,6 +1705,92 @@
 }
 
 .mb-6 { margin-bottom: 1.5rem; }
+
+/* ─── Personnel Assign Multi-Select Row Layout ──────────────────────── */
+.personnel-select-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding: 0.625rem 0.75rem !important;
+    border-bottom: 1px solid var(--color-surface-alt) !important;
+    cursor: pointer !important;
+    transition: background var(--transition-fast) !important;
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.personnel-select-row:last-child {
+    border-bottom: none !important;
+}
+
+.personnel-select-row:hover {
+    background: var(--color-surface-alt) !important;
+}
+
+.personnel-select-row.is-selected {
+    background: var(--color-surface-alt) !important;
+}
+
+.personnel-select-checkbox-cell {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    width: 28px !important;
+    margin-right: 0.625rem !important;
+}
+
+.personnel-select-checkbox {
+    margin: 0 !important;
+    width: 17px !important;
+    height: 17px !important;
+    flex-shrink: 0 !important;
+    cursor: pointer !important;
+    accent-color: var(--color-accent) !important;
+}
+
+.personnel-select-info-cell {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    gap: 0.5rem !important;
+}
+
+.personnel-select-name-wrap {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 0.375rem !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+}
+
+.personnel-select-name {
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+    color: var(--color-ink) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.personnel-select-id {
+    font-size: 0.75rem !important;
+    flex-shrink: 0 !important;
+}
+
+.personnel-select-badge {
+    background: var(--color-surface-alt) !important;
+    border: 1px solid var(--color-border) !important;
+    font-size: 0.6875rem !important;
+    font-weight: 600 !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+}
 </style>
 @endpush
 
@@ -1496,6 +1808,7 @@ function projectDetail() {
         createMajorTaskModalOpen: false,
         editMajorTaskModalOpen: false,
         editSubtaskModalOpen: false,
+        markCompletedModalOpen: false,
         activeTaskId: {{ $project->tasks->first()?->id ?? 'null' }},
         initialSubtasks: [{ title: '', due_date: '{{ $defaultStartDate->format('Y-m-d') }}' }],
         editingTask: {
@@ -1720,6 +2033,11 @@ function projectDetail() {
                             const currentRows = tbody.querySelectorAll('tr').length;
                             countEl.textContent = `${currentRows} ${currentRows === 1 ? 'event' : 'events'}`;
                         }
+                    }
+
+                    // 7. Pop up completion confirmation modal if all subtasks across the project are completed
+                    if (data.prompt_completion) {
+                        this.markCompletedModalOpen = true;
                     }
                 }
             })

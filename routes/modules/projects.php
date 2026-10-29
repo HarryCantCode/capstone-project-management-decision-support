@@ -11,7 +11,14 @@ use Illuminate\Support\Facades\Route;
 | All routes inside the 'auth + two-factor' middleware group.
 */
 
-Route::resource('projects', ProjectController::class);
+Route::resource('projects', ProjectController::class)
+    ->withTrashed(['show', 'edit']);
+
+Route::post('projects/{project}/archive', [ProjectController::class, 'archive'])
+    ->name('projects.archive');
+
+Route::post('projects/{id}/restore', [ProjectController::class, 'restore'])
+    ->name('projects.restore');
 
 // Status transition — separate route from standard CRUD update
 Route::patch('projects/{project}/transition', [ProjectController::class, 'transition'])
