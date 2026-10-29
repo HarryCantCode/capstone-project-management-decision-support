@@ -67,6 +67,8 @@ internet-scale infrastructure. Do not add complexity the system doesn't need.
 | Writing or reviewing tests | `testing.md` |
 | Building or editing any view/UI | `ui-design-system.md` |
 | Anything related to the Decision Support module | `decision-support-guardrails.md` — read this even if you think the task doesn't touch it |
+| Auditing robustness, concurrency, transactions, or senior dev standards | `robustness-guardrails.md` |
+| Validating output, running container tests, & self-refining code | `.agents/skills/senior-dev-validator/SKILL.md` |
 | Server setup, backups, going live | `deployment.md` |
 
 Most non-trivial tasks touch at least two or three of these — read all that

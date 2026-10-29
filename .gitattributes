@@ -1,0 +1,30 @@
+# Handle line endings consistently across Windows/Linux/Mac
+# All text files are stored as LF in the repository;
+# Windows checkouts convert to CRLF locally.
+
+* text=auto eol=lf
+
+# PHP, Blade, JS, CSS — force LF
+*.php   text eol=lf
+*.blade.php text eol=lf
+*.js    text eol=lf
+*.css   text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.md    text eol=lf
+*.env   text eol=lf
+*.sh    text eol=lf
+
+# Binary files — no line-ending conversion
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.ttf   binary
+*.woff  binary
+*.woff2 binary
+*.eot   binary
+*.pdf   binary
+*.zip   binary
