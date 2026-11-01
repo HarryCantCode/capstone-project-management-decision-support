@@ -68,7 +68,7 @@ class AccountUserController extends Controller implements HasMiddleware
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'birthdate' => ['required', 'date', 'before:today'],
+            'birthdate' => ['required', 'date', 'before_or_equal:' . now()->subYears(18)->format('Y-m-d')],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'job_title_choice' => ['required', 'string'],
             'job_title_other' => ['nullable', 'required_if:job_title_choice,Others', 'string', 'max:255'],

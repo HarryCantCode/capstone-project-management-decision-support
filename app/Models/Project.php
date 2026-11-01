@@ -44,6 +44,9 @@ class Project extends \Illuminate\Database\Eloquent\Model
         'address',
         'barangay',
         'city',
+        'province',
+        'region',
+        'postal_code',
         'project_type',
         'rated_capacity',
         'lifting_speed',
@@ -126,9 +129,16 @@ class Project extends \Illuminate\Database\Eloquent\Model
      */
     public function getFullAddressAttribute(): string
     {
-        return collect([$this->address, $this->barangay, $this->city])
+        $base = collect([$this->address, $this->barangay, $this->city, $this->province, $this->region])
             ->filter(fn ($part) => filled($part))
+            ->unique()
             ->implode(', ');
+
+        if (filled($this->postal_code)) {
+            $base = $base ? "{$base} {$this->postal_code}" : $this->postal_code;
+        }
+
+        return $base;
     }
 
     /**

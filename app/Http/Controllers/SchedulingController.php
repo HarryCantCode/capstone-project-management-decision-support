@@ -111,14 +111,21 @@ class SchedulingController extends Controller implements HasMiddleware
         $this->authorize('create', Personnel::class);
 
         $validated = $request->validate([
-            'first_name'    => ['required', 'string', 'max:255'],
-            'middle_name'   => ['nullable', 'string', 'max:255'],
-            'last_name'     => ['required', 'string', 'max:255'],
-            'date_of_birth' => ['required', 'date', 'before:today'],
-            'address'       => ['required', 'string', 'max:1000'],
-            'expertise'     => ['required', 'string', Rule::in(Personnel::EXPERTISE_OPTIONS)],
+            'first_name'     => ['required', 'string', 'max:255'],
+            'middle_name'    => ['nullable', 'string', 'max:255'],
+            'last_name'      => ['required', 'string', 'max:255'],
+            'date_of_birth'  => ['required', 'date', 'before_or_equal:' . now()->subYears(18)->format('Y-m-d')],
+            'address'        => ['required', 'string', 'max:1000'],
+            'region'         => ['nullable', 'string', 'max:255'],
+            'province'       => ['nullable', 'string', 'max:255'],
+            'city'           => ['nullable', 'string', 'max:255'],
+            'barangay'       => ['nullable', 'string', 'max:255'],
+            'postal_code'    => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:10'],
+            'expertise'      => ['required', 'string', Rule::in(Personnel::EXPERTISE_OPTIONS)],
             'assign_project' => ['nullable', 'boolean'],
-            'project_id'    => ['nullable', 'required_if:assign_project,1', 'exists:projects,id'],
+            'project_id'     => ['nullable', 'required_if:assign_project,1', 'exists:projects,id'],
+        ], [
+            'date_of_birth.before_or_equal' => 'Personnel must be at least 18 years of age.',
         ]);
 
         $personnel = Personnel::create([
@@ -127,6 +134,11 @@ class SchedulingController extends Controller implements HasMiddleware
             'last_name'     => $validated['last_name'],
             'date_of_birth' => $validated['date_of_birth'],
             'address'       => $validated['address'],
+            'barangay'      => $validated['barangay'] ?? null,
+            'city'          => $validated['city'] ?? null,
+            'province'      => $validated['province'] ?? null,
+            'region'        => $validated['region'] ?? null,
+            'postal_code'   => $validated['postal_code'] ?? null,
             'expertise'     => $validated['expertise'],
             'project_id'    => !empty($validated['assign_project']) ? ($validated['project_id'] ?? null) : null,
             'date_assigned' => !empty($validated['assign_project']) && !empty($validated['project_id']) ? now()->toDateString() : null,

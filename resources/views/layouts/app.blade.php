@@ -281,7 +281,216 @@
                 </div>
 
                 {{-- User dropdown (Right-aligned) --}}
-                <div class="topbar-user" style="margin-left: auto; display: flex; align-items: center;" x-data="{ open: false }">
+                <div class="topbar-right-group" style="margin-left: auto; display: flex; align-items: center; gap: var(--space-3);">
+
+                    {{-- Notification Bell --}}
+                    @if(Auth::user()->hasRole(['Admin', 'Manager']))
+                    <div
+                        class="notification-bell-wrap"
+                        x-data="notificationBell()"
+                        @click.outside="open = false"
+                        @keydown.escape.window="open = false"
+                    >
+                        <button
+                            type="button"
+                            class="notification-bell-btn"
+                            :class="{ 'notification-bell-btn--active': open }"
+                            @click="toggle()"
+                            :aria-expanded="open.toString()"
+                            aria-haspopup="true"
+                            aria-controls="notification-modal"
+                            aria-label="Notifications"
+                            title="Notifications"
+                        >
+                            <svg class="notification-bell-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                            </svg>
+                            <span
+                                class="notification-badge font-mono"
+                                x-show="unreadCount > 0"
+                                x-text="unreadCount > 99 ? '99+' : unreadCount"
+                                x-cloak
+                                aria-live="polite"
+                            ></span>
+                        </button>
+
+                        {{-- Technical Dropdown Modal --}}
+                        <div
+                            id="notification-modal"
+                            class="notification-modal"
+                            x-show="open"
+                            x-cloak
+                            x-transition:enter="transition ease-out duration-150"
+                            x-transition:enter-start="opacity-0 transform scale-95"
+                            x-transition:enter-end="opacity-100 transform scale-100"
+                            x-transition:leave="transition ease-in duration-100"
+                            x-transition:leave-start="opacity-100 transform scale-100"
+                            x-transition:leave-end="opacity-0 transform scale-95"
+                            role="dialog"
+                            aria-label="Notifications"
+                        >
+                            {{-- Modal Header --}}
+                            <div class="notification-modal-header">
+                                <div class="notification-header-top">
+                                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                        <h3 class="notification-modal-title">Notifications</h3>
+                                        <template x-if="unreadCount > 0">
+                                            <span class="status-pill status-pill--ongoing font-mono" style="font-size: 0.6875rem; padding: 1px 6px;" x-text="unreadCount + ' Unread'"></span>
+                                        </template>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="notification-mark-all-link"
+                                        @click="markAllRead()"
+                                        x-show="activeTab !== 'archived' && unreadCount > 0"
+                                        title="Mark all notifications as read"
+                                    >
+                                        Mark All Read
+                                    </button>
+                                </div>
+
+                                {{-- Tab Switcher --}}
+                                <div class="btn-group" role="tablist" style="display: flex; width: 100%; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; margin-top: var(--space-2);">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm"
+                                        :class="activeTab === 'all' ? 'btn-primary' : 'btn-secondary'"
+                                        style="flex: 1; padding: 0.25rem 0.5rem; font-size: 0.75rem; border: none; border-radius: 0;"
+                                        @click="switchTab('all')"
+                                    >
+                                        All (<span class="font-mono" x-text="activeNotifications.length"></span>)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm"
+                                        :class="activeTab === 'unread' ? 'btn-primary' : 'btn-secondary'"
+                                        style="flex: 1; padding: 0.25rem 0.5rem; font-size: 0.75rem; border: none; border-radius: 0;"
+                                        @click="switchTab('unread')"
+                                    >
+                                        Unread (<span class="font-mono" x-text="unreadCount"></span>)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm"
+                                        :class="activeTab === 'archived' ? 'btn-primary' : 'btn-secondary'"
+                                        style="flex: 1; padding: 0.25rem 0.5rem; font-size: 0.75rem; border: none; border-radius: 0;"
+                                        @click="switchTab('archived')"
+                                    >
+                                        Archived (<span class="font-mono" x-text="archivedNotifications.length"></span>)
+                                    </button>
+                                </div>
+                            </div>
+
+                            {{-- Modal Body --}}
+                            <div class="notification-modal-body" x-ref="notificationList">
+                                {{-- Loading Spinner --}}
+                                <div x-show="loading" class="notification-loading-state">
+                                    <div class="topbar-search-spinner"></div>
+                                    <span class="notification-loading-text">Loading notifications...</span>
+                                </div>
+
+                                {{-- Empty State: All --}}
+                                <div x-show="!loading && activeTab === 'all' && displayNotifications.length === 0" class="notification-empty-box">
+                                    <p class="notification-empty-title">No notifications yet</p>
+                                    <p class="notification-empty-subtitle">New project assignments, timeline tasks, and warranty alerts will appear here.</p>
+                                </div>
+
+                                {{-- Empty State: Unread --}}
+                                <div x-show="!loading && activeTab === 'unread' && displayNotifications.length === 0" class="notification-empty-box">
+                                    <p class="notification-empty-title">All caught up</p>
+                                    <p class="notification-empty-subtitle">There are no unread notifications right now.</p>
+                                </div>
+
+                                {{-- Empty State: Archived --}}
+                                <div x-show="!loading && activeTab === 'archived' && displayNotifications.length === 0" class="notification-empty-box">
+                                    <p class="notification-empty-title">No archived items</p>
+                                    <p class="notification-empty-subtitle">Notifications you archive will be kept here for historical reference.</p>
+                                </div>
+
+                                {{-- Notification Items List --}}
+                                <div x-show="!loading && displayNotifications.length > 0" class="notification-cards-list">
+                                    <template x-for="notification in displayNotifications" :key="notification.id">
+                                        <div
+                                            class="notification-card-item"
+                                            :class="{ 'notification-card-item--unread': !notification.is_read && activeTab !== 'archived' }"
+                                        >
+                                            <div class="notification-card-main">
+                                                <div class="notification-card-meta-row">
+                                                    {{-- Status Pill indicating event type --}}
+                                                    <template x-if="notification.type === 'warranty_expiry'">
+                                                        <span class="status-pill status-pill--ongoing">Warranty</span>
+                                                    </template>
+                                                    <template x-if="notification.type === 'new_project'">
+                                                        <span class="status-pill status-pill--completed">New Project</span>
+                                                    </template>
+                                                    <template x-if="notification.type === 'new_task'">
+                                                        <span class="status-pill status-pill--pending">Task Logged</span>
+                                                    </template>
+
+                                                    <span class="notification-card-time font-mono" x-text="notification.time_ago"></span>
+                                                </div>
+
+                                                <a
+                                                    :href="notification.url || 'javascript:void(0)'"
+                                                    class="notification-card-link-block"
+                                                    @click="onNotificationClick(notification)"
+                                                >
+                                                    <div class="notification-card-title" x-text="notification.title"></div>
+                                                    <div class="notification-card-msg" x-text="notification.message"></div>
+                                                </a>
+
+                                                <div class="notification-card-bottom-row">
+                                                    <div class="notification-status-indicator">
+                                                        <template x-if="!notification.is_read && activeTab !== 'archived'">
+                                                            <span class="status-pill status-pill--pending" style="font-size: 0.6875rem; padding: 1px 6px;">Unread</span>
+                                                        </template>
+                                                    </div>
+
+                                                    <div class="notification-card-actions">
+                                                        <button
+                                                            type="button"
+                                                            class="notification-text-action"
+                                                            x-show="!notification.is_read && activeTab !== 'archived'"
+                                                            @click.stop="markRead(notification)"
+                                                        >
+                                                            Mark Read
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            class="notification-text-action"
+                                                            x-show="activeTab !== 'archived'"
+                                                            @click.stop="archiveNotification(notification)"
+                                                        >
+                                                            Archive
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            class="notification-text-action notification-text-action--restore"
+                                                            x-show="activeTab === 'archived'"
+                                                            @click.stop="unarchiveNotification(notification)"
+                                                        >
+                                                            Restore
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            {{-- Modal Footer --}}
+                            <div class="notification-modal-footer">
+                                <span class="font-mono" x-text="displayNotifications.length + ' record' + (displayNotifications.length === 1 ? '' : 's')"></span>
+                                <a href="{{ route('projects.index') }}" class="notification-footer-link">Go to Projects →</a>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
+                    {{-- User menu --}}
+                    <div class="topbar-user" x-data="{ open: false }">
                     <button
                         id="user-menu-button"
                         type="button"
@@ -361,6 +570,7 @@
                         @csrf
                     </form>
                 </div>
+                </div>{{-- end .topbar-right-group --}}
             </header>
 
             {{-- Flash messages --}}
@@ -494,8 +704,216 @@
                 }
             };
         }
+
+        /**
+         * Notification Bell — Alpine.js component for the topbar bell icon & drop-down modal.
+         *
+         * Fetches notifications via JSON API, supports tabs (All / Unread / Archived),
+         * mark-as-read, archive, and unarchive. Polls every 60 seconds.
+         */
+        function notificationBell() {
+            return {
+                open: false,
+                loading: false,
+                activeTab: 'all', // 'all', 'unread', 'archived'
+                activeNotifications: [],
+                archivedNotifications: [],
+                unreadCount: 0,
+                pollInterval: null,
+
+                init() {
+                    this.fetchUnreadCount();
+                    this.pollInterval = setInterval(() => {
+                        if (!this.open) {
+                            this.fetchUnreadCount();
+                        }
+                    }, 60000);
+                },
+
+                destroy() {
+                    if (this.pollInterval) clearInterval(this.pollInterval);
+                },
+
+                toggle() {
+                    this.open = !this.open;
+                    if (this.open) {
+                        if (this.activeTab === 'archived') {
+                            this.fetchArchived();
+                        } else {
+                            this.fetchActive();
+                        }
+                    }
+                },
+
+                get displayNotifications() {
+                    if (this.activeTab === 'archived') {
+                        return this.archivedNotifications;
+                    }
+                    if (this.activeTab === 'unread') {
+                        return this.activeNotifications.filter(n => !n.is_read);
+                    }
+                    return this.activeNotifications;
+                },
+
+                async switchTab(tab) {
+                    this.activeTab = tab;
+                    if (tab === 'archived') {
+                        await this.fetchArchived();
+                    } else if (this.activeNotifications.length === 0) {
+                        await this.fetchActive();
+                    }
+                },
+
+                async fetchActive() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('{{ route("notifications.index") }}?filter=active', {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.activeNotifications = data.notifications;
+                            this.unreadCount = data.unread_count;
+                        }
+                    } catch (err) {
+                        console.error('Active notifications fetch error:', err);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async fetchArchived() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('{{ route("notifications.index") }}?filter=archived', {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.archivedNotifications = data.notifications;
+                        }
+                    } catch (err) {
+                        console.error('Archived notifications fetch error:', err);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async fetchUnreadCount() {
+                    try {
+                        const response = await fetch('{{ route("notifications.unread-count") }}', {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.unreadCount = data.unread_count;
+                        }
+                    } catch (err) {
+                        // Silent fail — poll will retry
+                    }
+                },
+
+                async onNotificationClick(notification) {
+                    if (!notification.is_read) {
+                        await this.markRead(notification);
+                    }
+                    if (notification.url && notification.url !== '#' && !notification.url.startsWith('javascript:')) {
+                        window.location.href = notification.url;
+                    }
+                },
+
+                async markRead(notification) {
+                    if (notification.is_read) return;
+                    try {
+                        const response = await fetch(`/notifications/${notification.id}/read`, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        if (response.ok) {
+                            notification.is_read = true;
+                            this.unreadCount = Math.max(0, this.unreadCount - 1);
+                        }
+                    } catch (err) {
+                        console.error('Mark read error:', err);
+                    }
+                },
+
+                async markAllRead() {
+                    try {
+                        const response = await fetch('{{ route("notifications.mark-all-read") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        if (response.ok) {
+                            this.activeNotifications.forEach(n => n.is_read = true);
+                            this.unreadCount = 0;
+                        }
+                    } catch (err) {
+                        console.error('Mark all read error:', err);
+                    }
+                },
+
+                async archiveNotification(notification) {
+                    try {
+                        const response = await fetch(`/notifications/${notification.id}/archive`, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        if (response.ok) {
+                            if (!notification.is_read) {
+                                this.unreadCount = Math.max(0, this.unreadCount - 1);
+                            }
+                            this.activeNotifications = this.activeNotifications.filter(n => n.id !== notification.id);
+                        }
+                    } catch (err) {
+                        console.error('Archive error:', err);
+                    }
+                },
+
+                async unarchiveNotification(notification) {
+                    try {
+                        const response = await fetch(`/notifications/${notification.id}/unarchive`, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        if (response.ok) {
+                            this.archivedNotifications = this.archivedNotifications.filter(n => n.id !== notification.id);
+                            this.activeNotifications.unshift(notification);
+                        }
+                    } catch (err) {
+                        console.error('Unarchive error:', err);
+                    }
+                }
+            };
+        }
     </script>
 
+    <script src="{{ asset('js/philippine-address.js') }}"></script>
     @stack('scripts')
 </body>
 </html>

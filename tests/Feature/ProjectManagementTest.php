@@ -22,7 +22,8 @@ test('manager can create a project with contract price, site address, project ty
             'name' => 'Makati Office Lift Modernization',
             'client_name' => 'Northpoint Properties',
             'address' => '6789 Ayala Avenue',
-            'barangay' => 'Bel-Air',
+            'region' => 'Metro-Manila',
+            'province' => 'Metro-Manila',
             'city' => 'Makati City',
             'project_type' => 'Commercial',
             'rated_capacity' => '1000 kg',
@@ -49,7 +50,8 @@ test('manager can create a project with contract price, site address, project ty
         ->and($project->project_code)->toMatch('/^DEX-\d{4}-\d{3}$/')
         ->and($project->created_by)->toBe($manager->id)
         ->and($project->address)->toBe('6789 Ayala Avenue')
-        ->and($project->barangay)->toBe('Bel-Air')
+        ->and($project->region)->toBe('Metro-Manila')
+        ->and($project->province)->toBe('Metro-Manila')
         ->and($project->city)->toBe('Makati City')
         ->and($project->project_type)->toBe('Commercial')
         ->and($project->rated_capacity)->toBe('1000 kg')
@@ -64,7 +66,7 @@ test('manager can create a project with contract price, site address, project ty
         ->and($project->payment_status)->toBe('Paid')
         ->and($project->warranty_period)->toBe('1 Year')
         ->and($project->warranty_end_date->format('Y-m-d'))->toBe(now()->addYear()->format('Y-m-d'))
-        ->and($project->full_address)->toBe('6789 Ayala Avenue, Bel-Air, Makati City')
+        ->and($project->full_address)->toBe('6789 Ayala Avenue, Makati City, Metro-Manila')
         ->and((float) $project->contract_price)->toBe(1250000.00)
         ->and((float) $project->actual_spend)->toBe(0.00)
         ->and((float) $project->remaining_budget)->toBe(1250000.00)
@@ -331,7 +333,6 @@ test('creating a project requires site address, project type, and payment status
         ])
         ->assertSessionHasErrors([
             'address',
-            'barangay',
             'city',
             'project_type',
             'payment_status',
@@ -1253,4 +1254,39 @@ test('completed project status can be reversed to ongoing via project update', f
         ->assertRedirect(route('projects.show', $project));
 
     expect($project->fresh()->status)->toBe('ongoing');
+});
+
+test('project can be created and updated with region, province and split address fields', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $response = $this->actingAs($manager)->post(route('projects.store'), [
+        'name' => 'Ayala Tower Elevator',
+        'client_name' => 'Ayala Land',
+        'address' => '6789 Ayala Avenue',
+        'region' => 'Metro-Manila',
+        'province' => 'Metro-Manila',
+        'city' => 'Makati City',
+        'project_type' => 'Commercial',
+        'rated_capacity' => '1000 kgs',
+        'lifting_speed' => '1.5 m/s',
+        'no_of_stops' => 15,
+        'cage_dimension' => '1.5m x 1.5m',
+        'wall_and_ceiling' => 'Stainless Steel',
+        'flooring' => 'Granite',
+        'door_operation' => 'Automatic Center Opening',
+        'power_source' => '220V 3-Phase',
+        'operation' => 'Simplex Selective Collective',
+        'payment_status' => 'Paid',
+        'start_date' => now()->addDay()->format('Y-m-d'),
+        'target_completion_date' => now()->addMonths(2)->format('Y-m-d'),
+        'contract_price' => 500000,
+    ]);
+
+    $response->assertSessionHasNoErrors();
+    $project = \App\Models\Project::where('name', 'Ayala Tower Elevator')->first();
+    expect($project)->not->toBeNull();
+    expect($project->region)->toBe('Metro-Manila');
+    expect($project->province)->toBe('Metro-Manila');
+    expect($project->full_address)->toBe('6789 Ayala Avenue, Makati City, Metro-Manila');
 });

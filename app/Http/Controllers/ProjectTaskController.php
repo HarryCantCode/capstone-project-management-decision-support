@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\ProjectStatusHistory;
 use App\Models\ProjectSubtask;
 use App\Models\ProjectTask;
+use App\Services\NotificationService;
 use App\Services\ProjectService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -134,6 +135,9 @@ class ProjectTaskController extends Controller
 
             return $task;
         });
+
+        // Notify Admin and Manager users about the new major task (outside transaction for performance)
+        app(NotificationService::class)->notifyNewTask($project, $task);
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -264,6 +268,9 @@ class ProjectTaskController extends Controller
                 ])
                 ->log($minorTaskNote);
         }
+
+        // Notify Admin and Manager users about the new sub task
+        app(NotificationService::class)->notifyNewTask($project, $task, $subtask->title);
 
         if ($request->wantsJson()) {
             return response()->json([

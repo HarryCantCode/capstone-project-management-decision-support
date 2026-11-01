@@ -313,3 +313,54 @@ test('personnel expertise options accept technician, project manager, qa inspect
 
     $invalidResponse->assertSessionHasErrors(['expertise']);
 });
+
+test('personnel creation validates birthdate must be at least 18 years old', function () {
+    $admin = User::factory()->create();
+    $admin->assignRole('Admin');
+
+    // 17 years old should fail
+    $underageBirthdate = now()->subYears(17)->format('Y-m-d');
+    $response = $this->actingAs($admin)->post(route('scheduling.store'), [
+        'first_name'    => 'Young',
+        'last_name'     => 'Worker',
+        'date_of_birth' => $underageBirthdate,
+        'address'       => '123 Test St',
+        'expertise'     => 'Worker / Installation Personnel',
+    ]);
+
+    $response->assertSessionHasErrors(['date_of_birth']);
+
+    // 20 years old should succeed
+    $validBirthdate = now()->subYears(20)->format('Y-m-d');
+    $validResponse = $this->actingAs($admin)->post(route('scheduling.store'), [
+        'first_name'    => 'Adult',
+        'last_name'     => 'Worker',
+        'date_of_birth' => $validBirthdate,
+        'address'       => '123 Test St',
+        'barangay'      => 'Bel-Air',
+        'city'          => 'Makati City',
+        'region'        => 'National Capital Region (NCR)',
+        'expertise'     => 'Worker / Installation Personnel',
+    ]);
+
+    $validResponse->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('personnel', [
+        'first_name' => 'Adult',
+        'barangay'   => 'Bel-Air',
+        'city'       => 'Makati City',
+        'region'     => 'National Capital Region (NCR)',
+    ]);
+});
+
+test('personnel create view renders placeholders and 18-year birthdate constraint', function () {
+    $admin = User::factory()->create();
+    $admin->assignRole('Admin');
+
+    $response = $this->actingAs($admin)->get(route('scheduling.create'));
+    $response->assertStatus(200);
+    $response->assertSee('placeholder="ex. Juan"', false);
+    $response->assertSee('placeholder="ex. David"', false);
+    $response->assertSee('placeholder="ex. Dela Cruz"', false);
+    $response->assertSee('max="' . now()->subYears(18)->format('Y-m-d') . '"', false);
+    $response->assertSee('National Capital Region (NCR)');
+});

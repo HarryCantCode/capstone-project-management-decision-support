@@ -52,6 +52,11 @@ class Personnel extends \Illuminate\Database\Eloquent\Model
         'last_name',
         'date_of_birth',
         'address',
+        'barangay',
+        'city',
+        'province',
+        'region',
+        'postal_code',
         'expertise',
         'project_id',
         'date_assigned',
@@ -66,7 +71,7 @@ class Personnel extends \Illuminate\Database\Eloquent\Model
     ];
 
     /** @var list<string> */
-    protected $appends = ['full_name', 'status'];
+    protected $appends = ['full_name', 'full_address', 'status'];
 
     // ─── Boot: auto-generate employee_id ──────────────────────────────────────
 
@@ -104,6 +109,23 @@ class Personnel extends \Illuminate\Database\Eloquent\Model
         ]);
 
         return implode(' ', $parts);
+    }
+
+    /**
+     * Full address composed from address, barangay, city, and region.
+     */
+    public function getFullAddressAttribute(): string
+    {
+        $base = collect([$this->address, $this->barangay, $this->city, $this->province, $this->region])
+            ->filter(fn ($part) => filled($part))
+            ->unique()
+            ->implode(', ');
+
+        if (filled($this->postal_code)) {
+            $base = $base ? "{$base} {$this->postal_code}" : $this->postal_code;
+        }
+
+        return $base;
     }
 
     /**

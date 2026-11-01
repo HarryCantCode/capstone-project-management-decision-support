@@ -99,4 +99,7 @@ Route::middleware(['auth', 'two-factor', 'must-change-password'])->group(functio
 
     // Phase 6: Decision Support
     require __DIR__ . '/modules/decision-support.php';
+
+    // Notifications (bell dropdown API)
+    require __DIR__ . '/modules/notifications.php';
 });

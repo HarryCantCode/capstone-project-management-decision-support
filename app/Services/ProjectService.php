@@ -20,6 +20,11 @@ use Illuminate\Validation\ValidationException;
  */
 class ProjectService
 {
+    public function __construct(
+        private readonly NotificationService $notificationService,
+    ) {
+    }
+
     /**
      * Allowed status transitions.
      * Supports transitions across pending, ongoing, delayed, and completed.
@@ -60,6 +65,9 @@ class ProjectService
                 'address' => $validated['address'] ?? null,
                 'barangay' => $validated['barangay'] ?? null,
                 'city' => $validated['city'] ?? null,
+                'province' => $validated['province'] ?? null,
+                'region' => $validated['region'] ?? null,
+                'postal_code' => $validated['postal_code'] ?? null,
                 'project_type' => $validated['project_type'] ?? null,
                 'rated_capacity' => $validated['rated_capacity'] ?? null,
                 'lifting_speed' => $validated['lifting_speed'] ?? null,
@@ -90,6 +98,9 @@ class ProjectService
 
             $html = view('projects.partials.row', compact('project'))->render();
             \App\Events\ProjectCreated::dispatch($html, $stats);
+
+            // Notify Admin and Manager users about the new project
+            $this->notificationService->notifyNewProject($project);
 
             return $project;
         });
@@ -172,6 +183,9 @@ class ProjectService
             'address' => $validated['address'] ?? $project->address,
             'barangay' => $validated['barangay'] ?? $project->barangay,
             'city' => $validated['city'] ?? $project->city,
+            'province' => $validated['province'] ?? $project->province,
+            'region' => $validated['region'] ?? $project->region,
+            'postal_code' => $validated['postal_code'] ?? $project->postal_code,
             'project_type' => $validated['project_type'] ?? $project->project_type,
             'rated_capacity' => $validated['rated_capacity'] ?? $project->rated_capacity,
             'lifting_speed' => $validated['lifting_speed'] ?? $project->lifting_speed,

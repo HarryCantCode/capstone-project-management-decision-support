@@ -349,39 +349,88 @@
                         value="{{ old('address', $project->address ?? '') }}"
                         maxlength="255"
                         required
-                        placeholder="e.g. 123 Ayala Avenue, Tower 1"
+                        placeholder="ex. 123 Ayala Avenue, Tower 1"
                     >
                     @error('address')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="form-group form-group-premium" style="margin-bottom: 0;">
-                    <label for="barangay" class="form-label">Barangay <span class="text-danger">*</span></label>
-                    <input
-                        id="barangay"
-                        name="barangay"
-                        type="text"
-                        class="form-control @error('barangay') is-invalid @enderror"
-                        value="{{ old('barangay', $project->barangay ?? '') }}"
-                        maxlength="255"
+                    <label for="region" class="form-label">Region <span class="text-danger">*</span></label>
+                    <select id="region" name="region" class="form-control @error('region') is-invalid @enderror" data-initial-value="{{ old('region', $project->region ?? '') }}" required>
+                        <option value="" disabled {{ old('region', $project->region ?? '') ? '' : 'selected' }}>Select Region...</option>
+                        @foreach(\App\Support\PhilippineRegions::all() as $regName)
+                            <option value="{{ $regName }}" @selected(old('region', $project->region ?? '') === $regName)>
+                                {{ $regName }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('region')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="province" class="form-label">Province <span class="text-danger">*</span></label>
+                    <select
+                        id="province"
+                        name="province"
+                        class="form-control @error('province') is-invalid @enderror"
+                        data-initial-value="{{ old('province', $project->province ?? '') }}"
                         required
-                        placeholder="e.g. Bel-Air"
                     >
-                    @error('barangay')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                        <option value="" disabled {{ old('province', $project->province ?? '') ? '' : 'selected' }}>Select Province...</option>
+                        @if(old('province', $project->province ?? ''))
+                            <option value="{{ old('province', $project->province ?? '') }}" selected>{{ old('province', $project->province ?? '') }}</option>
+                        @endif
+                    </select>
+                    @error('province')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="form-group form-group-premium" style="margin-bottom: 0;">
                     <label for="city" class="form-label">City <span class="text-danger">*</span></label>
-                    <input
+                    <select
                         id="city"
                         name="city"
-                        type="text"
                         class="form-control @error('city') is-invalid @enderror"
-                        value="{{ old('city', $project->city ?? '') }}"
-                        maxlength="255"
+                        data-initial-value="{{ old('city', $project->city ?? '') }}"
                         required
-                        placeholder="e.g. Makati City"
                     >
+                        <option value="" disabled {{ old('city', $project->city ?? '') ? '' : 'selected' }}>Select City / Municipality...</option>
+                        @if(old('city', $project->city ?? ''))
+                            <option value="{{ old('city', $project->city ?? '') }}" selected>{{ old('city', $project->city ?? '') }}</option>
+                        @endif
+                    </select>
                     @error('city')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="barangay" class="form-label">Barangay</label>
+                    <select
+                        id="barangay"
+                        name="barangay"
+                        class="form-control @error('barangay') is-invalid @enderror"
+                        data-initial-value="{{ old('barangay', $project->barangay ?? '') }}"
+                    >
+                        <option value="">Select Barangay...</option>
+                        @if(old('barangay', $project->barangay ?? ''))
+                            <option value="{{ old('barangay', $project->barangay ?? '') }}" selected>{{ old('barangay', $project->barangay ?? '') }}</option>
+                        @endif
+                    </select>
+                    @error('barangay')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="postal_code" class="form-label">Postal Code</label>
+                    <input
+                        id="postal_code"
+                        name="postal_code"
+                        type="text"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        class="form-control font-mono @error('postal_code') is-invalid @enderror"
+                        value="{{ old('postal_code', $project->postal_code ?? '') }}"
+                        maxlength="10"
+                        placeholder="ex. 1226"
+                    >
+                    @error('postal_code')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                 </div>
             </div>
         </div>
@@ -657,8 +706,11 @@
         const paymentSelect = document.getElementById('payment_status');
         const previewPaymentPill = document.getElementById('preview-payment-pill');
         const addressInput = document.getElementById('address');
-        const barangayInput = document.getElementById('barangay');
+        const regionInput = document.getElementById('region');
+        const provinceInput = document.getElementById('province');
         const cityInput = document.getElementById('city');
+        const barangayInput = document.getElementById('barangay');
+        const postalCodeInput = document.getElementById('postal_code');
         const previewLocation = document.getElementById('preview-location');
 
         function getMinTargetCompletionDate(startDateStr) {
@@ -759,9 +811,16 @@
             const parts = [
                 addressInput ? addressInput.value.trim() : '',
                 barangayInput ? barangayInput.value.trim() : '',
-                cityInput ? cityInput.value.trim() : ''
+                cityInput ? cityInput.value.trim() : '',
+                provinceInput ? provinceInput.value.trim() : '',
+                regionInput ? regionInput.value.trim() : ''
             ].filter(Boolean);
-            previewLocation.textContent = parts.length > 0 ? parts.join(', ') : 'Address pending';
+            const uniqueParts = [...new Set(parts)];
+            let locText = uniqueParts.length > 0 ? uniqueParts.join(', ') : 'Address pending';
+            if (postalCodeInput && postalCodeInput.value.trim() && locText !== 'Address pending') {
+                locText += ` ${postalCodeInput.value.trim()}`;
+            }
+            previewLocation.textContent = locText;
         }
 
         const stopsInput = document.getElementById('no_of_stops');
@@ -797,12 +856,28 @@
             paymentSelect.addEventListener('change', updatePaymentPill);
         }
 
-        [addressInput, barangayInput, cityInput].forEach(function (input) {
+        [addressInput, cityInput, provinceInput, regionInput, barangayInput, postalCodeInput].forEach(function (input) {
             if (input) {
                 input.addEventListener('input', updateLocation);
                 input.addEventListener('change', updateLocation);
             }
         });
+
+        if (typeof initPhilippineAddress === 'function') {
+            initPhilippineAddress({
+                regionSelect: '#region',
+                provinceSelect: '#province',
+                citySelect: '#city',
+                barangaySelect: '#barangay',
+                postalCodeInput: '#postal_code',
+                addressInput: '#address',
+                initialRegion: @js(old('region', $project->region ?? '')),
+                initialProvince: @js(old('province', $project->province ?? '')),
+                initialCity: @js(old('city', $project->city ?? '')),
+                initialBarangay: @js(old('barangay', $project->barangay ?? '')),
+                onChange: updateLocation
+            });
+        }
 
         [stopsInput, capacityInput].forEach(function (input) {
             if (input) {

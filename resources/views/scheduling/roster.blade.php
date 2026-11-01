@@ -15,6 +15,10 @@
         date_of_birth: '',
         expertise: 'Worker / Installation Personnel',
         address: '',
+        barangay: '',
+        city: '',
+        province: '',
+        region: '',
         project_id: '',
         archive_profile: false,
         actionUrl: '',
@@ -30,6 +34,10 @@
             date_of_birth: @js($p->date_of_birth ? $p->date_of_birth->format('Y-m-d') : ''),
             expertise: @js($p->expertise),
             address: @js($p->address),
+            barangay: @js($p->barangay ?? ''),
+            city: @js($p->city ?? ''),
+            province: @js($p->province ?? ''),
+            region: @js($p->region ?? ''),
             project_id: @js($p->project_id ?? ''),
             actionUrl: '{{ route('scheduling.update', $p->id) }}',
         },
@@ -47,11 +55,28 @@
             date_of_birth: item.date_of_birth,
             expertise: item.expertise,
             address: item.address,
+            barangay: item.barangay,
+            city: item.city,
+            province: item.province,
+            region: item.region,
             project_id: item.project_id || '',
             archive_profile: false,
             actionUrl: item.actionUrl,
         };
         this.editModalOpen = true;
+        this.$nextTick(() => {
+            if (typeof initPhilippineAddress === 'function') {
+                initPhilippineAddress({
+                    regionSelect: '#modal_region',
+                    provinceSelect: '#modal_province',
+                    citySelect: '#modal_city',
+                    addressInput: '#modal_address',
+                    initialRegion: item.region,
+                    initialProvince: item.province,
+                    initialCity: item.city
+                });
+            }
+        });
     },
     archiveDirectly(id, name) {
         if (confirm('Archive personnel profile for ' + name + '? They will be unassigned from projects and moved to the inactive roster.')) {
