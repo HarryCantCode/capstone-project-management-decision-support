@@ -5,6 +5,10 @@
         ? $project->start_date->format('Y-m-d')
         : $todayStr;
     $currentStartDate = old('start_date', isset($project) && $project->start_date ? $project->start_date->format('Y-m-d') : $todayStr);
+    $baseDate = \Carbon\Carbon::parse($currentStartDate)->gt(now()->startOfDay())
+        ? \Carbon\Carbon::parse($currentStartDate)
+        : now()->startOfDay();
+    $minTargetCompletionDate = $baseDate->copy()->addMonth()->format('Y-m-d');
     $currentTargetDate = old('target_completion_date', isset($project) && $project->target_completion_date ? $project->target_completion_date->format('Y-m-d') : now()->addWeeks(8)->format('Y-m-d'));
     $calculatedWarrantyEnd = \Carbon\Carbon::parse($currentStartDate)->addYear()->format('Y-m-d');
 ?>
@@ -345,39 +349,88 @@
                         value="{{ old('address', $project->address ?? '') }}"
                         maxlength="255"
                         required
-                        placeholder="e.g. 123 Ayala Avenue, Tower 1"
+                        placeholder="ex. 123 Ayala Avenue, Tower 1"
                     >
                     @error('address')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="form-group form-group-premium" style="margin-bottom: 0;">
-                    <label for="barangay" class="form-label">Barangay <span class="text-danger">*</span></label>
-                    <input
-                        id="barangay"
-                        name="barangay"
-                        type="text"
-                        class="form-control @error('barangay') is-invalid @enderror"
-                        value="{{ old('barangay', $project->barangay ?? '') }}"
-                        maxlength="255"
+                    <label for="region" class="form-label">Region <span class="text-danger">*</span></label>
+                    <select id="region" name="region" class="form-control @error('region') is-invalid @enderror" data-initial-value="{{ old('region', $project->region ?? '') }}" required>
+                        <option value="" disabled {{ old('region', $project->region ?? '') ? '' : 'selected' }}>Select Region...</option>
+                        @foreach(\App\Support\PhilippineRegions::all() as $regName)
+                            <option value="{{ $regName }}" @selected(old('region', $project->region ?? '') === $regName)>
+                                {{ $regName }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('region')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="province" class="form-label">Province <span class="text-danger">*</span></label>
+                    <select
+                        id="province"
+                        name="province"
+                        class="form-control @error('province') is-invalid @enderror"
+                        data-initial-value="{{ old('province', $project->province ?? '') }}"
                         required
-                        placeholder="e.g. Bel-Air"
                     >
-                    @error('barangay')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                        <option value="" disabled {{ old('province', $project->province ?? '') ? '' : 'selected' }}>Select Province...</option>
+                        @if(old('province', $project->province ?? ''))
+                            <option value="{{ old('province', $project->province ?? '') }}" selected>{{ old('province', $project->province ?? '') }}</option>
+                        @endif
+                    </select>
+                    @error('province')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="form-group form-group-premium" style="margin-bottom: 0;">
                     <label for="city" class="form-label">City <span class="text-danger">*</span></label>
-                    <input
+                    <select
                         id="city"
                         name="city"
-                        type="text"
                         class="form-control @error('city') is-invalid @enderror"
-                        value="{{ old('city', $project->city ?? '') }}"
-                        maxlength="255"
+                        data-initial-value="{{ old('city', $project->city ?? '') }}"
                         required
-                        placeholder="e.g. Makati City"
                     >
+                        <option value="" disabled {{ old('city', $project->city ?? '') ? '' : 'selected' }}>Select City / Municipality...</option>
+                        @if(old('city', $project->city ?? ''))
+                            <option value="{{ old('city', $project->city ?? '') }}" selected>{{ old('city', $project->city ?? '') }}</option>
+                        @endif
+                    </select>
                     @error('city')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="barangay" class="form-label">Barangay</label>
+                    <select
+                        id="barangay"
+                        name="barangay"
+                        class="form-control @error('barangay') is-invalid @enderror"
+                        data-initial-value="{{ old('barangay', $project->barangay ?? '') }}"
+                    >
+                        <option value="">Select Barangay...</option>
+                        @if(old('barangay', $project->barangay ?? ''))
+                            <option value="{{ old('barangay', $project->barangay ?? '') }}" selected>{{ old('barangay', $project->barangay ?? '') }}</option>
+                        @endif
+                    </select>
+                    @error('barangay')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="postal_code" class="form-label">Postal Code</label>
+                    <input
+                        id="postal_code"
+                        name="postal_code"
+                        type="text"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        class="form-control font-mono @error('postal_code') is-invalid @enderror"
+                        value="{{ old('postal_code', $project->postal_code ?? '') }}"
+                        maxlength="10"
+                        placeholder="ex. 1226"
+                    >
+                    @error('postal_code')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                 </div>
             </div>
         </div>
@@ -420,12 +473,12 @@
                         id="target_completion_date"
                         name="target_completion_date"
                         type="date"
-                        min="{{ $currentStartDate }}"
+                        min="{{ $minTargetCompletionDate }}"
                         class="form-control @error('target_completion_date') is-invalid @enderror font-mono"
                         value="{{ $currentTargetDate }}"
                         required
                     >
-                    <p class="form-hint">Drives weekly progress & timeline milestones.</p>
+                    <p class="form-hint">At least 1 month from now or start date.</p>
                     @error('target_completion_date')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                 </div>
 
@@ -454,6 +507,52 @@
     </div>
 
     @if ($isEditing)
+        {{-- Card: Project Status Configuration --}}
+        <div class="card card-glass">
+            <div class="card-header" style="font-weight: 700; font-size: 0.9375rem; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <svg style="width: 18px; height: 18px; color: var(--color-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Project Status / Lifecycle
+                </div>
+                <x-status-pill :status="$project->status ?? 'pending'" />
+            </div>
+            <div class="card-body">
+                <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                    <label for="status" class="form-label">Project Status <span class="text-danger">*</span></label>
+                    <select id="status" name="status" class="form-control @error('status') is-invalid @enderror">
+                        @php
+                            $currStatus = old('status', $project->status ?? 'pending');
+                        @endphp
+                        @if ($project->status === 'completed')
+                            <option value="completed" @selected($currStatus === 'completed')>Completed</option>
+                            <option value="ongoing" @selected($currStatus === 'ongoing')>In Progress (Ongoing)</option>
+                            <option value="delayed" @selected($currStatus === 'delayed')>Delayed</option>
+                        @elseif ($project->status === 'delayed')
+                            <option value="delayed" @selected($currStatus === 'delayed')>Delayed</option>
+                            <option value="ongoing" @selected($currStatus === 'ongoing')>In Progress (Ongoing)</option>
+                            <option value="completed" @selected($currStatus === 'completed')>Completed</option>
+                            <option value="pending" @selected($currStatus === 'pending')>Pending</option>
+                        @elseif ($project->status === 'ongoing')
+                            <option value="ongoing" @selected($currStatus === 'ongoing')>In Progress (Ongoing)</option>
+                            <option value="completed" @selected($currStatus === 'completed')>Completed</option>
+                            <option value="delayed" @selected($currStatus === 'delayed')>Delayed</option>
+                            <option value="pending" @selected($currStatus === 'pending')>Pending</option>
+                        @else
+                            <option value="pending" @selected($currStatus === 'pending')>Pending</option>
+                            <option value="ongoing" @selected($currStatus === 'ongoing')>In Progress (Ongoing)</option>
+                            <option value="delayed" @selected($currStatus === 'delayed')>Delayed</option>
+                            <option value="completed" @selected($currStatus === 'completed')>Completed</option>
+                        @endif
+                    </select>
+                    <p class="form-hint">You can reverse a completed project back to In Progress / Ongoing or adjust status as needed.</p>
+                    @error('status')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                </div>
+            </div>
+        </div>
+
         {{-- Card 4: Reason for Update / Audit Notes --}}
         <div class="card card-glass">
             <div class="card-header" style="font-weight: 700; font-size: 0.9375rem; display: flex; align-items: center; justify-content: space-between;">
@@ -529,7 +628,7 @@
                 @error('contract_price')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
             </div>
 
-            <div class="form-group form-group-premium" style="margin-bottom: 0;">
+            <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
                 <label for="payment_status" class="form-label">Payment Status <span class="text-danger">*</span></label>
                 <select id="payment_status" name="payment_status" class="form-control @error('payment_status') is-invalid @enderror" required>
                     <option value="" disabled {{ old('payment_status', $project->payment_status ?? '') === '' ? 'selected' : '' }}>Select Payment Status</option>
@@ -538,6 +637,36 @@
                 </select>
                 <p class="form-hint">Billing milestone collection tracking.</p>
                 @error('payment_status')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+            </div>
+
+            {{-- Invoice Attachment Upload --}}
+            @php
+                $hasExistingInvoice = isset($project) && $project->invoices()->exists();
+                $existingInvoice = $hasExistingInvoice ? $project->invoices()->first() : null;
+            @endphp
+            <div class="form-group form-group-premium" id="invoice-upload-group" style="margin-bottom: 0;">
+                <label for="invoice_file" class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>
+                        Invoice Attachment
+                        <span id="invoice-required-indicator" class="text-danger" style="{{ old('payment_status', $project->payment_status ?? 'Partial') === 'Paid' && !$hasExistingInvoice ? '' : 'display: none;' }}">*</span>
+                    </span>
+                    <span class="badge" style="background: var(--color-surface-alt); font-size: 0.6875rem;">PDF, DOCX, Images</span>
+                </label>
+                <input
+                    type="file"
+                    id="invoice_file"
+                    name="invoice_file"
+                    class="form-control @error('invoice_file') is-invalid @enderror"
+                    accept=".pdf,.doc,.docx,image/*"
+                >
+                <p class="form-hint" id="invoice-hint">
+                    @if($hasExistingInvoice)
+                        Current invoice on file: <a href="{{ route('projects.files.download', [$project, $existingInvoice]) }}" target="_blank" class="table-link font-bold">📄 {{ $existingInvoice->file_name }} ({{ $existingInvoice->formatted_size }})</a>. Uploading a new file will add an updated invoice.
+                    @else
+                        Required when payment status is <strong>Paid in full</strong>. Optional for Partial payment.
+                    @endif
+                </p>
+                @error('invoice_file')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
             </div>
         </div>
     </div>
@@ -607,20 +736,49 @@
         const paymentSelect = document.getElementById('payment_status');
         const previewPaymentPill = document.getElementById('preview-payment-pill');
         const addressInput = document.getElementById('address');
-        const barangayInput = document.getElementById('barangay');
+        const regionInput = document.getElementById('region');
+        const provinceInput = document.getElementById('province');
         const cityInput = document.getElementById('city');
+        const barangayInput = document.getElementById('barangay');
+        const postalCodeInput = document.getElementById('postal_code');
         const previewLocation = document.getElementById('preview-location');
+
+        function getMinTargetCompletionDate(startDateStr) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let baseDate = new Date(today);
+            if (startDateStr) {
+                const [sY, sM, sD] = startDateStr.split('-').map(Number);
+                if (sY && sM && sD) {
+                    const start = new Date(sY, sM - 1, sD);
+                    start.setHours(0, 0, 0, 0);
+                    if (start > baseDate) {
+                        baseDate = start;
+                    }
+                }
+            }
+
+            const minDate = new Date(baseDate);
+            minDate.setMonth(minDate.getMonth() + 1);
+
+            const y = minDate.getFullYear();
+            const m = String(minDate.getMonth() + 1).padStart(2, '0');
+            const d = String(minDate.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
 
         function updateDatesAndWarranty() {
             if (!startDateInput || !startDateInput.value) return;
 
             const selectedDateVal = startDateInput.value;
             
-            // Sync target completion date min
+            // Sync target completion date min (at least 1 month from now or start date)
             if (targetCompletionInput) {
-                targetCompletionInput.min = selectedDateVal;
-                if (targetCompletionInput.value && targetCompletionInput.value < selectedDateVal) {
-                    targetCompletionInput.value = selectedDateVal;
+                const minTargetVal = getMinTargetCompletionDate(selectedDateVal);
+                targetCompletionInput.min = minTargetVal;
+                if (targetCompletionInput.value && targetCompletionInput.value < minTargetVal) {
+                    targetCompletionInput.value = minTargetVal;
                 }
             }
 
@@ -676,6 +834,16 @@
             const val = paymentSelect.value || 'Partial';
             previewPaymentPill.textContent = val;
             previewPaymentPill.className = `status-pill status-pill--${val.toLowerCase()}`;
+
+            const invoiceRequiredIndicator = document.getElementById('invoice-required-indicator');
+            const hasExistingInvoice = @js($hasExistingInvoice);
+            if (invoiceRequiredIndicator) {
+                if (val === 'Paid' && !hasExistingInvoice) {
+                    invoiceRequiredIndicator.style.display = 'inline';
+                } else {
+                    invoiceRequiredIndicator.style.display = 'none';
+                }
+            }
         }
 
         function updateLocation() {
@@ -683,9 +851,16 @@
             const parts = [
                 addressInput ? addressInput.value.trim() : '',
                 barangayInput ? barangayInput.value.trim() : '',
-                cityInput ? cityInput.value.trim() : ''
+                cityInput ? cityInput.value.trim() : '',
+                provinceInput ? provinceInput.value.trim() : '',
+                regionInput ? regionInput.value.trim() : ''
             ].filter(Boolean);
-            previewLocation.textContent = parts.length > 0 ? parts.join(', ') : 'Address pending';
+            const uniqueParts = [...new Set(parts)];
+            let locText = uniqueParts.length > 0 ? uniqueParts.join(', ') : 'Address pending';
+            if (postalCodeInput && postalCodeInput.value.trim() && locText !== 'Address pending') {
+                locText += ` ${postalCodeInput.value.trim()}`;
+            }
+            previewLocation.textContent = locText;
         }
 
         const stopsInput = document.getElementById('no_of_stops');
@@ -721,12 +896,28 @@
             paymentSelect.addEventListener('change', updatePaymentPill);
         }
 
-        [addressInput, barangayInput, cityInput].forEach(function (input) {
+        [addressInput, cityInput, provinceInput, regionInput, barangayInput, postalCodeInput].forEach(function (input) {
             if (input) {
                 input.addEventListener('input', updateLocation);
                 input.addEventListener('change', updateLocation);
             }
         });
+
+        if (typeof initPhilippineAddress === 'function') {
+            initPhilippineAddress({
+                regionSelect: '#region',
+                provinceSelect: '#province',
+                citySelect: '#city',
+                barangaySelect: '#barangay',
+                postalCodeInput: '#postal_code',
+                addressInput: '#address',
+                initialRegion: @js(old('region', $project->region ?? '')),
+                initialProvince: @js(old('province', $project->province ?? '')),
+                initialCity: @js(old('city', $project->city ?? '')),
+                initialBarangay: @js(old('barangay', $project->barangay ?? '')),
+                onChange: updateLocation
+            });
+        }
 
         [stopsInput, capacityInput].forEach(function (input) {
             if (input) {
@@ -736,6 +927,7 @@
         });
 
         // Initialize live values
+        updateDatesAndWarranty();
         calculateDuration();
         updatePaymentPill();
         updateLocation();

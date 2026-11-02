@@ -37,8 +37,12 @@
         middle_name: '',
         last_name: '',
         date_of_birth: '',
-        expertise: 'Worker',
+        expertise: 'Worker / Installation Personnel',
         address: '',
+        barangay: '',
+        city: '',
+        province: '',
+        region: '',
         project_id: '',
         archive_profile: false,
         actionUrl: '',
@@ -54,6 +58,10 @@
             date_of_birth: @js($p->date_of_birth ? $p->date_of_birth->format('Y-m-d') : ''),
             expertise: @js($p->expertise),
             address: @js($p->address),
+            barangay: @js($p->barangay ?? ''),
+            city: @js($p->city ?? ''),
+            province: @js($p->province ?? ''),
+            region: @js($p->region ?? ''),
             project_id: @js($p->project_id ?? ''),
             actionUrl: '{{ route('scheduling.update', $p->id) }}',
         },
@@ -71,11 +79,28 @@
             date_of_birth: item.date_of_birth,
             expertise: item.expertise,
             address: item.address,
+            barangay: item.barangay,
+            city: item.city,
+            province: item.province,
+            region: item.region,
             project_id: item.project_id || '',
             archive_profile: false,
             actionUrl: item.actionUrl,
         };
         this.editModalOpen = true;
+        this.$nextTick(() => {
+            if (typeof initPhilippineAddress === 'function') {
+                initPhilippineAddress({
+                    regionSelect: '#modal_region',
+                    provinceSelect: '#modal_province',
+                    citySelect: '#modal_city',
+                    addressInput: '#modal_address',
+                    initialRegion: item.region,
+                    initialProvince: item.province,
+                    initialCity: item.city
+                });
+            }
+        });
     },
     openEditModalFromSelected() {
         if (this.selectedIds.length === 1) {
@@ -129,10 +154,9 @@
                     <label for="filter-expertise" class="visually-hidden">Filter by expertise</label>
                     <select id="filter-expertise" name="expertise" class="form-control form-control--compact filter-select">
                         <option value="">All Expertise</option>
-                        <option value="Site Engineer" @selected($expertise === 'Site Engineer')>Site Engineer</option>
-                        <option value="Foreman" @selected($expertise === 'Foreman')>Foreman</option>
-                        <option value="Safety Officer" @selected($expertise === 'Safety Officer')>Safety Officer</option>
-                        <option value="Worker" @selected($expertise === 'Worker')>Worker</option>
+                        @foreach ($expertiseOptions as $opt)
+                            <option value="{{ $opt }}" @selected($expertise === $opt)>{{ $opt }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -145,7 +169,7 @@
                     </select>
                 </div>
 
-                <button type="submit" class="btn btn-secondary btn-sm" id="btn-apply-filters">
+                <button type="submit" class="btn btn-primary btn-sm" id="btn-apply-filters">
                     <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd" />
                     </svg>
@@ -288,7 +312,7 @@
                                         aria-label="Select {{ $person->full_name }}"
                                     >
                                 </td>
-                                <td><span class="font-mono font-bold">{{ $person->employee_id }}</span></td>
+                                <td><span class="font-mono font-bold" style="color: var(--color-accent);">{{ $person->employee_id }}</span></td>
                                 <td><strong>{{ $person->full_name }}</strong></td>
                                 <td>{{ $person->expertise }}</td>
                                 <td>

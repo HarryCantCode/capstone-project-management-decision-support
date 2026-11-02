@@ -6,24 +6,32 @@
 @section('content')
     <div class="page-header">
         <div>
-            <a href="{{ route('resources.index') }}" class="back-link">← All resources</a>
+            <a href="{{ route('resources.index') }}" class="back-link">← Materials Catalog</a>
             <h1>{{ $resource->name }}</h1>
-            <p class="page-header__description"><span class="font-mono">{{ $resource->resource_code }}</span> · {{ ucfirst($resource->type) }}</p>
+            <p class="page-header__description">
+                <span class="font-mono" style="font-weight: 600;">{{ $resource->resource_code }}</span> · 
+                <span class="badge {{ $resource->demand_status === 'fast-moving' ? 'badge-success' : 'badge-warning' }}">
+                    {{ ucfirst($resource->demand_status ?? 'fast-moving') }}
+                </span>
+            </p>
         </div>
         @can('allocate', $resource)
             @if ($resource->quantity_available > 0)
-                <a href="{{ route('resources.allocate', $resource) }}" class="btn btn-primary">Allocate Resource</a>
+                <a href="{{ route('resources.allocate', $resource) }}" class="btn btn-primary">Allocate Material</a>
             @endif
         @endcan
     </div>
 
     <section class="card card-glass" aria-labelledby="resource-overview-heading">
-        <div class="card-header"><h2 id="resource-overview-heading">Inventory Overview</h2></div>
+        <div class="card-header"><h2 id="resource-overview-heading">Material Details & Specifications</h2></div>
         <dl class="card-body detail-list">
-            <div><dt>Available quantity</dt><dd class="font-mono">{{ number_format($resource->quantity_available) }}</dd></div>
-            <div><dt>Condition</dt><dd><span class="badge-condition badge-condition--{{ $resource->condition }}">{{ ucfirst(str_replace('_', ' ', $resource->condition)) }}</span></dd></div>
-            <div><dt>Resource type</dt><dd>{{ ucfirst($resource->type) }}</dd></div>
+            <div><dt>Model / Specifications</dt><dd>{{ $resource->model ?: 'Standard' }}</dd></div>
+            <div><dt>Available quantity</dt><dd class="font-mono" style="font-weight: 600;">{{ number_format($resource->quantity_available) }}</dd></div>
+            <div><dt>Catalog Price</dt><dd class="font-mono">₱{{ number_format((float) $resource->price, 2) }}</dd></div>
+            <div><dt>Unit Cost</dt><dd class="font-mono">₱{{ number_format((float) $resource->unit_cost, 2) }}</dd></div>
+            <div><dt>Demand Status</dt><dd>{{ ucfirst($resource->demand_status ?? 'fast-moving') }}</dd></div>
             <div><dt>Last updated</dt><dd>{{ $resource->updated_at->format('M j, Y · g:i A') }}</dd></div>
+            <div style="grid-column: 1 / -1;"><dt>Description & Application</dt><dd>{{ $resource->description ?: 'No additional notes provided.' }}</dd></div>
         </dl>
     </section>
 

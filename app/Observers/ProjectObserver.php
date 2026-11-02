@@ -89,7 +89,7 @@ class ProjectObserver
             $changes[] = "Payment status updated from '{$orig}' to '{$project->payment_status}'";
         }
 
-        if ($project->isDirty('address') || $project->isDirty('barangay') || $project->isDirty('city')) {
+        if ($project->isDirty('address') || $project->isDirty('barangay') || $project->isDirty('city') || $project->isDirty('province') || $project->isDirty('region') || $project->isDirty('postal_code')) {
             $changes[] = "Project site address updated to '{$project->full_address}'";
         }
 

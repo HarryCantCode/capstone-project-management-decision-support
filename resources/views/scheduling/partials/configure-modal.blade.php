@@ -51,6 +51,7 @@
                             class="form-control"
                             x-model="editForm.first_name"
                             required
+                            placeholder="ex. Juan"
                         >
                     </div>
 
@@ -62,6 +63,7 @@
                             name="middle_name"
                             class="form-control"
                             x-model="editForm.middle_name"
+                            placeholder="ex. David"
                         >
                     </div>
 
@@ -74,6 +76,7 @@
                             class="form-control"
                             x-model="editForm.last_name"
                             required
+                            placeholder="ex. Dela Cruz"
                         >
                     </div>
                 </div>
@@ -88,7 +91,7 @@
                             name="date_of_birth"
                             class="form-control"
                             x-model="editForm.date_of_birth"
-                            max="{{ now()->subYears(16)->format('Y-m-d') }}"
+                            max="{{ now()->subYears(18)->format('Y-m-d') }}"
                             required
                         >
                     </div>
@@ -128,18 +131,95 @@
                     </p>
                 </div>
 
-                {{-- Address Field --}}
-                <div class="form-group-premium" style="margin-bottom: var(--space-4);">
-                    <label for="modal_address" class="form-label">Address <span class="text-danger">*</span></label>
-                    <textarea
-                        id="modal_address"
-                        name="address"
-                        rows="2"
-                        maxlength="1000"
-                        class="form-control"
-                        x-model="editForm.address"
-                        required
-                    ></textarea>
+                {{-- Address and Region Grid --}}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
+                    <div class="form-group-premium">
+                        <label for="modal_address" class="form-label">Address <span class="text-danger">*</span></label>
+                        <input
+                            type="text"
+                            id="modal_address"
+                            name="address"
+                            class="form-control"
+                            x-model="editForm.address"
+                            required
+                            placeholder="ex. Unit 101, High Street"
+                        >
+                    </div>
+
+                    <div class="form-group-premium">
+                        <label for="modal_region" class="form-label">Region <span class="text-danger">*</span></label>
+                        <select
+                            id="modal_region"
+                            name="region"
+                            class="form-control"
+                            x-model="editForm.region"
+                            required
+                        >
+                            <option value="" disabled>Select Region...</option>
+                            @foreach(\App\Support\PhilippineRegions::all() as $regName)
+                                <option value="{{ $regName }}">{{ $regName }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                {{-- Province and City Grid --}}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
+                    <div class="form-group-premium">
+                        <label for="modal_province" class="form-label">Province <span class="text-danger">*</span></label>
+                        <select
+                            id="modal_province"
+                            name="province"
+                            class="form-control"
+                            x-model="editForm.province"
+                            required
+                        >
+                            <option value="" disabled>Select Province...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-premium">
+                        <label for="modal_city" class="form-label">City <span class="text-danger">*</span></label>
+                        <select
+                            id="modal_city"
+                            name="city"
+                            class="form-control"
+                            x-model="editForm.city"
+                            required
+                        >
+                            <option value="" disabled>Select City / Municipality...</option>
+                        </select>
+                    </div>
+                </div>
+
+                {{-- Barangay and Postal Code Grid --}}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
+                    <div class="form-group-premium">
+                        <label for="modal_barangay" class="form-label">Barangay</label>
+                        <select
+                            id="modal_barangay"
+                            name="barangay"
+                            class="form-control"
+                            x-model="editForm.barangay"
+                        >
+                            <option value="">Select Barangay...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-premium">
+                        <label for="modal_postal_code" class="form-label">Postal Code</label>
+                        <input
+                            type="text"
+                            id="modal_postal_code"
+                            name="postal_code"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            class="form-control font-mono"
+                            x-model="editForm.postal_code"
+                            maxlength="10"
+                            placeholder="ex. 1226"
+                        >
+                    </div>
                 </div>
 
                 {{-- Archive Profile Option Box --}}

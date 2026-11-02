@@ -20,6 +20,27 @@ class Personnel extends \Illuminate\Database\Eloquent\Model
     use HasFactory;
     use SoftDeletes;
 
+    public const EXPERTISE_SITE_ENGINEER = 'Site Engineer';
+    public const EXPERTISE_FOREMAN = 'Foreman';
+    public const EXPERTISE_SAFETY_OFFICER = 'Safety Officer';
+    public const EXPERTISE_TECHNICIAN = 'Technician';
+    public const EXPERTISE_PROJECT_MANAGER = 'Project Manager';
+    public const EXPERTISE_QA_INSPECTOR = 'QA Inspector';
+    public const EXPERTISE_ELEVATOR_CONTROL = 'Elevator Control';
+    public const EXPERTISE_WORKER = 'Worker / Installation Personnel';
+
+    /** @var list<string> */
+    public const EXPERTISE_OPTIONS = [
+        self::EXPERTISE_SITE_ENGINEER,
+        self::EXPERTISE_FOREMAN,
+        self::EXPERTISE_SAFETY_OFFICER,
+        self::EXPERTISE_TECHNICIAN,
+        self::EXPERTISE_PROJECT_MANAGER,
+        self::EXPERTISE_QA_INSPECTOR,
+        self::EXPERTISE_ELEVATOR_CONTROL,
+        self::EXPERTISE_WORKER,
+    ];
+
     /** @var string */
     protected $table = 'personnel';
 
@@ -31,6 +52,11 @@ class Personnel extends \Illuminate\Database\Eloquent\Model
         'last_name',
         'date_of_birth',
         'address',
+        'barangay',
+        'city',
+        'province',
+        'region',
+        'postal_code',
         'expertise',
         'project_id',
         'date_assigned',
@@ -45,7 +71,7 @@ class Personnel extends \Illuminate\Database\Eloquent\Model
     ];
 
     /** @var list<string> */
-    protected $appends = ['full_name', 'status'];
+    protected $appends = ['full_name', 'full_address', 'status'];
 
     // ─── Boot: auto-generate employee_id ──────────────────────────────────────
 
@@ -83,6 +109,23 @@ class Personnel extends \Illuminate\Database\Eloquent\Model
         ]);
 
         return implode(' ', $parts);
+    }
+
+    /**
+     * Full address composed from address, barangay, city, and region.
+     */
+    public function getFullAddressAttribute(): string
+    {
+        $base = collect([$this->address, $this->barangay, $this->city, $this->province, $this->region])
+            ->filter(fn ($part) => filled($part))
+            ->unique()
+            ->implode(', ');
+
+        if (filled($this->postal_code)) {
+            $base = $base ? "{$base} {$this->postal_code}" : $this->postal_code;
+        }
+
+        return $base;
     }
 
     /**

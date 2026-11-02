@@ -8,11 +8,7 @@
 
 <div class="sidebar-header">
     <a href="{{ route('dashboard') }}" class="sidebar-brand" aria-label="Dex PMS home">
-        <svg width="24" height="24" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-            <rect width="32" height="32" rx="6" fill="var(--color-accent)"/>
-            <path d="M8 10h8a6 6 0 0 1 0 12H8V10z" fill="white"/>
-            <rect x="19" y="17" width="5" height="5" rx="1" fill="white" opacity="0.7"/>
-        </svg>
+        <img src="{{ asset('images/dex-logo.png') }}" alt="Dex International Co. Logo" class="sidebar-brand-icon" width="28" height="28" style="border-radius: 8px; object-fit: cover;">
         <span>Dex International Co.</span>
     </a>
 </div>
@@ -78,19 +74,9 @@
                    class="nav-link {{ request()->routeIs('resources.*') ? 'nav-link--active' : '' }}"
                    aria-current="{{ request()->routeIs('resources.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path d="M5 3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5zm0 2h10v10H5V5z"/>
+                        <path d="M4 3a2 2 0 1 0 0 4h12a2 2 0 1 0 0-4H4zm0 6a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2H4zm2 3h8v3H6v-3z"/>
                     </svg>
-                    Resource Allocation
-                </a>
-            </li>
-            <li>
-                <a href="{{ route('equipment.index') }}"
-                   class="nav-link {{ request()->routeIs('equipment.*') ? 'nav-link--active' : '' }}"
-                   aria-current="{{ request()->routeIs('equipment.*') ? 'page' : 'false' }}">
-                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 0 1-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 0 1 .947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 0 1 2.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 0 1 2.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 0 1 .947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 0 1-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 0 1-2.287-.947zM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" clip-rule="evenodd"/>
-                    </svg>
-                    Equipment Records
+                    Materials Catalog
                 </a>
             </li>
         </ul>
@@ -122,24 +108,22 @@
         <span class="nav-section-label">Insights</span>
         <ul class="nav-list" role="list">
             <li>
-                <a href="{{ route('reports.index') }}"
-                   class="nav-link {{ request()->routeIs('reports.*') ? 'nav-link--active' : '' }}"
-                   aria-current="{{ request()->routeIs('reports.*') ? 'page' : 'false' }}">
+                <span class="nav-link nav-link--disabled" aria-disabled="true" title="Coming Soon">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M6 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.414A2 2 0 0 0 15.414 7L11 2.586A2 2 0 0 0 9.586 2H6zm2 10a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H8zm0-4a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H8z" clip-rule="evenodd"/>
                     </svg>
-                    Reports
-                </a>
+                    <span>Reports</span>
+                    <span class="nav-badge nav-badge--coming">Soon</span>
+                </span>
             </li>
             <li>
-                <a href="{{ route('decision-support.index') }}"
-                   class="nav-link {{ request()->routeIs('decision-support.*') ? 'nav-link--active' : '' }}"
-                   aria-current="{{ request()->routeIs('decision-support.*') ? 'page' : 'false' }}">
+                <span class="nav-link nav-link--disabled" aria-disabled="true" title="Coming Soon">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M11 3a1 1 0 1 0-2 0v1a1 1 0 1 0 2 0V3zM15.657 5.757a1 1 0 0 0-1.414-1.414l-.707.707a1 1 0 0 0 1.414 1.414l.707-.707zM18 10a1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM5.05 6.464A1 1 0 1 0 6.464 5.05l-.707-.707a1 1 0 0 0-1.414 1.414l.707.707zM5 10a1 1 0 0 1-1 1H3a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM8 16v-1h4v1a2 2 0 1 1-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 1 0-4.954 0c.27.213.462.519.476.859h4.001z"/>
                     </svg>
-                    Decision Support
-                </a>
+                    <span>Decision Support</span>
+                    <span class="nav-badge nav-badge--coming">Soon</span>
+                </span>
             </li>
         </ul>
     </div>

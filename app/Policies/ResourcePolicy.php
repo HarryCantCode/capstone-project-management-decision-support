@@ -36,4 +36,36 @@ class ResourcePolicy
     {
         return $user->hasAnyRole(['Admin', 'Manager', 'Staff']);
     }
+
+    /**
+     * Determine whether the user can create resources.
+     */
+    public function create(User $user): bool
+    {
+        return $user->hasAnyRole(['Admin', 'Manager', 'Staff']);
+    }
+
+    /**
+     * Determine whether the user can update the resource.
+     */
+    public function update(User $user, Resource $resource): bool
+    {
+        return $user->hasAnyRole(['Admin', 'Manager', 'Staff']);
+    }
+
+    /**
+     * Determine whether the user can delete the resource.
+     */
+    public function delete(User $user, Resource $resource): bool
+    {
+        return $user->hasAnyRole(['Admin', 'Manager', 'Staff']);
+    }
+
+    /**
+     * Determine whether the user can delete multiple resources.
+     */
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasAnyRole(['Admin', 'Manager', 'Staff']);
+    }
 }

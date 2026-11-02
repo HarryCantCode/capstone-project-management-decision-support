@@ -132,6 +132,11 @@ class PersonnelService
             $personnel->last_name = $data['last_name'];
             $personnel->date_of_birth = $data['date_of_birth'];
             $personnel->address = $data['address'];
+            $personnel->barangay = $data['barangay'] ?? $personnel->barangay;
+            $personnel->city = $data['city'] ?? $personnel->city;
+            $personnel->province = $data['province'] ?? $personnel->province;
+            $personnel->region = $data['region'] ?? $personnel->region;
+            $personnel->postal_code = $data['postal_code'] ?? $personnel->postal_code;
             $personnel->expertise = $data['expertise'];
             $personnel->project_id = $newProjectId;
             $personnel->date_assigned = $newProjectId

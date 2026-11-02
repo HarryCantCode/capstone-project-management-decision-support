@@ -47,4 +47,12 @@ class ProjectSubtask extends Model
     {
         return $this->belongsTo(ProjectTask::class, 'project_task_id');
     }
+
+    /**
+     * Uploaded files/attachments for this sub task.
+     */
+    public function files(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProjectFile::class, 'project_subtask_id')->orderByDesc('created_at');
+    }
 }

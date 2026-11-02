@@ -56,19 +56,19 @@
             <div class="personnel-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
                 <div class="form-group-premium">
                     <label for="first_name" class="form-label">First Name <span class="required" aria-hidden="true">*</span></label>
-                    <input type="text" id="first_name" name="first_name" class="form-control @error('first_name') is-invalid @enderror" value="{{ old('first_name') }}" required autofocus>
+                    <input type="text" id="first_name" name="first_name" class="form-control @error('first_name') is-invalid @enderror" value="{{ old('first_name') }}" required autofocus placeholder="ex. Juan">
                     @error('first_name')<div class="form-error">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="form-group-premium">
                     <label for="middle_name" class="form-label">Middle Name <span class="text-muted" style="font-weight: 400;">(optional)</span></label>
-                    <input type="text" id="middle_name" name="middle_name" class="form-control @error('middle_name') is-invalid @enderror" value="{{ old('middle_name') }}">
+                    <input type="text" id="middle_name" name="middle_name" class="form-control @error('middle_name') is-invalid @enderror" value="{{ old('middle_name') }}" placeholder="ex. David">
                     @error('middle_name')<div class="form-error">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="form-group-premium">
                     <label for="last_name" class="form-label">Last Name <span class="required" aria-hidden="true">*</span></label>
-                    <input type="text" id="last_name" name="last_name" class="form-control @error('last_name') is-invalid @enderror" value="{{ old('last_name') }}" required oninput="updatePasswordPreview()">
+                    <input type="text" id="last_name" name="last_name" class="form-control @error('last_name') is-invalid @enderror" value="{{ old('last_name') }}" required oninput="updatePasswordPreview()" placeholder="ex. Dela Cruz">
                     @error('last_name')<div class="form-error">{{ $message }}</div>@enderror
                 </div>
             </div>
@@ -77,7 +77,7 @@
             <div class="personnel-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
                 <div class="form-group-premium">
                     <label for="birthdate" class="form-label">Birthdate <span class="required" aria-hidden="true">*</span></label>
-                    <input type="date" id="birthdate" name="birthdate" class="form-control @error('birthdate') is-invalid @enderror" value="{{ old('birthdate') }}" max="{{ now()->format('Y-m-d') }}" required onchange="updatePasswordPreview()">
+                    <input type="date" id="birthdate" name="birthdate" class="form-control @error('birthdate') is-invalid @enderror" value="{{ old('birthdate') }}" max="{{ now()->subYears(18)->format('Y-m-d') }}" required onchange="updatePasswordPreview()">
                     @error('birthdate')<div class="form-error">{{ $message }}</div>@enderror
                 </div>
 

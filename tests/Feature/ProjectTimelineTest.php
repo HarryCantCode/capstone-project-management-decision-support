@@ -784,3 +784,89 @@ test('project show page renders major task creation, minor task creation, and ch
         ->assertSeeText("Ticked checkbox: completed sub task 'Stack filler weights and verify clearances'")
         ->assertSeeText('Site Lead Ramos');
 });
+
+test('ticking the final subtask prompts completion and unticking on completed project reverses status to ongoing', function () {
+    $manager = User::factory()->create(['name' => 'Lead Engineer Cruz']);
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create([
+        'name' => 'Ayala Tower Elevator',
+        'status' => 'ongoing',
+    ]);
+
+    // Clear auto-created default tasks so the test has a controlled set of 2 subtasks
+    $project->tasks()->delete();
+
+    // Create a major task with 2 subtasks
+    $task = ProjectTask::create([
+        'project_id' => $project->id,
+        'task_name' => 'Commissioning & Handover',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(6)->toDateString(),
+        'status' => 'in_progress',
+        'sort_order' => 1,
+        'created_by' => $manager->id,
+    ]);
+
+    $subtask1 = $task->subtasks()->create([
+        'title' => 'Final safety brake load test',
+        'is_completed' => false,
+        'sort_order' => 1,
+    ]);
+
+    $subtask2 = $task->subtasks()->create([
+        'title' => 'Client sign-off inspection',
+        'is_completed' => false,
+        'sort_order' => 2,
+    ]);
+
+    // 1. Tick first subtask: not final, prompt_completion should be false
+    $res1 = $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $task, $subtask1]))
+        ->assertOk()
+        ->assertJson([
+            'success' => true,
+            'is_completed' => true,
+            'prompt_completion' => false,
+        ]);
+
+    // 2. Tick second (final) subtask: all subtasks complete, prompt_completion must be true
+    $res2 = $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $task, $subtask2]))
+        ->assertOk()
+        ->assertJson([
+            'success' => true,
+            'is_completed' => true,
+            'prompt_completion' => true,
+            'overall_progress' => 100,
+        ]);
+
+    // 3. Complete the project via transition
+    $this->actingAs($manager)
+        ->patch(route('projects.transition', $project), [
+            'status' => 'completed',
+            'notes' => 'Handover complete.',
+        ]);
+
+    expect($project->fresh()->status)->toBe('completed');
+
+    // 4. Untick a subtask on the completed project: must reverse status to ongoing
+    $res3 = $this->actingAs($manager)
+        ->patchJson(route('projects.tasks.subtasks.toggle', [$project, $task, $subtask2]))
+        ->assertOk()
+        ->assertJson([
+            'success' => true,
+            'is_completed' => false,
+            'project_status' => 'ongoing',
+        ]);
+
+    expect($project->fresh()->status)->toBe('ongoing');
+
+    // Audit trail should record status reversal
+    $reversalHistory = $project->fresh()->statusHistory()
+        ->where('from_status', 'completed')
+        ->where('to_status', 'ongoing')
+        ->first();
+    expect($reversalHistory)->not->toBeNull()
+        ->and($reversalHistory->notes)->toContain('Status reversed from Completed back to In Progress due to unchecked task');
+});

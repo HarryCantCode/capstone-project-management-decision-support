@@ -8,6 +8,12 @@
     <title>@yield('title', 'Sign In') &mdash; Dex International Co.</title>
     <meta name="description" content="Dex International Co. Project Management System &mdash; sign in to continue.">
 
+    {{-- Favicon --}}
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
+
     {{-- Google Fonts: Inter for clean UI, Roboto Mono for numbers/tags --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -83,11 +89,7 @@
                 <div class="auth-form-content">
                     {{-- Wordmark / Brand --}}
                     <div class="auth-brand" aria-label="Dex PMS">
-                        <svg class="auth-brand-icon" width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-                            <rect width="32" height="32" rx="7" fill="var(--color-accent)"/>
-                            <path d="M8 10h8a6 6 0 0 1 0 12H8V10z" fill="white"/>
-                            <rect x="19" y="17" width="5" height="5" rx="1.5" fill="white" opacity="0.8"/>
-                        </svg>
+                        <img src="{{ asset('images/dex-logo.png') }}" alt="Dex International Co. Logo" class="auth-brand-icon" width="36" height="36" style="border-radius: 9px; object-fit: cover;">
                         <div class="auth-brand-text">
                             <span class="auth-brand-name">Dex International Co.</span>
                             <span class="auth-brand-badge">Project Management System</span>

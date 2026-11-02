@@ -23,11 +23,30 @@ class Resource extends \Illuminate\Database\Eloquent\Model
         'name',
         'resource_code',
         'type',
+        'model',
         'quantity_available',
+        'price',
+        'unit_cost',
+        'demand_status',
+        'description',
         'condition',
         'created_by',
         'updated_by',
     ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'price' => 'decimal:2',
+            'unit_cost' => 'decimal:2',
+            'quantity_available' => 'integer',
+        ];
+    }
 
     /**
      * Get the user who created this resource.

@@ -20,6 +20,11 @@ use Illuminate\Validation\ValidationException;
  */
 class ProjectService
 {
+    public function __construct(
+        private readonly NotificationService $notificationService,
+    ) {
+    }
+
     /**
      * Allowed status transitions.
      * Supports transitions across pending, ongoing, delayed, and completed.
@@ -60,6 +65,9 @@ class ProjectService
                 'address' => $validated['address'] ?? null,
                 'barangay' => $validated['barangay'] ?? null,
                 'city' => $validated['city'] ?? null,
+                'province' => $validated['province'] ?? null,
+                'region' => $validated['region'] ?? null,
+                'postal_code' => $validated['postal_code'] ?? null,
                 'project_type' => $validated['project_type'] ?? null,
                 'rated_capacity' => $validated['rated_capacity'] ?? null,
                 'lifting_speed' => $validated['lifting_speed'] ?? null,
@@ -86,10 +94,18 @@ class ProjectService
             // Create initial default Major Task: Pre-construction & Regulatory Compliance (covering Week 1)
             $this->createDefaultPermitTask($project, $user->id);
 
+            // Handle optional invoice attachment if provided
+            if (isset($validated['invoice_file']) && $validated['invoice_file'] instanceof \Illuminate\Http\UploadedFile) {
+                $this->storeProjectFile($project, $validated['invoice_file'], 'invoice', $user->id, 'Initial project invoice attachment.');
+            }
+
             $stats = Project::getDashboardStats();
 
             $html = view('projects.partials.row', compact('project'))->render();
             \App\Events\ProjectCreated::dispatch($html, $stats);
+
+            // Notify Admin and Manager users about the new project
+            $this->notificationService->notifyNewProject($project);
 
             return $project;
         });
@@ -160,6 +176,11 @@ class ProjectService
             ? $validated['warranty_end_date']
             : ($startDate ? \Carbon\Carbon::parse($startDate)->addYear()->toDateString() : $project->warranty_end_date);
 
+        $targetStatus = !empty($validated['status']) ? $validated['status'] : $project->status;
+        if ($targetStatus !== $project->status) {
+            $this->assertTransitionAllowed($project->status, $targetStatus);
+        }
+
         $project->update([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
@@ -167,6 +188,9 @@ class ProjectService
             'address' => $validated['address'] ?? $project->address,
             'barangay' => $validated['barangay'] ?? $project->barangay,
             'city' => $validated['city'] ?? $project->city,
+            'province' => $validated['province'] ?? $project->province,
+            'region' => $validated['region'] ?? $project->region,
+            'postal_code' => $validated['postal_code'] ?? $project->postal_code,
             'project_type' => $validated['project_type'] ?? $project->project_type,
             'rated_capacity' => $validated['rated_capacity'] ?? $project->rated_capacity,
             'lifting_speed' => $validated['lifting_speed'] ?? $project->lifting_speed,
@@ -179,12 +203,41 @@ class ProjectService
             'operation' => $validated['operation'] ?? $project->operation,
             'warranty_period' => $warrantyPeriod,
             'warranty_end_date' => $warrantyEndDate,
+            'status' => $targetStatus,
             'payment_status' => $validated['payment_status'] ?? $project->payment_status,
             'start_date' => $startDate,
             'target_completion_date' => $validated['target_completion_date'] ?? $project->target_completion_date,
             'contract_price' => $validated['contract_price'] ?? $project->contract_price,
             'updated_by' => $user->id,
         ]);
+
+        // Handle invoice attachment if provided upon update
+        if (isset($validated['invoice_file']) && $validated['invoice_file'] instanceof \Illuminate\Http\UploadedFile) {
+            $this->storeProjectFile($project, $validated['invoice_file'], 'invoice', $user->id, 'Project invoice attachment.');
+        }
+
+        if ($targetStatus === 'completed') {
+            $now = now()->toDateString();
+            $assignedPersonnel = $project->personnel()->get();
+            $releasedCount = $assignedPersonnel->count();
+
+            foreach ($assignedPersonnel as $person) {
+                \App\Models\ProjectPersonnelHistory::where('project_id', $project->id)
+                    ->where('personnel_id', $person->id)
+                    ->whereNull('released_at')
+                    ->update([
+                        'released_at'    => $now,
+                        'release_reason' => 'project_completed',
+                        'released_by'    => $user->id,
+                    ]);
+
+                $person->update([
+                    'project_id'    => null,
+                    'date_assigned' => null,
+                    'updated_by'    => $user->id,
+                ]);
+            }
+        }
 
         return $project->fresh();
     }
@@ -358,6 +411,80 @@ class ProjectService
     }
 
     /**
+     * Archive a completed project.
+     */
+    public function archive(Project $project): void
+    {
+        if ($project->status !== 'completed') {
+            throw ValidationException::withMessages([
+                'project' => 'Only completed projects can be archived.',
+            ]);
+        }
+
+        DB::transaction(function () use ($project) {
+            $user = Auth::user();
+            $userId = $user ? $user->id : $project->updated_by;
+            $now = now()->toDateString();
+
+            // Release any remaining assigned personnel just in case
+            $assignedPersonnel = $project->personnel()->get();
+            foreach ($assignedPersonnel as $person) {
+                \App\Models\ProjectPersonnelHistory::where('project_id', $project->id)
+                    ->where('personnel_id', $person->id)
+                    ->whereNull('released_at')
+                    ->update([
+                        'released_at'    => $now,
+                        'release_reason' => 'project_archived',
+                        'released_by'    => $userId,
+                    ]);
+
+                $person->update([
+                    'project_id'    => null,
+                    'date_assigned' => null,
+                    'updated_by'    => $userId,
+                ]);
+            }
+
+            \App\Models\ProjectStatusHistory::create([
+                'project_id'  => $project->id,
+                'from_status' => 'completed',
+                'to_status'   => 'completed',
+                'notes'       => "Project archived to records repository",
+                'changed_by'  => $userId,
+                'changed_at'  => now(),
+            ]);
+
+            $projectId = $project->id;
+            $project->delete(); // Soft delete as archive
+
+            $stats = Project::getDashboardStats();
+            \App\Events\ProjectDeleted::dispatch($projectId, $stats);
+        });
+    }
+
+    /**
+     * Restore an archived project back to active completed state.
+     */
+    public function restore(Project $project): void
+    {
+        DB::transaction(function () use ($project) {
+            $user = Auth::user();
+            $userId = $user ? $user->id : $project->updated_by;
+
+            $project->restore();
+
+            \App\Models\ProjectStatusHistory::create([
+                'project_id'  => $project->id,
+                'from_status' => 'completed',
+                'to_status'   => 'completed',
+                'notes'       => "Project restored from archive",
+                'changed_by'  => $userId,
+                'changed_at'  => now(),
+            ]);
+        });
+    }
+
+    /**
      * Assert that a transition from $from → $to is allowed.
      *
      * @throws \Illuminate\Validation\ValidationException
@@ -400,5 +527,31 @@ class ProjectService
         }
 
         return sprintf('DEX-%d-%03d', $year, $next);
+    }
+
+    /**
+     * Store an uploaded file attachment for a project or specific subtask.
+     */
+    public function storeProjectFile(
+        Project $project,
+        \Illuminate\Http\UploadedFile $file,
+        string $fileType = 'general',
+        ?int $userId = null,
+        ?string $description = null,
+        ?\App\Models\ProjectSubtask $subtask = null,
+    ): \App\Models\ProjectFile {
+        $folder = "projects/{$project->id}/" . ($subtask ? "tasks/{$subtask->id}" : ($fileType === 'invoice' ? 'invoices' : 'files'));
+        $path = $file->store($folder, 'public');
+
+        return $project->files()->create([
+            'project_subtask_id' => $subtask?->id,
+            'uploaded_by' => $userId ?? Auth::id(),
+            'file_type' => $fileType,
+            'file_name' => $file->getClientOriginalName(),
+            'file_path' => $path,
+            'mime_type' => $file->getClientMimeType() ?: $file->getMimeType(),
+            'file_size' => $file->getSize(),
+            'description' => $description,
+        ]);
     }
 }

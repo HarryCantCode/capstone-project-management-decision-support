@@ -130,3 +130,15 @@ test('admin can create a user with custom job title when Others is selected', fu
     // Password should be @doeDEX1995
     expect(Hash::check('@doeDEX1995', $user->password))->toBeTrue();
 });
+
+test('user create view renders name placeholders and 18-year birthdate limit', function () {
+    $admin = User::factory()->create();
+    $admin->assignRole('Admin');
+
+    $response = $this->actingAs($admin)->get(route('account.users.create'));
+    $response->assertStatus(200);
+    $response->assertSee('placeholder="ex. Juan"', false);
+    $response->assertSee('placeholder="ex. David"', false);
+    $response->assertSee('placeholder="ex. Dela Cruz"', false);
+    $response->assertSee('max="' . now()->subYears(18)->format('Y-m-d') . '"', false);
+});

@@ -61,4 +61,20 @@ class ProjectPolicy
     {
         return $user->hasAnyRole(['Admin', 'Manager']);
     }
+
+    /**
+     * Determine whether the user can archive a completed project.
+     */
+    public function archive(User $user, Project $project): bool
+    {
+        return $user->hasAnyRole(['Admin', 'Manager']);
+    }
+
+    /**
+     * Determine whether the user can restore an archived project.
+     */
+    public function restore(User $user, Project $project): bool
+    {
+        return $user->hasAnyRole(['Admin', 'Manager']);
+    }
 }

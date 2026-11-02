@@ -30,5 +30,27 @@
     </td>
     <td><x-status-pill :status="$project->status" /></td>
     <td>{{ $project->creator?->name ?? 'System' }}</td>
-    <td class="text-right"><a href="{{ route('projects.show', $project) }}" class="btn btn-secondary btn-sm">View</a></td>
+    <td class="text-right" style="white-space: nowrap;">
+        <div style="display: inline-flex; gap: 0.375rem; align-items: center; justify-content: flex-end;">
+            <a href="{{ route('projects.show', $project) }}" class="btn btn-secondary btn-sm">View</a>
+            
+            @if ($project->trashed())
+                @can('restore', $project)
+                    <form method="POST" action="{{ route('projects.restore', $project->id) }}" class="inline-form" onsubmit="return confirm('Restore archived project {{ addslashes($project->name) }} back to active completed projects?');">
+                        @csrf
+                        <button type="submit" class="btn btn-primary btn-sm" title="Restore project from archive">Restore</button>
+                    </form>
+                @endcan
+            @elseif ($project->status === 'completed')
+                @can('archive', $project)
+                    <form method="POST" action="{{ route('projects.archive', $project) }}" class="inline-form" onsubmit="return confirm('Move project {{ addslashes($project->name) }} to archived projects?');">
+                        @csrf
+                        <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-muted); border-color: var(--color-border);" title="Archive completed project">
+                            Archive
+                        </button>
+                    </form>
+                @endcan
+            @endif
+        </div>
+    </td>
 </tr>

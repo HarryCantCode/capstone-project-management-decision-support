@@ -25,8 +25,11 @@ class UpdateProjectRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:5000'],
             'client_name' => ['required', 'string', 'max:255'],
             'address' => ['required', 'string', 'max:255'],
-            'barangay' => ['required', 'string', 'max:255'],
+            'region' => ['nullable', 'string', 'max:255'],
+            'province' => ['nullable', 'string', 'max:255'],
             'city' => ['required', 'string', 'max:255'],
+            'barangay' => ['nullable', 'string', 'max:255'],
+            'postal_code' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:10'],
             'project_type' => ['required', 'string', 'in:Residential,Commercial,Industrial,Infrastructure'],
             'rated_capacity' => ['required', 'string', 'max:100'],
             'lifting_speed' => ['required', 'string', 'max:100'],
@@ -39,12 +42,74 @@ class UpdateProjectRequest extends FormRequest
             'operation' => ['required', 'string', 'max:100'],
             'warranty_period' => ['nullable', 'string', 'max:100'],
             'warranty_end_date' => ['nullable', 'date'],
+            'status' => ['nullable', 'string', 'in:pending,ongoing,delayed,completed'],
             'payment_status' => ['required', 'string', 'in:Paid,Partial'],
+            'invoice_file' => [
+                'nullable',
+                'file',
+                'mimes:pdf,docx,jpg,jpeg,png,webp',
+                'max:20480', // 20 MB limit
+            ],
             'start_date' => ['required', 'date'],
-            'target_completion_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'target_completion_date' => [
+                'required',
+                'date',
+                'after_or_equal:start_date',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (!$value) {
+                        return;
+                    }
+
+                    try {
+                        $targetDate = \Carbon\Carbon::parse($value)->startOfDay();
+                    } catch (\Throwable) {
+                        return;
+                    }
+
+                    $startDateVal = $this->input('start_date');
+                    $baseDate = now()->startOfDay();
+
+                    if ($startDateVal) {
+                        try {
+                            $parsedStart = \Carbon\Carbon::parse($startDateVal)->startOfDay();
+                            if ($parsedStart->gt($baseDate)) {
+                                $baseDate = $parsedStart;
+                            }
+                        } catch (\Throwable) {
+                            // Handled by date rule on start_date
+                        }
+                    }
+
+                    $minAllowedDate = $baseDate->copy()->addMonth();
+
+                    if ($targetDate->lt($minAllowedDate)) {
+                        $fail('The target completion date must be at least 1 month from now or the project start date.');
+                    }
+                },
+            ],
             'contract_price' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
             'update_notes' => ['required', 'string', 'max:1000'],
         ];
+    }
+
+    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    {
+        $validator->after(function (\Illuminate\Validation\Validator $validator) {
+            /** @var \App\Models\Project|string|int|null $project */
+            $project = $this->route('project');
+            if (is_numeric($project) || is_string($project)) {
+                $project = \App\Models\Project::find($project);
+            }
+
+            // Only require invoice if transitioning/setting to Paid and no invoice exists
+            $isChangingToPaid = $this->input('payment_status') === 'Paid' && (!$project || $project->payment_status !== 'Paid');
+            if ($isChangingToPaid && !$this->hasFile('invoice_file')) {
+                $hasExistingInvoice = $project && $project->invoices()->exists();
+                if (!$hasExistingInvoice) {
+                    $validator->errors()->add('invoice_file', 'An invoice attachment (PDF, DOCX, or Image) is required when payment status is Paid in full.');
+                }
+            }
+        });
     }
 
     /**
@@ -74,6 +139,9 @@ class UpdateProjectRequest extends FormRequest
             'operation.required' => 'Elevator operation type is required.',
             'payment_status.required' => 'Payment status is required.',
             'payment_status.in' => 'Payment status must be Paid or Partial.',
+            'invoice_file.file' => 'The invoice must be a valid uploaded file.',
+            'invoice_file.mimes' => 'The invoice must be a file of type: PDF, DOCX, or Image (JPG, PNG, WEBP).',
+            'invoice_file.max' => 'The invoice file may not be greater than 20MB.',
             'start_date.required' => 'Project start date is required.',
             'description.max' => 'Description cannot exceed 5,000 characters.',
             'target_completion_date.required' => 'Target completion date is required.',
