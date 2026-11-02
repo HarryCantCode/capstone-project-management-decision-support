@@ -66,3 +66,19 @@ Route::delete('projects/{project}/tasks/{task}/subtasks/{subtask}', [\App\Http\C
 
 Route::post('projects/{project}/tasks/initialize-defaults', [\App\Http\Controllers\ProjectTaskController::class, 'initializeDefaults'])
     ->name('projects.tasks.initialize-defaults');
+
+// Project Files & Attachments (PDF, Docx, Images)
+Route::post('projects/{project}/files', [\App\Http\Controllers\ProjectFileController::class, 'store'])
+    ->name('projects.files.store');
+
+Route::post('projects/{project}/tasks/{task}/subtasks/{subtask}/files', [\App\Http\Controllers\ProjectFileController::class, 'storeSubtaskFile'])
+    ->name('projects.tasks.subtasks.files.store');
+
+Route::get('projects/{project}/files/{file}/download', [\App\Http\Controllers\ProjectFileController::class, 'download'])
+    ->name('projects.files.download');
+
+Route::put('projects/{project}/files/{file}', [\App\Http\Controllers\ProjectFileController::class, 'update'])
+    ->name('projects.files.update');
+
+Route::delete('projects/{project}/files/{file}', [\App\Http\Controllers\ProjectFileController::class, 'destroy'])
+    ->name('projects.files.destroy');

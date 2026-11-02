@@ -50,6 +50,12 @@ class StoreProjectRequest extends FormRequest
             'warranty_period' => ['nullable', 'string', 'max:100'],
             'warranty_end_date' => ['nullable', 'date'],
             'payment_status' => ['required', 'string', 'in:Paid,Partial'],
+            'invoice_file' => [
+                'nullable',
+                'file',
+                'mimes:pdf,docx,jpg,jpeg,png,webp',
+                'max:20480',
+            ],
             'start_date' => ['required', 'date', 'after_or_equal:today'],
             'target_completion_date' => [
                 'required',
@@ -91,6 +97,15 @@ class StoreProjectRequest extends FormRequest
         ];
     }
 
+    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    {
+        $validator->after(function (\Illuminate\Validation\Validator $validator) {
+            if ($this->input('payment_status') === 'Paid' && !$this->hasFile('invoice_file')) {
+                $validator->errors()->add('invoice_file', 'An invoice attachment (PDF, DOCX, or Image) is required when payment status is Paid in full.');
+            }
+        });
+    }
+
     /**
      * @return array<string, string>
      */
@@ -118,6 +133,9 @@ class StoreProjectRequest extends FormRequest
             'operation.required' => 'Elevator operation type is required.',
             'payment_status.required' => 'Payment status is required.',
             'payment_status.in' => 'Payment status must be Paid or Partial.',
+            'invoice_file.file' => 'The invoice must be a valid uploaded file.',
+            'invoice_file.mimes' => 'The invoice must be a file of type: PDF, DOCX, or Image (JPG, PNG, WEBP).',
+            'invoice_file.max' => 'The invoice file may not be greater than 20MB.',
             'start_date.required' => 'Project start date is required.',
             'start_date.after_or_equal' => 'Project start date cannot be a past date.',
             'description.max' => 'Description cannot exceed 5,000 characters.',

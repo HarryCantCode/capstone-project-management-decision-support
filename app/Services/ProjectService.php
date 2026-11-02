@@ -94,6 +94,11 @@ class ProjectService
             // Create initial default Major Task: Pre-construction & Regulatory Compliance (covering Week 1)
             $this->createDefaultPermitTask($project, $user->id);
 
+            // Handle optional invoice attachment if provided
+            if (isset($validated['invoice_file']) && $validated['invoice_file'] instanceof \Illuminate\Http\UploadedFile) {
+                $this->storeProjectFile($project, $validated['invoice_file'], 'invoice', $user->id, 'Initial project invoice attachment.');
+            }
+
             $stats = Project::getDashboardStats();
 
             $html = view('projects.partials.row', compact('project'))->render();
@@ -205,6 +210,11 @@ class ProjectService
             'contract_price' => $validated['contract_price'] ?? $project->contract_price,
             'updated_by' => $user->id,
         ]);
+
+        // Handle invoice attachment if provided upon update
+        if (isset($validated['invoice_file']) && $validated['invoice_file'] instanceof \Illuminate\Http\UploadedFile) {
+            $this->storeProjectFile($project, $validated['invoice_file'], 'invoice', $user->id, 'Project invoice attachment.');
+        }
 
         if ($targetStatus === 'completed') {
             $now = now()->toDateString();
@@ -517,5 +527,31 @@ class ProjectService
         }
 
         return sprintf('DEX-%d-%03d', $year, $next);
+    }
+
+    /**
+     * Store an uploaded file attachment for a project or specific subtask.
+     */
+    public function storeProjectFile(
+        Project $project,
+        \Illuminate\Http\UploadedFile $file,
+        string $fileType = 'general',
+        ?int $userId = null,
+        ?string $description = null,
+        ?\App\Models\ProjectSubtask $subtask = null,
+    ): \App\Models\ProjectFile {
+        $folder = "projects/{$project->id}/" . ($subtask ? "tasks/{$subtask->id}" : ($fileType === 'invoice' ? 'invoices' : 'files'));
+        $path = $file->store($folder, 'public');
+
+        return $project->files()->create([
+            'project_subtask_id' => $subtask?->id,
+            'uploaded_by' => $userId ?? Auth::id(),
+            'file_type' => $fileType,
+            'file_name' => $file->getClientOriginalName(),
+            'file_path' => $path,
+            'mime_type' => $file->getClientMimeType() ?: $file->getMimeType(),
+            'file_size' => $file->getSize(),
+            'description' => $description,
+        ]);
     }
 }

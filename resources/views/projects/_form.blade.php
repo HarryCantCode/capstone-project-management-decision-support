@@ -628,7 +628,7 @@
                 @error('contract_price')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
             </div>
 
-            <div class="form-group form-group-premium" style="margin-bottom: 0;">
+            <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
                 <label for="payment_status" class="form-label">Payment Status <span class="text-danger">*</span></label>
                 <select id="payment_status" name="payment_status" class="form-control @error('payment_status') is-invalid @enderror" required>
                     <option value="" disabled {{ old('payment_status', $project->payment_status ?? '') === '' ? 'selected' : '' }}>Select Payment Status</option>
@@ -637,6 +637,36 @@
                 </select>
                 <p class="form-hint">Billing milestone collection tracking.</p>
                 @error('payment_status')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+            </div>
+
+            {{-- Invoice Attachment Upload --}}
+            @php
+                $hasExistingInvoice = isset($project) && $project->invoices()->exists();
+                $existingInvoice = $hasExistingInvoice ? $project->invoices()->first() : null;
+            @endphp
+            <div class="form-group form-group-premium" id="invoice-upload-group" style="margin-bottom: 0;">
+                <label for="invoice_file" class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>
+                        Invoice Attachment
+                        <span id="invoice-required-indicator" class="text-danger" style="{{ old('payment_status', $project->payment_status ?? 'Partial') === 'Paid' && !$hasExistingInvoice ? '' : 'display: none;' }}">*</span>
+                    </span>
+                    <span class="badge" style="background: var(--color-surface-alt); font-size: 0.6875rem;">PDF, DOCX, Images</span>
+                </label>
+                <input
+                    type="file"
+                    id="invoice_file"
+                    name="invoice_file"
+                    class="form-control @error('invoice_file') is-invalid @enderror"
+                    accept=".pdf,.doc,.docx,image/*"
+                >
+                <p class="form-hint" id="invoice-hint">
+                    @if($hasExistingInvoice)
+                        Current invoice on file: <a href="{{ route('projects.files.download', [$project, $existingInvoice]) }}" target="_blank" class="table-link font-bold">📄 {{ $existingInvoice->file_name }} ({{ $existingInvoice->formatted_size }})</a>. Uploading a new file will add an updated invoice.
+                    @else
+                        Required when payment status is <strong>Paid in full</strong>. Optional for Partial payment.
+                    @endif
+                </p>
+                @error('invoice_file')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
             </div>
         </div>
     </div>
@@ -804,6 +834,16 @@
             const val = paymentSelect.value || 'Partial';
             previewPaymentPill.textContent = val;
             previewPaymentPill.className = `status-pill status-pill--${val.toLowerCase()}`;
+
+            const invoiceRequiredIndicator = document.getElementById('invoice-required-indicator');
+            const hasExistingInvoice = @js($hasExistingInvoice);
+            if (invoiceRequiredIndicator) {
+                if (val === 'Paid' && !hasExistingInvoice) {
+                    invoiceRequiredIndicator.style.display = 'inline';
+                } else {
+                    invoiceRequiredIndicator.style.display = 'none';
+                }
+            }
         }
 
         function updateLocation() {

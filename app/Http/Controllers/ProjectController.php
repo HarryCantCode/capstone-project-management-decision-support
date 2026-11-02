@@ -111,7 +111,9 @@ class ProjectController extends Controller
             'personnelHistory.assignedBy',
             'personnelHistory.releasedBy',
             'costs' => fn ($query) => $query->with('creator')->orderByDesc('incurred_date')->orderByDesc('id'),
-            'tasks.subtasks',
+            'tasks.subtasks.files.uploader',
+            'files.uploader',
+            'files.subtask',
         ]);
 
         $availablePersonnel = Personnel::query()

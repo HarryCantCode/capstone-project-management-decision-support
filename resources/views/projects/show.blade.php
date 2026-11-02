@@ -106,6 +106,7 @@
         </section>
 
         {{-- Financials & Budget Tracking Card --}}
+        <div style="display: flex; flex-direction: column; gap: var(--space-6);">
         <section class="card card-glass" aria-labelledby="project-costing-heading">
             <div class="card-header">
                 <h2 id="project-costing-heading">Financials & Budget</h2>
@@ -154,6 +155,116 @@
                 </div>
             </div>
         </section>
+
+            {{-- ─── Uploaded Project Files & Attachments (Placed directly below Financials & Budget) ─── --}}
+            <section class="card card-glass" aria-labelledby="project-files-heading" id="project-files-card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
+                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                        <svg style="width: 18px; height: 18px; color: var(--color-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        <h2 id="project-files-heading" style="margin: 0; font-size: 0.9375rem; font-weight: 700;">Project Files & Documents</h2>
+                        <span class="badge font-mono" style="background: var(--color-surface-alt); font-size: 0.75rem; font-weight: 600;">{{ $project->files->count() }}</span>
+                    </div>
+                    @can('update', $project)
+                        <button type="button" class="btn btn-primary btn-sm" @click="uploadFileModalOpen = true" style="white-space: nowrap; font-size: 0.75rem; padding: 4px 10px;">
+                            + Upload File
+                        </button>
+                    @endcan
+                </div>
+                <div class="card-body" style="padding: var(--space-3) var(--space-4);">
+                    @if ($project->files->isEmpty())
+                        <div style="text-align: center; padding: var(--space-5) var(--space-3); color: var(--color-muted);">
+                            <svg style="width: 32px; height: 32px; margin: 0 auto var(--space-2); opacity: 0.4;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                            </svg>
+                            <p style="margin: 0; font-size: 0.8125rem;">No files uploaded yet.</p>
+                            <p class="form-hint" style="margin-top: 4px; font-size: 0.75rem;">Supported: PDF, DOCX, and Images (up to 20MB).</p>
+                        </div>
+                    @else
+                        <div style="display: flex; flex-direction: column; gap: var(--space-2); max-height: 280px; overflow-y: auto; padding-right: 2px;">
+                            @foreach ($project->files as $file)
+                                @php
+                                    $fileData = [
+                                        'id' => $file->id,
+                                        'name' => $file->file_name,
+                                        'size' => $file->formatted_size,
+                                        'type' => $file->file_type,
+                                        'description' => $file->description ?? '',
+                                        'uploader' => $file->uploader ? $file->uploader->name : 'System',
+                                        'date' => $file->created_at->format('M j, Y · g:i A'),
+                                        'download_url' => route('projects.files.download', [$project, $file]),
+                                        'update_url' => route('projects.files.update', [$project, $file]),
+                                        'delete_url' => route('projects.files.destroy', [$project, $file]),
+                                        'is_img' => $file->is_image,
+                                        'is_pdf' => $file->is_pdf,
+                                        'is_word' => $file->is_word,
+                                        'subtask_title' => $file->subtask ? $file->subtask->title : null,
+                                    ];
+                                @endphp
+                                <div 
+                                    class="project-file-item"
+                                    style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.8125rem; cursor: pointer; transition: all 0.15s ease;"
+                                    @click="openViewFileModal({{ json_encode($fileData) }})"
+                                    title="Click to view details, update description, download, or delete"
+                                >
+                                    <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1;">
+                                        @if ($file->is_image)
+                                            <span style="font-size: 1.125rem;">🖼️</span>
+                                        @elseif ($file->is_pdf)
+                                            <span style="font-size: 1.125rem;">📕</span>
+                                        @elseif ($file->is_word)
+                                            <span style="font-size: 1.125rem;">📘</span>
+                                        @else
+                                            <span style="font-size: 1.125rem;">📄</span>
+                                        @endif
+                                        <div style="min-width: 0; flex: 1;">
+                                            <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
+                                                <span class="table-link font-bold" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;" title="{{ $file->file_name }}">
+                                                    {{ $file->file_name }}
+                                                </span>
+                                                @if ($file->file_type === 'invoice')
+                                                    <span class="badge" style="background: rgba(34, 197, 94, 0.12); color: var(--color-success); font-size: 0.6875rem; font-weight: 700;">Invoice</span>
+                                                @elseif ($file->file_type === 'task_attachment' && $file->subtask)
+                                                    <span class="badge" style="background: var(--color-surface-alt); font-size: 0.6875rem;" title="Subtask: {{ $file->subtask->title }}">
+                                                        Task #{{ $file->subtask->id }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            <div class="text-muted" style="font-size: 0.6875rem; display: flex; gap: var(--space-2); align-items: center;">
+                                                <span>{{ $file->formatted_size }}</span>
+                                                <span>·</span>
+                                                <span>{{ $file->created_at->format('M j, Y') }}</span>
+                                                @if ($file->uploader)
+                                                    <span>·</span>
+                                                    <span>by {{ $file->uploader->name }}</span>
+                                                @endif
+                                                @if ($file->description)
+                                                    <span>·</span>
+                                                    <span style="font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">"{{ $file->description }}"</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0;" @click.stop>
+                                        <a href="{{ route('projects.files.download', [$project, $file]) }}" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem;" title="Direct Download">
+                                            ⬇
+                                        </a>
+                                        <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem;" @click="openViewFileModal({{ json_encode($fileData) }})" title="Details & Edit">
+                                            ⚙️
+                                        </button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </section>
+        </div>
 
     </div>
 
@@ -204,109 +315,6 @@
                 </div>
             </div>
         </div>
-    </section>
-
-    {{-- ─── Expenditures Table (3 Recent Entries Shortcut) ────────────────────── --}}
-    <section class="card card-glass mb-6" aria-labelledby="project-expenditures-heading">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);">
-            <div>
-                <h2 id="project-expenditures-heading" style="display: inline-block; margin-right: var(--space-2); margin-bottom: 0;">Expenditures</h2>
-                <span class="text-muted" style="font-size: 0.8125rem;">
-                    Total Spend: <strong class="font-mono text-dark">₱{{ number_format($project->actual_spend, 2) }}</strong> ({{ $project->costs->count() }} {{ Str::plural('entry', $project->costs->count()) }})
-                </span>
-                <span class="badge" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); margin-left: var(--space-2); font-size: 0.75rem; font-weight: 600;">
-                    Recent 3 Entries
-                </span>
-            </div>
-            <div style="display: flex; flex-direction: row; gap: var(--space-2); align-items: center; flex-wrap: nowrap;">
-                <a href="{{ route('costing.show', $project) }}" class="btn btn-secondary btn-sm" style="white-space: nowrap;">
-                    Full Breakdown ↗
-                </a>
-                @can('update', $project)
-                    <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true" style="white-space: nowrap;">
-                        + Log New Expense / Cost
-                    </button>
-                @endcan
-            </div>
-        </div>
-
-        @if ($project->costs->isEmpty())
-            <div class="card-body">
-                <div class="empty-state" style="padding: var(--space-6) var(--space-4);">
-                    <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                    </svg>
-                    <h3 class="empty-state__title">No itemized costs logged yet</h3>
-                    <p class="empty-state__description">
-                        Manually type down what each cost is for (materials, labor, equipment rental, permits) to keep an accurate spend ledger.
-                    </p>
-                    @can('update', $project)
-                        <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
-                            + Log First Cost Entry
-                        </button>
-                    @endcan
-                </div>
-            </div>
-        @else
-            {{-- Indicator banner for recent 3 entries --}}
-            <div style="background: var(--color-surface-alt); padding: var(--space-2) var(--space-6); border-bottom: 1px solid var(--color-border); font-size: 0.8125rem;">
-                <span class="text-muted">
-                    📌 <strong>Quick View:</strong> Displaying the <strong>3 most recent expenditures</strong> for this project.
-                </span>
-            </div>
-            <div class="table-wrapper">
-                <table class="data-table">
-                    <caption class="visually-hidden">Itemized costs logged for {{ $project->name }}</caption>
-                    <thead>
-                        <tr>
-                            <th scope="col">Description (What this is for)</th>
-                            <th scope="col">Category</th>
-                            <th scope="col" class="text-right">Amount (PHP)</th>
-                            <th scope="col">Incurred Date</th>
-                            <th scope="col">Logged By</th>
-                            <th scope="col" class="text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($project->costs->take(3) as $cost)
-                            <tr>
-                                <td><strong>{{ $cost->description }}</strong></td>
-                                <td>
-                                    <span class="badge" style="background: var(--color-surface-alt); text-transform: capitalize;">
-                                        {{ $cost->cost_type }}
-                                    </span>
-                                </td>
-                                <td class="cell-numeric text-success">
-                                    ₱{{ number_format($cost->amount, 2) }}
-                                </td>
-                                <td class="font-mono">
-                                    {{ $cost->incurred_date ? $cost->incurred_date->format('M j, Y') : $cost->created_at->format('M j, Y') }}
-                                </td>
-                                <td>{{ $cost->creator ? $cost->creator->name : 'System' }}</td>
-                                <td class="text-right">
-                                    @can('update', $project)
-                                        <form method="POST" action="{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Remove this cost entry?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
-                                                Delete
-                                            </button>
-                                        </form>
-                                    @endcan
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            @if ($project->costs->count() > 3)
-                <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; background: var(--color-surface-alt);">
-                    <span class="text-muted">Showing 3 most recent expenditures (out of {{ $project->costs->count() }} total logged).</span>
-                    <a href="{{ route('costing.show', $project) }}" class="table-link font-bold">View Complete History in Full Breakdown ↗</a>
-                </div>
-            @endif
-        @endif
     </section>
 
     {{-- ─── Dynamic Project Progress Timeline (Major Tasks & Sub Tasks) ──────────── --}}
@@ -592,6 +600,23 @@
                                                         </span>
                                                     @endif
 
+                                                    {{-- Subtask Attachment Button & Count --}}
+                                                    <button 
+                                                        type="button" 
+                                                        class="btn-icon" 
+                                                        title="Upload or view files for this sub task ({{ $subtask->files->count() }} attached)"
+                                                        @click="openSubtaskUploadModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', {{ json_encode($subtask->files->map(fn($f) => ['id' => $f->id, 'name' => $f->file_name, 'size' => $f->formatted_size, 'url' => route('projects.files.download', [$project, $f]), 'is_img' => $f->is_image, 'is_pdf' => $f->is_pdf, 'is_word' => $f->is_word])) }})"
+                                                        style="background: none; border: none; cursor: pointer; color: {{ $subtask->files->isNotEmpty() ? 'var(--color-primary)' : 'var(--color-muted)' }}; padding: 4px; border-radius: var(--radius-sm); position: relative;"
+                                                        id="btn-files-subtask-{{ $subtask->id }}"
+                                                    >
+                                                        <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.5 9.525l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.248z" clip-rule="evenodd" />
+                                                        </svg>
+                                                        @if ($subtask->files->isNotEmpty())
+                                                            <span style="font-size: 0.625rem; font-weight: 700; color: var(--color-primary); margin-left: 1px;">{{ $subtask->files->count() }}</span>
+                                                        @endif
+                                                    </button>
+
                                                     @can('update', $project)
                                                         <button 
                                                             type="button" 
@@ -761,11 +786,22 @@
                                                                     {{ $subtask->title }}
                                                                 </span>
                                                             </label>
-                                                            @if ($subtask->due_date)
-                                                                <span class="badge font-mono" style="background: var(--color-surface-alt); color: var(--color-muted); font-size: 0.6875rem;">
-                                                                    📅 {{ $subtask->due_date->format('M j') }}
-                                                                </span>
-                                                            @endif
+                                                            <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                                                @if ($subtask->due_date)
+                                                                    <span class="badge font-mono" style="background: var(--color-surface-alt); color: var(--color-muted); font-size: 0.6875rem;">
+                                                                        📅 {{ $subtask->due_date->format('M j') }}
+                                                                    </span>
+                                                                @endif
+                                                                <button 
+                                                                    type="button" 
+                                                                    class="btn-icon" 
+                                                                    title="Attachments ({{ $subtask->files->count() }})"
+                                                                    @click="openSubtaskUploadModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', {{ json_encode($subtask->files->map(fn($f) => ['id' => $f->id, 'name' => $f->file_name, 'size' => $f->formatted_size, 'url' => route('projects.files.download', [$project, $f]), 'is_img' => $f->is_image, 'is_pdf' => $f->is_pdf, 'is_word' => $f->is_word])) }})"
+                                                                    style="background: none; border: none; cursor: pointer; color: {{ $subtask->files->isNotEmpty() ? 'var(--color-primary)' : 'var(--color-muted)' }}; padding: 2px; border-radius: var(--radius-sm);"
+                                                                >
+                                                                    📎 @if($subtask->files->isNotEmpty())<span style="font-size: 0.6875rem; font-weight: bold;">{{ $subtask->files->count() }}</span>@endif
+                                                                </button>
+                                                            </div>
                                                         </li>
                                                     @endforeach
                                                 </ul>
@@ -779,6 +815,109 @@
                 </div>
             @endif
         </div>
+    </section>
+
+    {{-- ─── Expenditures Table (3 Recent Entries Shortcut) ────────────────────── --}}
+    <section class="card card-glass mb-6" aria-labelledby="project-expenditures-heading">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);">
+            <div>
+                <h2 id="project-expenditures-heading" style="display: inline-block; margin-right: var(--space-2); margin-bottom: 0;">Expenditures</h2>
+                <span class="text-muted" style="font-size: 0.8125rem;">
+                    Total Spend: <strong class="font-mono text-dark">₱{{ number_format($project->actual_spend, 2) }}</strong> ({{ $project->costs->count() }} {{ Str::plural('entry', $project->costs->count()) }})
+                </span>
+                <span class="badge" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); margin-left: var(--space-2); font-size: 0.75rem; font-weight: 600;">
+                    Recent 3 Entries
+                </span>
+            </div>
+            <div style="display: flex; flex-direction: row; gap: var(--space-2); align-items: center; flex-wrap: nowrap;">
+                <a href="{{ route('costing.show', $project) }}" class="btn btn-secondary btn-sm" style="white-space: nowrap;">
+                    Full Breakdown ↗
+                </a>
+                @can('update', $project)
+                    <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true" style="white-space: nowrap;">
+                        + Log New Expense / Cost
+                    </button>
+                @endcan
+            </div>
+        </div>
+
+        @if ($project->costs->isEmpty())
+            <div class="card-body">
+                <div class="empty-state" style="padding: var(--space-6) var(--space-4);">
+                    <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    <h3 class="empty-state__title">No itemized costs logged yet</h3>
+                    <p class="empty-state__description">
+                        Manually type down what each cost is for (materials, labor, equipment rental, permits) to keep an accurate spend ledger.
+                    </p>
+                    @can('update', $project)
+                        <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
+                            + Log First Cost Entry
+                        </button>
+                    @endcan
+                </div>
+            </div>
+        @else
+            {{-- Indicator banner for recent 3 entries --}}
+            <div style="background: var(--color-surface-alt); padding: var(--space-2) var(--space-6); border-bottom: 1px solid var(--color-border); font-size: 0.8125rem;">
+                <span class="text-muted">
+                    📌 <strong>Quick View:</strong> Displaying the <strong>3 most recent expenditures</strong> for this project.
+                </span>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <caption class="visually-hidden">Itemized costs logged for {{ $project->name }}</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Description (What this is for)</th>
+                            <th scope="col">Category</th>
+                            <th scope="col" class="text-right">Amount (PHP)</th>
+                            <th scope="col">Incurred Date</th>
+                            <th scope="col">Logged By</th>
+                            <th scope="col" class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($project->costs->take(3) as $cost)
+                            <tr>
+                                <td><strong>{{ $cost->description }}</strong></td>
+                                <td>
+                                    <span class="badge" style="background: var(--color-surface-alt); text-transform: capitalize;">
+                                        {{ $cost->cost_type }}
+                                    </span>
+                                </td>
+                                <td class="cell-numeric text-success">
+                                    ₱{{ number_format($cost->amount, 2) }}
+                                </td>
+                                <td class="font-mono">
+                                    {{ $cost->incurred_date ? $cost->incurred_date->format('M j, Y') : $cost->created_at->format('M j, Y') }}
+                                </td>
+                                <td>{{ $cost->creator ? $cost->creator->name : 'System' }}</td>
+                                <td class="text-right">
+                                    @can('update', $project)
+                                        <form method="POST" action="{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Remove this cost entry?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
+                                                Delete
+                                            </button>
+                                        </form>
+                                    @endcan
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            @if ($project->costs->count() > 3)
+                <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; background: var(--color-surface-alt);">
+                    <span class="text-muted">Showing 3 most recent expenditures (out of {{ $project->costs->count() }} total logged).</span>
+                    <a href="{{ route('costing.show', $project) }}" class="table-link font-bold">View Complete History in Full Breakdown ↗</a>
+                </div>
+            @endif
+        @endif
     </section>
 
     {{-- ─── Assigned Manpower / Project Personnel (Active & Archived Records) ─── --}}
@@ -1564,11 +1703,254 @@
         </div>
     </div>
 
+    {{-- ─── Modal 7: Upload Project File (Invoice or General Document) ──── --}}
+    <div class="reassign-modal-overlay" style="display: none;" x-show="uploadFileModalOpen" x-cloak>
+        <div class="reassign-modal-backdrop" @click="uploadFileModalOpen = false"></div>
+        <div class="reassign-modal-content card" x-show="uploadFileModalOpen" x-transition style="max-width: 480px;">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <svg style="width: 18px; height: 18px; color: var(--color-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span style="font-weight: 700; font-size: 1rem;">Upload Project Document</span>
+                </div>
+                <button type="button" class="flash-close" @click="uploadFileModalOpen = false" aria-label="Close modal">&times;</button>
+            </div>
+            <form action="{{ route('projects.files.store', $project) }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="card-body">
+                    <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
+                        <label for="project_file_input" class="form-label">Select File <span class="required">*</span></label>
+                        <input
+                            type="file"
+                            id="project_file_input"
+                            name="file"
+                            class="form-control"
+                            accept=".pdf,.doc,.docx,image/*"
+                            required
+                        >
+                        <p class="form-hint" style="margin-top: 4px;">Allowed formats: PDF, DOCX, and Images (up to 20MB).</p>
+                    </div>
+
+                    <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
+                        <label for="project_file_type" class="form-label">File Type <span class="required">*</span></label>
+                        <select id="project_file_type" name="file_type" class="form-control" required>
+                            <option value="general">General Project File / Document</option>
+                            <option value="invoice">Official Invoice / Payment Receipt</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                        <label for="project_file_description" class="form-label">Description / Note <span class="text-muted">(optional)</span></label>
+                        <input
+                            type="text"
+                            id="project_file_description"
+                            name="description"
+                            class="form-control"
+                            maxlength="255"
+                            placeholder="e.g. Official signed billing invoice #1024"
+                        >
+                    </div>
+                </div>
+                <div class="card-footer" style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                    <button type="button" class="btn btn-secondary" @click="uploadFileModalOpen = false">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Upload File</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- ─── Modal 9: File Details, Description Editor & Actions ─────── --}}
+    <div class="reassign-modal-overlay" style="display: none;" x-show="viewFileModalOpen" x-cloak>
+        <div class="reassign-modal-backdrop" @click="viewFileModalOpen = false"></div>
+        <div class="reassign-modal-content card" x-show="viewFileModalOpen" x-transition style="max-width: 520px;">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0;">
+                    <span x-text="activeFileData.is_img ? '🖼️' : (activeFileData.is_pdf ? '📕' : (activeFileData.is_word ? '📘' : '📄'))"></span>
+                    <span style="font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="activeFileData.name"></span>
+                </div>
+                <button type="button" class="flash-close" @click="viewFileModalOpen = false" aria-label="Close modal">&times;</button>
+            </div>
+            
+            <form :action="activeFileData.update_url" method="POST">
+                @csrf
+                @method('PUT')
+                <div class="card-body">
+                    {{-- File Meta Info Grid --}}
+                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); background: var(--color-surface-alt); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); margin-bottom: var(--space-4); font-size: 0.8125rem;">
+                        <div>
+                            <span class="text-muted" style="display: block; font-size: 0.6875rem; text-transform: uppercase; font-weight: 700;">File Size</span>
+                            <span class="font-mono font-bold" x-text="activeFileData.size"></span>
+                        </div>
+                        <div>
+                            <span class="text-muted" style="display: block; font-size: 0.6875rem; text-transform: uppercase; font-weight: 700;">Category</span>
+                            <span class="badge" style="text-transform: capitalize; background: var(--color-surface); font-size: 0.75rem;" x-text="activeFileData.type === 'invoice' ? 'Invoice / Billing' : (activeFileData.type === 'task_attachment' ? 'Task Attachment' : 'General Document')"></span>
+                        </div>
+                        <div>
+                            <span class="text-muted" style="display: block; font-size: 0.6875rem; text-transform: uppercase; font-weight: 700;">Uploaded By</span>
+                            <span x-text="activeFileData.uploader"></span>
+                        </div>
+                        <div>
+                            <span class="text-muted" style="display: block; font-size: 0.6875rem; text-transform: uppercase; font-weight: 700;">Upload Date</span>
+                            <span class="font-mono" x-text="activeFileData.date"></span>
+                        </div>
+                        <template x-if="activeFileData.subtask_title">
+                            <div style="grid-column: 1 / -1; padding-top: var(--space-2); border-top: 1px solid var(--color-border);">
+                                <span class="text-muted" style="display: block; font-size: 0.6875rem; text-transform: uppercase; font-weight: 700;">Associated Sub Task</span>
+                                <span style="font-weight: 600;" x-text="activeFileData.subtask_title"></span>
+                            </div>
+                        </template>
+                    </div>
+
+                    {{-- Description Editor --}}
+                    <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                        <label for="modal_file_description" class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>File Description / Notes</span>
+                            <span class="text-muted" style="font-size: 0.6875rem;">Editable</span>
+                        </label>
+                        <textarea
+                            id="modal_file_description"
+                            name="description"
+                            rows="3"
+                            class="form-control"
+                            maxlength="500"
+                            x-model="activeFileData.description"
+                            placeholder="Add or update notes about this document..."
+                        ></textarea>
+                        <p class="form-hint" style="margin-top: 4px;">Click 'Save Description' below to record changes to this file's description.</p>
+                    </div>
+                </div>
+
+                <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
+                    <div style="display: flex; gap: var(--space-2);">
+                        <a :href="activeFileData.download_url" class="btn btn-secondary btn-sm" target="_blank" style="display: inline-flex; align-items: center; gap: 4px;">
+                            ⬇ Download File
+                        </a>
+                        @can('update', $project)
+                            <button
+                                type="button"
+                                class="btn btn-secondary btn-sm"
+                                style="color: var(--color-danger); border-color: #fecaca;"
+                                @click="deleteActiveFile()"
+                            >
+                                🗑 Delete File
+                            </button>
+                        @endcan
+                    </div>
+                    <div style="display: flex; gap: var(--space-2);">
+                        <button type="button" class="btn btn-secondary btn-sm" @click="viewFileModalOpen = false">Close</button>
+                        @can('update', $project)
+                            <button type="submit" class="btn btn-primary btn-sm">Save Description</button>
+                        @endcan
+                    </div>
+                </div>
+            </form>
+
+            {{-- Hidden delete form for modal --}}
+            <form id="activeFileDeleteForm" :action="activeFileData.delete_url" method="POST" style="display: none;">
+                @csrf
+                @method('DELETE')
+            </form>
+        </div>
+    </div>
+
+    {{-- ─── Modal 8: Sub Task Attachments & Upload Modal ────────────────── --}}
+    <div class="reassign-modal-overlay" style="display: none;" x-show="subtaskFileModalOpen" x-cloak>
+        <div class="reassign-modal-backdrop" @click="subtaskFileModalOpen = false"></div>
+        <div class="reassign-modal-content card" x-show="subtaskFileModalOpen" x-transition style="max-width: 520px;">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0;">
+                    <svg style="width: 18px; height: 18px; color: var(--color-primary); flex-shrink: 0;" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.5 9.525l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.248z" clip-rule="evenodd" />
+                    </svg>
+                    <span style="font-weight: 700; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="'Subtask Files: ' + activeSubtaskData.title"></span>
+                </div>
+                <button type="button" class="flash-close" @click="subtaskFileModalOpen = false" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="card-body">
+                {{-- Existing Subtask Files List --}}
+                <div style="margin-bottom: var(--space-4);">
+                    <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-2);">
+                        Attached Documents (<span x-text="activeSubtaskData.files.length"></span>)
+                    </div>
+                    <template x-if="activeSubtaskData.files.length === 0">
+                        <div style="background: var(--color-surface); border: 1px dashed var(--color-border); padding: var(--space-3); border-radius: var(--radius-md); text-align: center; color: var(--color-muted); font-size: 0.8125rem;">
+                            No files attached to this sub task yet.
+                        </div>
+                    </template>
+                    <div style="display: flex; flex-direction: column; gap: var(--space-2); max-height: 180px; overflow-y: auto;" x-show="activeSubtaskData.files.length > 0">
+                        <template x-for="f in activeSubtaskData.files" :key="f.id">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 0.8125rem;">
+                                <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1;">
+                                    <span x-text="f.is_img ? '🖼️' : (f.is_pdf ? '📕' : (f.is_word ? '📘' : '📄'))"></span>
+                                    <a :href="f.url" target="_blank" class="table-link font-bold" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;" x-text="f.name"></a>
+                                    <span class="text-muted" style="font-size: 0.75rem;" x-text="'(' + f.size + ')'"></span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0;">
+                                    <a :href="f.url" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem;" title="Download">⬇</a>
+                                    @can('update', $project)
+                                        <form :action="'/projects/{{ $project->id }}/files/' + f.id" method="POST" onsubmit="return confirm('Delete this attachment?');" class="inline-form">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); padding: 2px 6px; font-size: 0.75rem;">✕</button>
+                                        </form>
+                                    @endcan
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                {{-- Upload New Attachment Form --}}
+                @can('update', $project)
+                    <div style="border-top: 1px solid var(--color-border); padding-top: var(--space-3);">
+                        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-2);">
+                            + Upload New Attachment
+                        </div>
+                        <form :action="activeSubtaskData.uploadUrl" method="POST" enctype="multipart/form-data">
+                            @csrf
+                            <div class="form-group form-group-premium" style="margin-bottom: var(--space-3);">
+                                <input
+                                    type="file"
+                                    name="file"
+                                    class="form-control"
+                                    accept=".pdf,.doc,.docx,image/*"
+                                    required
+                                >
+                                <p class="form-hint" style="margin-top: 4px;">PDF, DOCX, or Images up to 20MB.</p>
+                            </div>
+                            <div class="form-group form-group-premium" style="margin-bottom: var(--space-3);">
+                                <input
+                                    type="text"
+                                    name="description"
+                                    class="form-control"
+                                    maxlength="255"
+                                    placeholder="Description / note (e.g. Approved Permit Certificate)"
+                                >
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                                <button type="button" class="btn btn-secondary" @click="subtaskFileModalOpen = false">Close</button>
+                                <button type="submit" class="btn btn-primary btn-sm">Attach File</button>
+                            </div>
+                        </form>
+                    </div>
+                @endcan
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 
 @push('styles')
 <style>
+.project-file-item:hover {
+    border-color: var(--color-primary) !important;
+    background: var(--color-surface-alt) !important;
+}
+
 .timeline-stages-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1809,6 +2191,32 @@ function projectDetail() {
         editMajorTaskModalOpen: false,
         editSubtaskModalOpen: false,
         markCompletedModalOpen: false,
+        uploadFileModalOpen: false,
+        subtaskFileModalOpen: false,
+        viewFileModalOpen: false,
+        activeFileData: {
+            id: null,
+            name: '',
+            size: '',
+            type: '',
+            description: '',
+            uploader: '',
+            date: '',
+            download_url: '',
+            update_url: '',
+            delete_url: '',
+            is_img: false,
+            is_pdf: false,
+            is_word: false,
+            subtask_title: null
+        },
+        activeSubtaskData: {
+            taskId: null,
+            subtaskId: null,
+            title: '',
+            files: [],
+            uploadUrl: ''
+        },
         activeTaskId: {{ $project->tasks->first()?->id ?? 'null' }},
         initialSubtasks: [{ title: '', due_date: '{{ $defaultStartDate->format('Y-m-d') }}' }],
         editingTask: {
@@ -1842,6 +2250,28 @@ function projectDetail() {
                 updateUrl: '/projects/{{ $project->id }}/tasks/' + task.id
             };
             this.editMajorTaskModalOpen = true;
+        },
+        openViewFileModal(fileData) {
+            this.activeFileData = Object.assign({}, fileData);
+            this.viewFileModalOpen = true;
+        },
+        deleteActiveFile() {
+            if (confirm(`Are you sure you want to delete "${this.activeFileData.name}"? This action cannot be undone.`)) {
+                const form = document.getElementById('activeFileDeleteForm');
+                if (form) {
+                    form.submit();
+                }
+            }
+        },
+        openSubtaskUploadModal(taskId, subtaskId, title, files = []) {
+            this.activeSubtaskData = {
+                taskId: taskId,
+                subtaskId: subtaskId,
+                title: title,
+                files: files || [],
+                uploadUrl: `/projects/{{ $project->id }}/tasks/${taskId}/subtasks/${subtaskId}/files`
+            };
+            this.subtaskFileModalOpen = true;
         },
         openEditSubtaskModal(taskId, subtaskId, currentTitle, currentDate = '', minDate = '', maxDate = '') {
             this.editingSubtask = {

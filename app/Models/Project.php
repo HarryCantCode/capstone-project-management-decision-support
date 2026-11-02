@@ -244,6 +244,22 @@ class Project extends \Illuminate\Database\Eloquent\Model
         return $this->hasMany(ProjectTask::class)->orderBy('sort_order')->orderBy('start_date')->orderBy('id');
     }
 
+    /**
+     * Uploaded project files and attachments (PDF, Docx, Images).
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(ProjectFile::class)->orderByDesc('created_at')->orderByDesc('id');
+    }
+
+    /**
+     * Invoices attached to this project.
+     */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(ProjectFile::class)->where('file_type', 'invoice')->orderByDesc('created_at');
+    }
+
     // ─── Scopes ───────────────────────────────────────────────────────────────
 
     /** @param \Illuminate\Database\Eloquent\Builder<Project> $query */
