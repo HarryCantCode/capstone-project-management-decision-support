@@ -127,6 +127,67 @@ test('first-login password update rejects reusing the temporary password', funct
     $response->assertSessionHasErrors(['password']);
 });
 
+test('first-login password update rejects password containing user first name', function () {
+    $user = User::factory()->create([
+        'first_name' => 'Alexander',
+        'last_name' => 'Wright',
+        'password' => Hash::make('@tempPass123'),
+        'must_change_password' => true,
+    ]);
+    $user->assignRole('Manager');
+
+    $response = $this->actingAs($user)->post(route('password.first-login.update'), [
+        'password' => 'Alexand3r!99',
+        'password_confirmation' => 'Alexand3r!99',
+    ]);
+
+    $response->assertSessionHasErrors(['password']);
+});
+
+test('first-login password update rejects password containing user last name', function () {
+    $user = User::factory()->create([
+        'first_name' => 'John',
+        'last_name' => 'Doe',
+        'password' => Hash::make('@tempPass123'),
+        'must_change_password' => true,
+    ]);
+    $user->assignRole('Manager');
+
+    $response = $this->actingAs($user)->post(route('password.first-login.update'), [
+        'password' => 'PassDoe123!',
+        'password_confirmation' => 'PassDoe123!',
+    ]);
+
+    $response->assertSessionHasErrors(['password']);
+});
+
+test('first-login password update rejects password containing user birthdate', function () {
+    $user = User::factory()->create([
+        'first_name' => 'John',
+        'last_name' => 'Doe',
+        'birthdate' => '1995-08-25',
+        'password' => Hash::make('@tempPass123'),
+        'must_change_password' => true,
+    ]);
+    $user->assignRole('Manager');
+
+    // Using birthdate in format 19950825
+    $response = $this->actingAs($user)->post(route('password.first-login.update'), [
+        'password' => 'Secret!19950825',
+        'password_confirmation' => 'Secret!19950825',
+    ]);
+
+    $response->assertSessionHasErrors(['password']);
+
+    // Using birthdate in format 08251995
+    $response2 = $this->actingAs($user)->post(route('password.first-login.update'), [
+        'password' => 'Secret!08251995',
+        'password_confirmation' => 'Secret!08251995',
+    ]);
+
+    $response2->assertSessionHasErrors(['password']);
+});
+
 test('first-login password update succeeds with valid 8+ chars mix of symbols number and capital letter', function () {
     $user = User::factory()->create([
         'password' => Hash::make('@tempPass123'),

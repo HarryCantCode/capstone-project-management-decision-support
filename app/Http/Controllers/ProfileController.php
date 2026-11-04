@@ -64,7 +64,7 @@ class ProfileController extends Controller implements HasMiddleware
 
         $validated = $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'string', 'confirmed', new PasswordComplexity()],
+            'password' => ['required', 'string', 'confirmed', new PasswordComplexity($user)],
         ]);
 
         $user->password = Hash::make($validated['password']);

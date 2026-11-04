@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Rules\PasswordComplexity;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -153,7 +154,7 @@ class AccountUserController extends Controller implements HasMiddleware
             'job_title_choice' => ['required', 'string'],
             'job_title_other' => ['nullable', 'required_if:job_title_choice,Others', 'string', 'max:255'],
             'role' => ['required', 'string', 'exists:roles,name'],
-            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            'password' => ['nullable', 'string', 'confirmed', new PasswordComplexity($user)],
         ]);
 
         $jobTitle = $validated['job_title_choice'] === 'Others'

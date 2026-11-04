@@ -126,14 +126,53 @@
                         </div>
 
                         <div class="form-group-premium">
-                            <label for="password" class="form-label">New Password <span class="required" aria-hidden="true">*</span></label>
-                            <input type="password" id="password" name="password" class="form-control @error('password') is-invalid @enderror" required minlength="8" placeholder="Minimum 8 characters">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                                <label for="password" class="form-label" style="margin-bottom: 0;">New Password <span class="required" aria-hidden="true">*</span></label>
+                                <button type="button" onclick="togglePasswordVisibility('password', this)" style="background: none; border: none; font-size: 0.75rem; color: var(--color-accent, #2563eb); cursor: pointer; padding: 0; font-weight: 500;" aria-label="Toggle password visibility">
+                                    Show
+                                </button>
+                            </div>
+                            <input type="password" id="password" name="password" class="form-control @error('password') is-invalid @enderror" required minlength="8" placeholder="Minimum 8 characters" oninput="checkSelfPasswordRules(this.value)">
                             @error('password')<div class="form-error">{{ $message }}</div>@enderror
                         </div>
 
                         <div class="form-group-premium">
-                            <label for="password_confirmation" class="form-label">Confirm New Password <span class="required" aria-hidden="true">*</span></label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                                <label for="password_confirmation" class="form-label" style="margin-bottom: 0;">Confirm New Password <span class="required" aria-hidden="true">*</span></label>
+                                <button type="button" onclick="togglePasswordVisibility('password_confirmation', this)" style="background: none; border: none; font-size: 0.75rem; color: var(--color-accent, #2563eb); cursor: pointer; padding: 0; font-weight: 500;" aria-label="Toggle confirm password visibility">
+                                    Show
+                                </button>
+                            </div>
                             <input type="password" id="password_confirmation" name="password_confirmation" class="form-control" required minlength="8" placeholder="Repeat new password">
+                        </div>
+
+                        {{-- Password Requirements Checklist Card --}}
+                        <div class="password-requirements-card" style="background: rgba(15, 23, 42, 0.03); border: 1px solid var(--color-border, #e2e8f0); border-radius: var(--radius-md, 8px); padding: 0.875rem 1rem; margin-top: 1rem; margin-bottom: 1rem;">
+                            <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted, #64748b); margin-bottom: 0.5rem;">
+                                Password Format Requirements:
+                            </div>
+                            <ul style="list-style: none; padding-left: 0; margin-bottom: 0; font-size: 0.8125rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                                <li id="self-req-len" style="display: flex; align-items: center; gap: 0.5rem; color: var(--color-text-muted, #64748b);">
+                                    <span class="req-indicator" style="font-size: 0.75rem; width: 14px; text-align: center;">&bull;</span>
+                                    <span>At least <strong>8 characters</strong> long</span>
+                                </li>
+                                <li id="self-req-cap" style="display: flex; align-items: center; gap: 0.5rem; color: var(--color-text-muted, #64748b);">
+                                    <span class="req-indicator" style="font-size: 0.75rem; width: 14px; text-align: center;">&bull;</span>
+                                    <span>At least <strong>1 capital letter</strong> (A&ndash;Z)</span>
+                                </li>
+                                <li id="self-req-num" style="display: flex; align-items: center; gap: 0.5rem; color: var(--color-text-muted, #64748b);">
+                                    <span class="req-indicator" style="font-size: 0.75rem; width: 14px; text-align: center;">&bull;</span>
+                                    <span>At least <strong>1 number</strong> (0&ndash;9)</span>
+                                </li>
+                                <li id="self-req-sym" style="display: flex; align-items: center; gap: 0.5rem; color: var(--color-text-muted, #64748b);">
+                                    <span class="req-indicator" style="font-size: 0.75rem; width: 14px; text-align: center;">&bull;</span>
+                                    <span>Mix of <strong>symbols</strong> (!@#$%^&amp;*...)</span>
+                                </li>
+                                <li id="self-req-personal" style="display: flex; align-items: center; gap: 0.5rem; color: var(--color-text-muted, #64748b);">
+                                    <span class="req-indicator" style="font-size: 0.75rem; width: 14px; text-align: center;">&bull;</span>
+                                    <span>Cannot contain your <strong>name</strong> or <strong>birthdate</strong></span>
+                                </li>
+                            </ul>
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 0.5rem;">Update Password</button>
@@ -282,6 +321,105 @@
         </div>
     </section>
     @endrole
+
+    <script>
+        @php
+            $authUser = Auth::user();
+            $authRawTokens = [
+                mb_strtolower(trim($authUser->first_name ?? '')),
+                mb_strtolower(trim($authUser->middle_name ?? '')),
+                mb_strtolower(trim($authUser->last_name ?? '')),
+            ];
+            if (!empty($authUser->name)) {
+                $authRawTokens = array_merge($authRawTokens, preg_split('/[\s,\.\-_]+/', mb_strtolower(trim($authUser->name))));
+            }
+            $authNameTokens = array_values(array_filter(array_unique($authRawTokens), fn($t) => mb_strlen($t) >= 3));
+
+            $authDobDigits = [];
+            if (!empty($authUser->birthdate)) {
+                $bDate = is_string($authUser->birthdate) ? \Carbon\Carbon::parse($authUser->birthdate) : $authUser->birthdate;
+                $authDobDigits = array_unique([
+                    $bDate->format('Ymd'),
+                    $bDate->format('mdY'),
+                    $bDate->format('dmY'),
+                    $bDate->format('mdy'),
+                    $bDate->format('dmy'),
+                    $bDate->format('Y-m-d'),
+                    $bDate->format('m/d/Y'),
+                    $bDate->format('d/m/Y'),
+                ]);
+            }
+        @endphp
+
+        const authPersonalTokens = @json($authNameTokens);
+        const authDobPatterns = @json(array_values($authDobDigits));
+
+        function togglePasswordVisibility(fieldId, btn) {
+            const input = document.getElementById(fieldId);
+            if (!input) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                btn.textContent = 'Show';
+            }
+        }
+
+        function checkSelfPasswordRules(password) {
+            if (!password || password.length === 0) {
+                ['self-req-len', 'self-req-cap', 'self-req-num', 'self-req-sym', 'self-req-personal'].forEach(id => updateSelfRuleUI(id, false));
+                return;
+            }
+
+            const lenOk = password.length >= 8;
+            const capOk = /[A-Z]/.test(password);
+            const numOk = /[0-9]/.test(password);
+            const symOk = /[\W_]/.test(password);
+
+            const lower = password.toLowerCase();
+            const numericOnly = password.replace(/[^0-9]/g, '');
+
+            let containsName = false;
+            for (const token of authPersonalTokens) {
+                if (token && lower.includes(token)) {
+                    containsName = true;
+                    break;
+                }
+            }
+
+            let containsDob = false;
+            for (const pattern of authDobPatterns) {
+                if (!pattern) continue;
+                const patternNumeric = pattern.replace(/[^0-9]/g, '');
+                if (lower.includes(pattern.toLowerCase()) || (patternNumeric.length >= 6 && numericOnly.includes(patternNumeric))) {
+                    containsDob = true;
+                    break;
+                }
+            }
+
+            const personalOk = !containsName && !containsDob;
+
+            updateSelfRuleUI('self-req-len', lenOk);
+            updateSelfRuleUI('self-req-cap', capOk);
+            updateSelfRuleUI('self-req-num', numOk);
+            updateSelfRuleUI('self-req-sym', symOk);
+            updateSelfRuleUI('self-req-personal', personalOk);
+        }
+
+        function updateSelfRuleUI(elementId, isMet) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            const indicator = el.querySelector('.req-indicator');
+            if (isMet) {
+                el.style.color = '#10b981'; // emerald green
+                if (indicator) indicator.innerHTML = '&#10003;';
+            } else {
+                el.style.color = 'var(--color-text-muted, #64748b)';
+                if (indicator) indicator.innerHTML = '&bull;';
+            }
+        }
+    </script>
 @endsection
 
 @push('styles')

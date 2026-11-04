@@ -119,10 +119,15 @@ class CostingController extends Controller implements HasMiddleware
             ->get()
             ->keyBy('cost_type');
 
+        $catalogMaterials = \App\Models\Resource::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'resource_code', 'model', 'price', 'unit_cost', 'quantity_available']);
+
         return view('costing.show', compact(
             'project',
             'costs',
             'categoryTotals',
+            'catalogMaterials',
             'search',
             'category',
             'startDate',

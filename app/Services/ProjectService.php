@@ -253,14 +253,41 @@ class ProjectService
         $user = Auth::user();
 
         return DB::transaction(function () use ($project, $data, $user) {
+            $qty = !empty($data['quantity']) && (int)$data['quantity'] > 0 ? (int)$data['quantity'] : 1;
+            $resourceId = !empty($data['resource_id']) ? (int)$data['resource_id'] : null;
+
             $cost = $project->costs()->create([
+                'resource_id' => $resourceId,
                 'description' => $data['description'],
                 'cost_type' => $data['cost_type'] ?? 'materials',
                 'amount' => $data['amount'],
+                'quantity' => $qty,
                 'incurred_date' => $data['incurred_date'] ?? now()->toDateString(),
                 'created_by' => $user->id,
                 'updated_by' => $user->id,
             ]);
+
+            // If selected from catalog, deduct stock and record in ResourceAllocation history
+            if ($resourceId) {
+                $resource = \App\Models\Resource::query()->lockForUpdate()->find($resourceId);
+                if ($resource) {
+                    $newQty = max(0, $resource->quantity_available - $qty);
+                    $resource->update([
+                        'quantity_available' => $newQty,
+                        'updated_by' => $user->id,
+                    ]);
+
+                    \App\Models\ResourceAllocation::create([
+                        'project_id' => $project->id,
+                        'resource_id' => $resource->id,
+                        'quantity' => $qty,
+                        'notes' => "Expensed: {$data['description']}" . (!empty($data['incurred_date']) ? " (Incurred: {$data['incurred_date']})" : ''),
+                        'created_by' => $user->id,
+                        'updated_by' => $user->id,
+                        'created_at' => !empty($data['incurred_date']) ? \Carbon\Carbon::parse($data['incurred_date']) : now(),
+                    ]);
+                }
+            }
 
             // Recalculate total spend
             $totalSpend = (float) $project->costs()->sum('amount');
@@ -282,6 +309,16 @@ class ProjectService
         $user = Auth::user();
 
         DB::transaction(function () use ($project, $cost, $user) {
+            // If it was linked to a resource, restore quantity
+            if ($cost->resource_id) {
+                $resource = \App\Models\Resource::query()->lockForUpdate()->find($cost->resource_id);
+                if ($resource) {
+                    $resource->increment('quantity_available', $cost->quantity ?? 1, [
+                        'updated_by' => $user->id,
+                    ]);
+                }
+            }
+
             $cost->delete();
 
             $totalSpend = (float) $project->costs()->sum('amount');

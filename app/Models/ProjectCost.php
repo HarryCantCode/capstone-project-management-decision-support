@@ -21,9 +21,11 @@ class ProjectCost extends Model
 
     protected $fillable = [
         'project_id',
+        'resource_id',
         'description',
         'cost_type',
         'amount',
+        'quantity',
         'incurred_date',
         'created_by',
         'updated_by',
@@ -33,6 +35,7 @@ class ProjectCost extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'quantity' => 'integer',
             'incurred_date' => 'date',
             'deleted_at' => 'datetime',
         ];
@@ -43,6 +46,11 @@ class ProjectCost extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function resource(): BelongsTo
+    {
+        return $this->belongsTo(Resource::class);
     }
 
     public function creator(): BelongsTo

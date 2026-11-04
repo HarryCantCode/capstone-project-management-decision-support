@@ -142,3 +142,59 @@ test('user create view renders name placeholders and 18-year birthdate limit', f
     $response->assertSee('placeholder="ex. Dela Cruz"', false);
     $response->assertSee('max="' . now()->subYears(18)->format('Y-m-d') . '"', false);
 });
+
+test('admin updating user password enforces password complexity and personal info restrictions', function () {
+    $admin = User::factory()->create();
+    $admin->assignRole('Admin');
+
+    $targetUser = User::factory()->create([
+        'first_name' => 'Roberto',
+        'last_name' => 'Gomez',
+        'birthdate' => '1990-05-12',
+    ]);
+    $targetUser->assignRole('Staff');
+
+    // 1. Rejects if it contains target user's name
+    $response = $this->actingAs($admin)->put(route('account.users.update', $targetUser), [
+        'first_name' => $targetUser->first_name,
+        'middle_name' => $targetUser->middle_name,
+        'last_name' => $targetUser->last_name,
+        'birthdate' => '1990-05-12',
+        'email' => $targetUser->email,
+        'job_title_choice' => 'Engineer',
+        'role' => 'Staff',
+        'password' => 'RobertoPass123!',
+        'password_confirmation' => 'RobertoPass123!',
+    ]);
+    $response->assertSessionHasErrors(['password']);
+
+    // 2. Rejects if it contains target user's birthdate
+    $responseDob = $this->actingAs($admin)->put(route('account.users.update', $targetUser), [
+        'first_name' => $targetUser->first_name,
+        'middle_name' => $targetUser->middle_name,
+        'last_name' => $targetUser->last_name,
+        'birthdate' => '1990-05-12',
+        'email' => $targetUser->email,
+        'job_title_choice' => 'Engineer',
+        'role' => 'Staff',
+        'password' => 'SecurePass!19900512',
+        'password_confirmation' => 'SecurePass!19900512',
+    ]);
+    $responseDob->assertSessionHasErrors(['password']);
+
+    // 3. Succeeds with valid complex password not containing name or birthdate
+    $validResponse = $this->actingAs($admin)->put(route('account.users.update', $targetUser), [
+        'first_name' => $targetUser->first_name,
+        'middle_name' => $targetUser->middle_name,
+        'last_name' => $targetUser->last_name,
+        'birthdate' => '1990-05-12',
+        'email' => $targetUser->email,
+        'job_title_choice' => 'Engineer',
+        'role' => 'Staff',
+        'password' => 'ValidAdminCh@nge99!',
+        'password_confirmation' => 'ValidAdminCh@nge99!',
+    ]);
+    $validResponse->assertRedirect(route('account.settings'));
+    $targetUser->refresh();
+    expect(Hash::check('ValidAdminCh@nge99!', $targetUser->password))->toBeTrue();
+});

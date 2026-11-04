@@ -95,6 +95,10 @@
                     <span class="req-indicator" style="font-size: 0.75rem; width: 14px; text-align: center;">&bull;</span>
                     <span>Mix of <strong>symbols</strong> (!@#$%^&amp;*...)</span>
                 </li>
+                <li id="req-personal" style="display: flex; align-items: center; gap: 0.5rem; color: var(--color-text-muted, #64748b);">
+                    <span class="req-indicator" style="font-size: 0.75rem; width: 14px; text-align: center;">&bull;</span>
+                    <span>Cannot contain your <strong>name</strong> or <strong>birthdate</strong></span>
+                </li>
             </ul>
         </div>
 
@@ -115,6 +119,36 @@
     </form>
 
     <script>
+        @php
+            $rawTokens = [
+                mb_strtolower(trim($user->first_name ?? '')),
+                mb_strtolower(trim($user->middle_name ?? '')),
+                mb_strtolower(trim($user->last_name ?? '')),
+            ];
+            if (!empty($user->name)) {
+                $rawTokens = array_merge($rawTokens, preg_split('/[\s,\.\-_]+/', mb_strtolower(trim($user->name))));
+            }
+            $filteredNameTokens = array_values(array_filter(array_unique($rawTokens), fn($t) => mb_strlen($t) >= 3));
+
+            $dobDigits = [];
+            if (!empty($user->birthdate)) {
+                $bDate = is_string($user->birthdate) ? \Carbon\Carbon::parse($user->birthdate) : $user->birthdate;
+                $dobDigits = array_unique([
+                    $bDate->format('Ymd'),
+                    $bDate->format('mdY'),
+                    $bDate->format('dmY'),
+                    $bDate->format('mdy'),
+                    $bDate->format('dmy'),
+                    $bDate->format('Y-m-d'),
+                    $bDate->format('m/d/Y'),
+                    $bDate->format('d/m/Y'),
+                ]);
+            }
+        @endphp
+
+        const userPersonalTokens = @json($filteredNameTokens);
+        const userDobPatterns = @json(array_values($dobDigits));
+
         function togglePasswordVisibility(fieldId, btn) {
             const input = document.getElementById(fieldId);
             if (!input) return;
@@ -133,10 +167,35 @@
             const numOk = /[0-9]/.test(password);
             const symOk = /[\W_]/.test(password);
 
+            // Check name and birthdate presence
+            const lower = password.toLowerCase();
+            const numericOnly = password.replace(/[^0-9]/g, '');
+
+            let containsName = false;
+            for (const token of userPersonalTokens) {
+                if (token && lower.includes(token)) {
+                    containsName = true;
+                    break;
+                }
+            }
+
+            let containsDob = false;
+            for (const pattern of userDobPatterns) {
+                if (!pattern) continue;
+                const patternNumeric = pattern.replace(/[^0-9]/g, '');
+                if (lower.includes(pattern.toLowerCase()) || (patternNumeric.length >= 6 && numericOnly.includes(patternNumeric))) {
+                    containsDob = true;
+                    break;
+                }
+            }
+
+            const personalOk = password.length > 0 && !containsName && !containsDob;
+
             updateRuleUI('req-len', lenOk);
             updateRuleUI('req-cap', capOk);
             updateRuleUI('req-num', numOk);
             updateRuleUI('req-sym', symOk);
+            updateRuleUI('req-personal', personalOk);
         }
 
         function updateRuleUI(elementId, isMet) {

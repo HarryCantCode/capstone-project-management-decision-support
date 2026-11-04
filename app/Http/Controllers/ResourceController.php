@@ -68,7 +68,9 @@ class ResourceController extends Controller
     {
         $this->authorize('view', $resource);
 
-        $resource->load(['allocations.project', 'allocations.creator']);
+        $resource->load([
+            'allocations' => fn ($q) => $q->with(['project', 'creator'])->orderByDesc('created_at'),
+        ]);
 
         return view('resources.show', compact('resource'));
     }

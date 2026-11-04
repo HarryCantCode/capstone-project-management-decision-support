@@ -4,7 +4,7 @@
 @section('meta-description', 'Detailed project expense ledger, search, multi-criteria filtering, and budget tracking.')
 
 @section('content')
-<div x-data="{ addCostModalOpen: false }">
+<div x-data="costingBreakdown()">
 
     {{-- Page Header --}}
     <div class="page-header">
@@ -263,6 +263,7 @@
                         <tr>
                             <th scope="col">Description (What this is for)</th>
                             <th scope="col">Category</th>
+                            <th scope="col" class="text-center">Qty</th>
                             <th scope="col" class="text-right">Amount (PHP)</th>
                             <th scope="col">Incurred Date</th>
                             <th scope="col">Logged By</th>
@@ -279,6 +280,9 @@
                                     <span class="badge" style="background: var(--color-surface-alt); text-transform: capitalize; font-weight: 600;">
                                         {{ $cost->cost_type }}
                                     </span>
+                                </td>
+                                <td class="text-center font-mono font-bold">
+                                    {{ $cost->quantity ?? 1 }}
                                 </td>
                                 <td class="cell-numeric text-success font-bold" style="font-size: 0.9375rem;">
                                     ₱{{ number_format($cost->amount, 2) }}
@@ -315,7 +319,7 @@
     {{-- Modal: Log New Expense Entry --}}
     <div class="reassign-modal-overlay" style="display: none;" x-show="addCostModalOpen" x-cloak>
         <div class="reassign-modal-backdrop" @click="addCostModalOpen = false"></div>
-        <div class="reassign-modal-content card" x-show="addCostModalOpen" x-transition>
+        <div class="reassign-modal-content card" x-show="addCostModalOpen" x-transition style="max-width: 580px;">
             <div class="card-header">
                 <span>Log Project Expense / Cost</span>
                 <button type="button" class="flash-close" @click="addCostModalOpen = false" aria-label="Close modal">&times;</button>
@@ -323,28 +327,139 @@
             <form action="{{ route('projects.costs.store', $project) }}" method="POST">
                 @csrf
                 <input type="hidden" name="redirect_to" value="costing">
+                <input type="hidden" name="resource_id" :value="selectedMaterialId || ''">
                 <div class="card-body">
                     <p class="text-muted" style="font-size: 0.875rem; margin-bottom: var(--space-4);">
                         Project: <strong>{{ $project->name }}</strong> (<span class="font-mono">{{ $project->project_code }}</span>)<br>
                         Allocated Budget: <strong class="text-success font-mono">₱{{ number_format($project->contract_price, 2) }}</strong>
                     </p>
 
+                    {{-- Option to choose from Materials Catalog with Search & Clear --}}
+                    <div class="form-group form-group-premium" style="background: var(--color-surface-alt); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); margin-bottom: var(--space-4);" @click.outside="materialDropdownOpen = false">
+                        <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-weight: 600;">Choose from Materials Catalog (Optional)</span>
+                            <span class="text-muted" style="font-size: 0.75rem; font-weight: normal;">Search by name, code or model</span>
+                        </label>
+
+                        {{-- Searchable Dropdown Container --}}
+                        <div style="position: relative;">
+                            <div style="display: flex; align-items: center; position: relative;">
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    placeholder="Search material name, DEX code, or model..."
+                                    x-model="materialSearch"
+                                    @focus="materialDropdownOpen = true"
+                                    @input="materialDropdownOpen = true"
+                                    style="padding-right: 32px;"
+                                >
+                                <button
+                                    type="button"
+                                    x-show="selectedMaterialId || materialSearch"
+                                    @click="clearMaterialSelection()"
+                                    title="Clear chosen material"
+                                    style="position: absolute; right: 8px; background: none; border: none; font-size: 1.15rem; line-height: 1; color: var(--color-muted); cursor: pointer; padding: 2px 6px;"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+
+                            {{-- Dropdown options list --}}
+                            <div
+                                x-show="materialDropdownOpen"
+                                x-cloak
+                                style="position: absolute; top: calc(100% + 4px); left: 0; right: 0; max-height: 260px; overflow-y: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: 0 8px 24px rgba(0,0,0,0.14); z-index: 50; padding: 4px;"
+                            >
+                                <template x-for="item in filteredMaterials" :key="item.id">
+                                    <div
+                                        @click="selectMaterial(item)"
+                                        style="padding: 10px 14px; margin-bottom: 4px; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--color-border-subtle); background: var(--color-surface); font-size: 0.8125rem; display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); transition: all 0.15s ease;"
+                                        :style="selectedMaterialId == item.id ? 'background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.3); font-weight: 600;' : ''"
+                                        onmouseover="if(this.dataset.selected !== 'true') this.style.background='var(--color-surface-alt)'"
+                                        onmouseout="if(this.dataset.selected !== 'true') this.style.background='var(--color-surface)'"
+                                        :data-selected="selectedMaterialId == item.id"
+                                    >
+                                        <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+                                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                                <span class="badge" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); font-size: 0.75rem; font-family: var(--font-mono); font-weight: 600; padding: 1px 6px;" x-text="item.resource_code"></span>
+                                                <span style="font-weight: 600; color: var(--color-ink);" x-text="item.name"></span>
+                                            </div>
+                                            <div x-show="item.model" class="text-muted" style="font-size: 0.75rem; line-height: 1.3;" x-text="'Model / Spec: ' + item.model"></div>
+                                        </div>
+                                        <div style="text-align: right; flex-shrink: 0;">
+                                            <div class="font-mono text-success" style="font-weight: 700; font-size: 0.875rem;">
+                                                ₱<span x-text="Number(item.price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                                            </div>
+                                            <span class="text-muted" style="font-size: 0.7rem;">unit price</span>
+                                        </div>
+                                    </div>
+                                </template>
+                                <div x-show="filteredMaterials.length === 0" style="padding: 16px; font-size: 0.8125rem; color: var(--color-muted); text-align: center;">
+                                    No matching materials found in catalog.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div x-show="selectedMaterialId" x-cloak style="margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--color-border); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); font-size: 0.8125rem;">
+                            <div>
+                                <label for="costing_material_qty_input" class="form-label" style="font-size: 0.75rem; margin-bottom: 4px;">Quantity (Cannot be 0)</label>
+                                <input
+                                    type="number"
+                                    id="costing_material_qty_input"
+                                    min="1"
+                                    step="1"
+                                    class="form-control font-mono"
+                                    x-model.number="materialQuantity"
+                                    @input="recalculateMaterialTotal()"
+                                    placeholder="Qty"
+                                >
+                            </div>
+                            <div>
+                                <label class="form-label" style="font-size: 0.75rem; margin-bottom: 4px;">Unit Price</label>
+                                <div class="font-mono text-muted" style="padding: 8px 12px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-weight: 600;">
+                                    ₱<span x-text="Number(materialUnitPrice).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-group form-group-premium">
-                        <label for="cost_description" class="form-label">What is this cost for? (Description)</label>
+                        <label for="cost_description" class="form-label">What is this cost for? (Description) <span class="required">*</span></label>
                         <input
                             id="cost_description"
                             name="description"
                             type="text"
                             class="form-control"
+                            x-model="costForm.description"
+                            :readonly="Boolean(selectedMaterialId)"
+                            :style="selectedMaterialId ? 'background: var(--color-surface-alt); cursor: not-allowed;' : ''"
                             placeholder="e.g. Scaffolding rental, Elevator cables, Concrete mix"
                             required
                         >
                     </div>
 
+                    {{-- Quantity for manual non-catalog expense --}}
+                    <div x-show="!selectedMaterialId" class="form-group form-group-premium">
+                        <label for="costing_manual_cost_quantity" class="form-label">Quantity <span class="required">*</span></label>
+                        <input
+                            id="costing_manual_cost_quantity"
+                            name="quantity"
+                            type="number"
+                            min="1"
+                            step="1"
+                            class="form-control font-mono"
+                            x-model.number="materialQuantity"
+                            placeholder="1"
+                            required
+                        >
+                        <p class="form-hint">Default is 1, minimum is 1 (cannot be 0).</p>
+                    </div>
+                    <input type="hidden" name="quantity" :value="materialQuantity" x-show="selectedMaterialId">
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-4);">
                         <div class="form-group form-group-premium" style="margin-bottom: 0;">
-                            <label for="cost_type" class="form-label">Category</label>
-                            <select id="cost_type" name="cost_type" class="form-control" required>
+                            <label for="cost_type" class="form-label">Category <span class="required">*</span></label>
+                            <select id="cost_type" name="cost_type" class="form-control" x-model="costForm.cost_type" required>
                                 <option value="materials">Materials</option>
                                 <option value="equipment">Equipment Rental</option>
                                 <option value="labor">Labor / Overtime</option>
@@ -366,7 +481,7 @@
                     </div>
 
                     <div class="form-group form-group-premium">
-                        <label for="cost_amount" class="form-label">Amount (PHP ₱)</label>
+                        <label for="cost_amount" class="form-label">Amount (PHP ₱) <span class="required">*</span></label>
                         <div style="position: relative;">
                             <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 600; color: var(--color-muted); font-family: var(--font-mono);">₱</span>
                             <input
@@ -377,11 +492,15 @@
                                 min="0.01"
                                 class="form-control font-mono"
                                 style="padding-left: 32px;"
+                                x-model="costForm.amount"
+                                :readonly="Boolean(selectedMaterialId)"
+                                :style="selectedMaterialId ? 'background: var(--color-surface-alt); cursor: not-allowed;' : ''"
                                 placeholder="0.00"
                                 required
                             >
                         </div>
-                        <p class="form-hint">This will automatically recalculate the actual spend and remaining balance for this project.</p>
+                        <p class="form-hint" x-show="selectedMaterialId">Calculated as Quantity &times; Unit Price (locked for catalog materials).</p>
+                        <p class="form-hint" x-show="!selectedMaterialId">This will automatically recalculate the actual spend and remaining balance for this project.</p>
                     </div>
                 </div>
                 <div class="card-footer">
@@ -396,3 +515,75 @@
 
 </div>
 @endsection
+
+@push('scripts')
+<script>
+function costingBreakdown() {
+    return {
+        addCostModalOpen: false,
+        selectedMaterialId: '',
+        materialSearch: '',
+        materialDropdownOpen: false,
+        materialQuantity: 1,
+        materialUnitPrice: 0,
+        costForm: {
+            description: '',
+            cost_type: 'materials',
+            amount: ''
+        },
+        catalogMaterialsList: [
+            @foreach ($catalogMaterials as $mat)
+            {
+                id: {{ $mat->id }},
+                name: @js($mat->name),
+                resource_code: @js($mat->resource_code),
+                model: @js($mat->model ?? ''),
+                price: {{ (float) ($mat->price > 0 ? $mat->price : $mat->unit_cost) }}
+            },
+            @endforeach
+        ],
+        get filteredMaterials() {
+            if (!this.materialSearch) {
+                return this.catalogMaterialsList;
+            }
+            const q = this.materialSearch.toLowerCase().trim();
+            return this.catalogMaterialsList.filter(item => {
+                return (item.name && item.name.toLowerCase().includes(q)) ||
+                       (item.resource_code && item.resource_code.toLowerCase().includes(q)) ||
+                       (item.model && item.model.toLowerCase().includes(q));
+            });
+        },
+        selectMaterial(mat) {
+            this.selectedMaterialId = mat.id;
+            this.materialUnitPrice = mat.price;
+            this.materialSearch = `[${mat.resource_code}] ${mat.name}${mat.model ? ' (' + mat.model + ')' : ''}`;
+            this.materialDropdownOpen = false;
+            if (!this.materialQuantity || this.materialQuantity < 1) {
+                this.materialQuantity = 1;
+            }
+            const modelInfo = mat.model ? ` (${mat.model})` : '';
+            this.costForm.description = `${mat.name}${modelInfo} [${mat.resource_code}]`;
+            this.costForm.cost_type = 'materials';
+            this.recalculateMaterialTotal();
+        },
+        clearMaterialSelection() {
+            this.selectedMaterialId = '';
+            this.materialSearch = '';
+            this.materialDropdownOpen = false;
+            this.materialUnitPrice = 0;
+            this.costForm.description = '';
+            this.costForm.amount = '';
+            this.materialQuantity = 1;
+        },
+        recalculateMaterialTotal() {
+            if (this.selectedMaterialId && this.materialUnitPrice) {
+                const qty = Math.max(1, parseInt(this.materialQuantity, 10) || 1);
+                this.materialQuantity = qty;
+                const total = (qty * this.materialUnitPrice).toFixed(2);
+                this.costForm.amount = total;
+            }
+        }
+    };
+}
+</script>
+@endpush

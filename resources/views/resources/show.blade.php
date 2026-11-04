@@ -43,12 +43,21 @@
             <div class="table-wrapper">
                 <table class="data-table">
                     <caption class="visually-hidden">Resource allocation history</caption>
-                    <thead><tr><th scope="col">Project</th><th scope="col" class="text-right">Quantity</th><th scope="col">Allocated by</th><th scope="col">Notes</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th scope="col">Project</th>
+                            <th scope="col" class="text-right">Quantity</th>
+                            <th scope="col">Date Incurred / Allocated</th>
+                            <th scope="col">Allocated by</th>
+                            <th scope="col">Notes</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         @foreach ($resource->allocations as $allocation)
                             <tr>
                                 <td><span class="font-mono">{{ $allocation->project->project_code }}</span><br>{{ $allocation->project->name }}</td>
                                 <td class="cell-numeric">{{ number_format($allocation->quantity) }}</td>
+                                <td class="font-mono">{{ $allocation->created_at ? $allocation->created_at->format('M j, Y') : '—' }}</td>
                                 <td>{{ $allocation->creator?->name ?? 'System' }}</td>
                                 <td>{{ $allocation->notes ?: '—' }}</td>
                             </tr>

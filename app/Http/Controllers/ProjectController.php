@@ -121,7 +121,11 @@ class ProjectController extends Controller
             ->orderBy('last_name')
             ->get(['id', 'employee_id', 'first_name', 'middle_name', 'last_name', 'expertise']);
 
-        return view('projects.show', compact('project', 'availablePersonnel'));
+        $catalogMaterials = \App\Models\Resource::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'resource_code', 'model', 'price', 'unit_cost', 'quantity_available']);
+
+        return view('projects.show', compact('project', 'availablePersonnel', 'catalogMaterials'));
     }
 
     /** Show the edit project form. */
@@ -388,9 +392,11 @@ class ProjectController extends Controller
         $this->authorize('update', $project);
 
         $validated = $request->validate([
+            'resource_id' => ['nullable', 'exists:resources,id'],
             'description' => ['required', 'string', 'max:255'],
             'cost_type' => ['required', 'string', 'in:materials,equipment,labor,subcontractor,other'],
             'amount' => ['required', 'numeric', 'min:0.01', 'max:999999999.99'],
+            'quantity' => ['nullable', 'integer', 'min:1'],
             'incurred_date' => ['nullable', 'date'],
         ]);
 

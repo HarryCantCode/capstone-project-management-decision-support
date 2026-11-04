@@ -46,7 +46,7 @@ class FirstLoginPasswordController extends Controller
         $user = Auth::user();
 
         $validated = $request->validate([
-            'password' => ['required', 'string', 'confirmed', new PasswordComplexity()],
+            'password' => ['required', 'string', 'confirmed', new PasswordComplexity($user)],
         ]);
 
         // Security requirement: New password must not match the temporary auto-generated password
