@@ -642,33 +642,6 @@
                 Compile and download official PDF reports for projects information, materials movement inventories, and field manpower rosters.
             </p>
         </div>
-        <div class="page-actions" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-            <button
-                type="button"
-                class="btn btn-primary btn-sm"
-                @click="submitRevenueExport('pdf', 'download')"
-                id="btn-header-export-revenue-pdf"
-                title="Download Revenue & Financial Performance PDF Report (Without Taxes)"
-                style="display: inline-flex; align-items: center; gap: 0.35rem;"
-            >
-                <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M3 17a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1zm3.293-7.707a1 1 0 0 1 1.414 0L9 10.586V3a1 1 0 1 1 2 0v7.586l1.293-1.293a1 1 0 1 1 1.414 1.414l-3 3a1 1 0 0 1-1.414 0l-3-3a1 1 0 0 1 0-1.414z" clip-rule="evenodd"/>
-                </svg>
-                Export Revenue PDF (Without Taxes)
-            </button>
-            <form method="POST" action="{{ route('reports.portfolio.export') }}" class="inline-form">
-                @csrf
-                <input type="hidden" name="scope" :value="projectScope">
-                <input type="hidden" name="status" :value="projectStatus">
-                <input type="hidden" name="search" :value="projectSearch">
-                <button type="submit" class="btn btn-secondary btn-sm" id="btn-export-portfolio-pdf" title="Export a multi-project executive portfolio summary PDF">
-                    <svg style="width: 15px; height: 15px; margin-right: 4px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M6 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.414A2 2 0 0 0 15.414 7L11 2.586A2 2 0 0 0 9.586 2H6zm5 6a1 1 0 1 0-2 0v3.586l-1.293-1.293a1 1 0 1 0-1.414 1.414l3 3a1 1 0 0 0 1.414 0l3-3a1 1 0 0 0-1.414-1.414L11 11.586V8z" clip-rule="evenodd"/>
-                    </svg>
-                    Export Portfolio Summary PDF
-                </button>
-            </form>
-        </div>
     </div>
 
     {{-- Organizational KPI Strip (Dashboard Status Card Design Layout) --}}
