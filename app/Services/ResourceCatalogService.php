@@ -49,7 +49,15 @@ class ResourceCatalogService
             $data['created_by'] = $user->id;
             $data['updated_by'] = $user->id;
 
-            return Resource::create($data);
+            $resource = Resource::create($data);
+
+            app(\App\Services\NotificationService::class)->notifyNewMaterial($resource);
+
+            if ((int) $resource->quantity_available < 5) {
+                app(\App\Services\NotificationService::class)->notifyLowStockMaterial($resource);
+            }
+
+            return $resource;
         });
     }
 
@@ -66,6 +74,10 @@ class ResourceCatalogService
             unset($data['resource_code']);
             $data['updated_by'] = $user->id;
             $lockedResource->update($data);
+
+            if ((int) $lockedResource->quantity_available < 5) {
+                app(\App\Services\NotificationService::class)->notifyLowStockMaterial($lockedResource);
+            }
 
             return $lockedResource;
         });

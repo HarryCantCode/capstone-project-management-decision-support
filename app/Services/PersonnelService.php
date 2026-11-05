@@ -164,6 +164,8 @@ class PersonnelService
                         'changed_by'  => $userId,
                         'changed_at'  => now(),
                     ]);
+
+                    app(NotificationService::class)->notifyManpowerAssigned($newProject, collect([$personnel]));
                 }
             }
 

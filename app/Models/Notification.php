@@ -150,6 +150,14 @@ class Notification extends Model
             'warranty_expiry' => 'shield',
             'new_project' => 'briefcase',
             'new_task' => 'clipboard',
+            'expense_logged' => 'dollar-sign',
+            'credential_reset', 'password_reset', 'email_reset' => 'key',
+            'major_task_completed' => 'check-circle',
+            'task_due_soon' => 'clock',
+            'file_uploaded' => 'file-text',
+            'manpower_assigned' => 'users',
+            'new_material' => 'package',
+            'low_stock' => 'alert-triangle',
             default => 'bell',
         };
     }
@@ -161,8 +169,16 @@ class Notification extends Model
     {
         $data = $this->data ?? [];
 
+        if (!empty($data['url'])) {
+            return $data['url'];
+        }
+
         if (!empty($data['project_id'])) {
             return route('projects.show', $data['project_id']);
+        }
+
+        if (!empty($data['resource_id'])) {
+            return route('resources.show', $data['resource_id']);
         }
 
         return null;

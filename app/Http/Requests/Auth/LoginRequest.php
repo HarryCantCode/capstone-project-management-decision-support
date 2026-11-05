@@ -42,12 +42,13 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Attempt to authenticate the request's credentials.
-     * Supports both email address and 7-digit account number.
+     * Validate user credentials and handle device verification check.
+     *
+     * @return array{needs_device_verification: bool, user: \App\Models\User}
      *
      * @throws \Illuminate\Validation\ValidationException
      */
-    public function authenticate(): void
+    public function validateCredentialsAndCheckDevice(\App\Services\OtpService $otpService): array
     {
         $loginInput = trim($this->input('email'));
         $password = $this->input('password');
@@ -89,13 +90,8 @@ class LoginRequest extends FormRequest
 
         $this->ensureIsNotRateLimited();
 
-        $credentials = [
-            $fieldType => $loginInput,
-            'password' => $password,
-        ];
-
-        // 4. Attempt authentication with provided password
-        if (! Auth::attempt($credentials, $remember)) {
+        // Check password validity without logging in immediately
+        if (! \Illuminate\Support\Facades\Hash::check($password, $user->password)) {
             RateLimiter::hit($this->throttleKey());
 
             $user->increment('failed_login_attempts');
@@ -139,6 +135,31 @@ class LoginRequest extends FormRequest
                 'locked_until' => null,
             ]);
         }
+
+        // Check if device / browser / location is known and verified
+        $isDeviceVerified = $otpService->isDeviceKnownAndVerified($user, $this);
+
+        if (! $isDeviceVerified) {
+            // Check send rate limit (only send initial OTP if not currently locked)
+            $throttle = $otpService->checkSendThrottle($user->id, 'device_verification');
+            if ($throttle['allowed']) {
+                $otpService->recordSendAttempt($user->id, 'device_verification');
+                $otpService->sendDeviceVerificationOtp($user, $this);
+            }
+
+            return [
+                'needs_device_verification' => true,
+                'user' => $user,
+            ];
+        }
+
+        // Device is verified: perform full authentication
+        Auth::login($user, $remember);
+
+        return [
+            'needs_device_verification' => false,
+            'user' => $user,
+        ];
     }
 
     /**

@@ -18,31 +18,32 @@ class NotificationController extends Controller
 {
     /**
      * List the current user's notifications.
-     * Supports filtering: 'active' (default) or 'archived'.
+     * Supports filtering: 'all' (default), 'unread', or 'read'.
      *
-     * Returns the 30 most recent notifications, plus an unread count.
+     * Returns the 50 most recent notifications, plus an unread count.
      */
     public function index(Request $request): JsonResponse
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $filter = $request->input('filter', 'active');
+        $filter = $request->input('filter', 'all');
 
         $query = Notification::where('user_id', $user->id);
 
-        if ($filter === 'archived') {
+        if ($filter === 'unread') {
+            $query->unread();
+        } elseif ($filter === 'read') {
+            $query->whereNotNull('read_at');
+        } elseif ($filter === 'archived') {
             $query->archived();
-        } else {
-            $query->active();
         }
 
         $notifications = $query->orderByDesc('created_at')
-            ->limit(30)
+            ->limit(50)
             ->get()
             ->map(fn (Notification $n) => $this->formatNotification($n));
 
         $unreadCount = Notification::where('user_id', $user->id)
-            ->active()
             ->unread()
             ->count();
 
@@ -61,7 +62,6 @@ class NotificationController extends Controller
         $user = Auth::user();
 
         $count = Notification::where('user_id', $user->id)
-            ->active()
             ->unread()
             ->count();
 
@@ -84,7 +84,7 @@ class NotificationController extends Controller
     }
 
     /**
-     * Mark all active notifications as read for the current user.
+     * Mark all notifications as read for the current user.
      */
     public function markAllRead(): JsonResponse
     {
@@ -92,7 +92,6 @@ class NotificationController extends Controller
         $user = Auth::user();
 
         Notification::where('user_id', $user->id)
-            ->active()
             ->unread()
             ->update(['read_at' => now()]);
 

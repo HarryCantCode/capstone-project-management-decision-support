@@ -61,6 +61,8 @@ class FirstLoginPasswordController extends Controller
         $user->password_changed_at = now();
         $user->save();
 
+        app(\App\Services\NotificationService::class)->notifyCredentialReset($user, 'password');
+
         $targetRoute = $user->hasRole('Staff') ? route('resources.index') : route('dashboard');
 
         return redirect()->intended($targetRoute)->with(

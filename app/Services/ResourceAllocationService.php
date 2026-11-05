@@ -55,6 +55,11 @@ class ResourceAllocationService
                 'updated_by' => $user->id,
             ]);
 
+            $remaining = (int) $lockedResource->fresh()->quantity_available;
+            if ($remaining < 5) {
+                app(\App\Services\NotificationService::class)->notifyLowStockMaterial($lockedResource->fresh());
+            }
+
             return $allocation;
         });
     }

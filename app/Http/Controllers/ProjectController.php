@@ -375,6 +375,8 @@ class ProjectController extends Controller
             ]);
         });
 
+        app(\App\Services\NotificationService::class)->notifyManpowerAssigned($project, $personnelList);
+
         $msg = $count === 1
             ? "Personnel {$personnelList->first()->employee_id} ({$personnelList->first()->full_name}) assigned to project successfully."
             : "Successfully assigned {$count} personnel to {$project->name}.";

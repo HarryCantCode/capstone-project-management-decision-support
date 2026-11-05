@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Rules\PasswordComplexity;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
@@ -138,6 +137,7 @@ class AccountUserController extends Controller implements HasMiddleware
 
     /**
      * Update the specified user in storage.
+     * Requires the authenticated Admin's current password for security verification.
      *
      * @param \Illuminate\Http\Request $request
      * @param \App\Models\User $user
@@ -146,6 +146,7 @@ class AccountUserController extends Controller implements HasMiddleware
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
+            'admin_password' => ['required', 'current_password'],
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
@@ -154,7 +155,9 @@ class AccountUserController extends Controller implements HasMiddleware
             'job_title_choice' => ['required', 'string'],
             'job_title_other' => ['nullable', 'required_if:job_title_choice,Others', 'string', 'max:255'],
             'role' => ['required', 'string', 'exists:roles,name'],
-            'password' => ['nullable', 'string', 'confirmed', new PasswordComplexity($user)],
+        ], [
+            'admin_password.required' => 'You must enter your administrator password to confirm these changes.',
+            'admin_password.current_password' => 'The administrator password you entered is incorrect.',
         ]);
 
         $jobTitle = $validated['job_title_choice'] === 'Others'
@@ -171,6 +174,8 @@ class AccountUserController extends Controller implements HasMiddleware
         $user->first_name = $validated['first_name'];
         $user->middle_name = $validated['middle_name'] ?? null;
         $user->last_name = $validated['last_name'];
+        $emailChanged = $user->email !== $validated['email'];
+
         if (!empty($validated['birthdate'])) {
             $user->birthdate = $validated['birthdate'];
         }
@@ -179,14 +184,65 @@ class AccountUserController extends Controller implements HasMiddleware
         $user->job_title = $jobTitle;
         $user->updated_by = auth()->id();
 
-        if (!empty($validated['password'])) {
-            $user->password = Hash::make($validated['password']);
-        }
-
         $user->save();
         $user->syncRoles([$validated['role']]);
 
+        if ($emailChanged) {
+            app(\App\Services\NotificationService::class)->notifyCredentialReset($user, 'email');
+        }
+
         return redirect()->route('account.settings')->with('status', 'User account updated successfully.');
+    }
+
+    /**
+     * Admin action 1: Generate a temporary password and send it directly to the user's email.
+     * Requires Admin's current password.
+     */
+    public function sendTemporaryPassword(Request $request, User $user)
+    {
+        $request->validate([
+            'admin_password' => ['required', 'current_password'],
+        ], [
+            'admin_password.required' => 'Please enter your administrator password to proceed.',
+            'admin_password.current_password' => 'The administrator password you entered is incorrect.',
+        ]);
+
+        $service = app(\App\Services\PasswordResetService::class);
+        $result = $service->generateTemporaryPasswordForUser($user, sendEmail: true);
+
+        return back()->with('status', "A randomized temporary password was generated and sent to {$user->email}.");
+    }
+
+    /**
+     * Admin action 2: Generate a temporary password that the admin can view and copy.
+     * Requires Admin's current password.
+     */
+    public function generateTemporaryPassword(Request $request, User $user)
+    {
+        $request->validate([
+            'admin_password' => ['required', 'current_password'],
+        ], [
+            'admin_password.required' => 'Please enter your administrator password to proceed.',
+            'admin_password.current_password' => 'The administrator password you entered is incorrect.',
+        ]);
+
+        $service = app(\App\Services\PasswordResetService::class);
+        $result = $service->generateTemporaryPasswordForUser($user, sendEmail: false);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'temporary_password' => $result['temporary_password'],
+                'user_name' => $user->name,
+                'email' => $user->email,
+            ]);
+        }
+
+        return back()->with([
+            'status' => "Temporary password generated successfully.",
+            'generated_temporary_password' => $result['temporary_password'],
+            'generated_for_user' => $user->name,
+        ]);
     }
 
     /**

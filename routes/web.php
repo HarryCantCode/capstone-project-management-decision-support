@@ -28,6 +28,14 @@ Route::redirect('/', '/login');
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store'])->name('login.store');
+
+    // Device OTP Verification (for unverified device / browser / location)
+    Route::get('/verify-device', [\App\Http\Controllers\Auth\DeviceVerificationController::class, 'create'])->name('auth.device-verification');
+    Route::post('/verify-device', [\App\Http\Controllers\Auth\DeviceVerificationController::class, 'store'])->name('auth.device-verification.store');
+    Route::post('/verify-device/resend', [\App\Http\Controllers\Auth\DeviceVerificationController::class, 'resend'])->name('auth.device-verification.resend');
+
+    // Forgot Password Request
+    Route::post('/forgot-password', [\App\Http\Controllers\Auth\ForgotPasswordController::class, 'store'])->name('password.forgot.store');
 });
 
 // ─── 2FA challenge & First-login password change (must be logged in) ──────────
@@ -62,6 +70,7 @@ Route::middleware(['auth', 'two-factor', 'must-change-password'])->group(functio
         })->name('settings');
 
         // Self-service profile updates (email & password for all authenticated users)
+        Route::post('/profile/send-otp', [\App\Http\Controllers\ProfileController::class, 'sendOtp'])->name('profile.send-otp');
         Route::put('/profile/email', [\App\Http\Controllers\ProfileController::class, 'updateEmail'])->name('profile.email');
         Route::put('/profile/password', [\App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('profile.password');
 
@@ -74,6 +83,8 @@ Route::middleware(['auth', 'two-factor', 'must-change-password'])->group(functio
         // User Management & Account Archiving (Admin only)
         Route::post('users/{id}/restore', [\App\Http\Controllers\AccountUserController::class, 'restore'])->name('users.restore');
         Route::post('users/{user}/unlock', [\App\Http\Controllers\AccountUserController::class, 'unlock'])->name('users.unlock');
+        Route::post('users/{user}/send-temporary-password', [\App\Http\Controllers\AccountUserController::class, 'sendTemporaryPassword'])->name('users.send-temporary-password');
+        Route::post('users/{user}/generate-temporary-password', [\App\Http\Controllers\AccountUserController::class, 'generateTemporaryPassword'])->name('users.generate-temporary-password');
         Route::resource('users', \App\Http\Controllers\AccountUserController::class)->except(['index', 'show']);
     });
 

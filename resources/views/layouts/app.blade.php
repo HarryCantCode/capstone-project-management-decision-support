@@ -97,7 +97,7 @@
                             x-model="query"
                             @input.debounce.250ms="performSearch()"
                             @focus="if(query.trim().length >= 1) open = true"
-                            placeholder="Search projects, manpower, resources... (Press '/' to focus)"
+                            placeholder="Search projects, tasks, files, expenses, resources... (Press '/' to focus)"
                             class="topbar-search-input"
                             autocomplete="off"
                             aria-label="Global real-time search"
@@ -148,8 +148,8 @@
                                         <a
                                             :href="project.url"
                                             class="search-result-item"
-                                            :class="{ 'is-keyboard-active': selectedIndex === idx }"
-                                            @mouseenter="selectedIndex = idx"
+                                            :class="{ 'is-keyboard-active': selectedIndex === getItemIndex('projects', idx) }"
+                                            @mouseenter="selectedIndex = getItemIndex('projects', idx)"
                                         >
                                             <div class="search-result-icon search-result-icon--project" title="Project">
                                                 <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -187,8 +187,8 @@
                                         <a
                                             :href="person.url"
                                             class="search-result-item"
-                                            :class="{ 'is-keyboard-active': selectedIndex === (results.projects ? results.projects.length : 0) + idx }"
-                                            @mouseenter="selectedIndex = (results.projects ? results.projects.length : 0) + idx"
+                                            :class="{ 'is-keyboard-active': selectedIndex === getItemIndex('manpower', idx) }"
+                                            @mouseenter="selectedIndex = getItemIndex('manpower', idx)"
                                         >
                                             <div class="search-result-icon search-result-icon--manpower" title="Manpower Personnel">
                                                 <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -228,8 +228,8 @@
                                         <a
                                             :href="res.url"
                                             class="search-result-item"
-                                            :class="{ 'is-keyboard-active': selectedIndex === (results.projects ? results.projects.length : 0) + (results.manpower ? results.manpower.length : 0) + idx }"
-                                            @mouseenter="selectedIndex = (results.projects ? results.projects.length : 0) + (results.manpower ? results.manpower.length : 0) + idx"
+                                            :class="{ 'is-keyboard-active': selectedIndex === getItemIndex('resources', idx) }"
+                                            @mouseenter="selectedIndex = getItemIndex('resources', idx)"
                                         >
                                             <div class="search-result-icon search-result-icon--resource" title="Resource">
                                                 <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -257,6 +257,164 @@
                                 </div>
                             </template>
 
+                            {{-- Major Tasks Section --}}
+                            <template x-if="results.major_tasks && results.major_tasks.length > 0">
+                                <div>
+                                    <div class="search-category-header">
+                                        <span>Major Tasks (Projects)</span>
+                                        <span x-text="`${results.major_tasks.length} found`"></span>
+                                    </div>
+                                    <template x-for="(task, idx) in results.major_tasks" :key="'mtask-' + task.id">
+                                        <a
+                                            :href="task.url"
+                                            class="search-result-item"
+                                            :class="{ 'is-keyboard-active': selectedIndex === getItemIndex('major_tasks', idx) }"
+                                            @mouseenter="selectedIndex = getItemIndex('major_tasks', idx)"
+                                        >
+                                            <div class="search-result-icon search-result-icon--task" title="Major Task">
+                                                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                                    <line x1="16" y1="2" x2="16" y2="6"/>
+                                                    <line x1="8" y1="2" x2="8" y2="6"/>
+                                                    <line x1="3" y1="10" x2="21" y2="10"/>
+                                                    <path d="m9 16 2 2 4-4"/>
+                                                </svg>
+                                            </div>
+                                            <div class="search-result-info">
+                                                <div class="search-result-top">
+                                                    <span class="search-result-title" x-text="task.title"></span>
+                                                    <span class="search-result-code" x-text="task.code"></span>
+                                                </div>
+                                                <div class="search-result-bottom">
+                                                    <span style="font-weight: 500; color: var(--color-ink);" x-text="task.subtitle"></span>
+                                                    <span>·</span>
+                                                    <span x-text="task.meta"></span>
+                                                </div>
+                                            </div>
+                                            <div class="search-result-badge">
+                                                <span class="status-pill" :class="`status-pill--${task.status_class}`" x-text="task.status"></span>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Specific Tasks / Subtasks Section --}}
+                            <template x-if="results.specific_tasks && results.specific_tasks.length > 0">
+                                <div>
+                                    <div class="search-category-header">
+                                        <span>Specific Tasks (Subtasks)</span>
+                                        <span x-text="`${results.specific_tasks.length} found`"></span>
+                                    </div>
+                                    <template x-for="(subtask, idx) in results.specific_tasks" :key="'stask-' + subtask.id">
+                                        <a
+                                            :href="subtask.url"
+                                            class="search-result-item"
+                                            :class="{ 'is-keyboard-active': selectedIndex === getItemIndex('specific_tasks', idx) }"
+                                            @mouseenter="selectedIndex = getItemIndex('specific_tasks', idx)"
+                                        >
+                                            <div class="search-result-icon search-result-icon--subtask" title="Specific Subtask">
+                                                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polyline points="9 11 12 14 22 4"/>
+                                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                                                </svg>
+                                            </div>
+                                            <div class="search-result-info">
+                                                <div class="search-result-top">
+                                                    <span class="search-result-title" x-text="subtask.title"></span>
+                                                    <span class="search-result-code" x-text="subtask.code"></span>
+                                                </div>
+                                                <div class="search-result-bottom">
+                                                    <span x-text="subtask.subtitle"></span>
+                                                    <span>·</span>
+                                                    <span x-text="subtask.meta"></span>
+                                                </div>
+                                            </div>
+                                            <div class="search-result-badge">
+                                                <span class="status-pill" :class="`status-pill--${subtask.status_class}`" x-text="subtask.status"></span>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Project Files Section --}}
+                            <template x-if="results.files && results.files.length > 0">
+                                <div>
+                                    <div class="search-category-header">
+                                        <span>Project Attachments & Files</span>
+                                        <span x-text="`${results.files.length} found`"></span>
+                                    </div>
+                                    <template x-for="(file, idx) in results.files" :key="'file-' + file.id">
+                                        <a
+                                            :href="file.url"
+                                            class="search-result-item"
+                                            :class="{ 'is-keyboard-active': selectedIndex === getItemIndex('files', idx) }"
+                                            @mouseenter="selectedIndex = getItemIndex('files', idx)"
+                                        >
+                                            <div class="search-result-icon search-result-icon--file" title="Attached File">
+                                                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                                                </svg>
+                                            </div>
+                                            <div class="search-result-info">
+                                                <div class="search-result-top">
+                                                    <span class="search-result-title" x-text="file.title"></span>
+                                                    <span class="search-result-code" x-text="file.code"></span>
+                                                </div>
+                                                <div class="search-result-bottom">
+                                                    <span x-text="file.subtitle"></span>
+                                                    <span>·</span>
+                                                    <span x-text="file.meta"></span>
+                                                </div>
+                                            </div>
+                                            <div class="search-result-badge">
+                                                <span class="status-pill status-pill--completed" x-text="file.status"></span>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
+                            {{-- Project Expenses Section --}}
+                            <template x-if="results.expenses && results.expenses.length > 0">
+                                <div>
+                                    <div class="search-category-header">
+                                        <span>Logged Expenses & Costs</span>
+                                        <span x-text="`${results.expenses.length} found`"></span>
+                                    </div>
+                                    <template x-for="(expense, idx) in results.expenses" :key="'exp-' + expense.id">
+                                        <a
+                                            :href="expense.url"
+                                            class="search-result-item"
+                                            :class="{ 'is-keyboard-active': selectedIndex === getItemIndex('expenses', idx) }"
+                                            @mouseenter="selectedIndex = getItemIndex('expenses', idx)"
+                                        >
+                                            <div class="search-result-icon search-result-icon--expense" title="Logged Expense">
+                                                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <line x1="12" y1="1" x2="12" y2="23"/>
+                                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                                </svg>
+                                            </div>
+                                            <div class="search-result-info">
+                                                <div class="search-result-top">
+                                                    <span class="search-result-title" x-text="expense.title"></span>
+                                                    <span class="search-result-code" x-text="expense.code"></span>
+                                                </div>
+                                                <div class="search-result-bottom">
+                                                    <span x-text="expense.subtitle"></span>
+                                                    <span>·</span>
+                                                    <span x-text="expense.meta"></span>
+                                                </div>
+                                            </div>
+                                            <div class="search-result-badge">
+                                                <span class="status-pill status-pill--ongoing font-mono font-bold" x-text="expense.status"></span>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </template>
+
                             {{-- No Results Empty State --}}
                             <div x-show="!loading && results.total === 0" class="search-empty-state">
                                 <svg style="width: 32px; height: 32px; margin: 0 auto 8px; color: var(--color-muted); opacity: 0.6;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -264,7 +422,7 @@
                                     <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                                 </svg>
                                 <p style="font-weight: 600; font-size: 0.875rem; margin-bottom: 2px; color: var(--color-ink);">No matching records found</p>
-                                <p style="font-size: 0.8125rem; margin: 0; color: var(--color-muted);">No projects, manpower, or resources match "<strong x-text="query"></strong>".</p>
+                                <p style="font-size: 0.8125rem; margin: 0; color: var(--color-muted);">No projects, tasks, files, expenses, manpower, or resources match "<strong x-text="query"></strong>".</p>
                             </div>
                         </div>
 
@@ -573,18 +731,102 @@
                 </div>{{-- end .topbar-right-group --}}
             </header>
 
-            {{-- Flash messages --}}
-            @if (session('status'))
-                <div class="flash-banner flash-banner--success" role="alert" x-data="{ show: true }" x-show="show">
-                    {{ session('status') }}
-                    <button type="button" class="flash-close" @click="show = false" aria-label="Dismiss">×</button>
-                </div>
-            @endif
+            {{-- Global Toast Notifications (Centered auto-dismissing floating alert) --}}
+            @if (session('status') || session('success') || session('error') || session('warning'))
+                <div
+                    style="position: fixed; top: 1.5rem; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; z-index: 99999; pointer-events: none; padding: 0 1rem;"
+                    role="region"
+                    aria-label="Notification alerts"
+                >
+                    @if (session('status') || session('success'))
+                        <div
+                            x-data="{ show: true }"
+                            x-show="show"
+                            x-init="setTimeout(() => show = false, 5000)"
+                            x-transition.duration.300ms
+                            style="pointer-events: auto; width: 100%; max-width: 440px;"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #064e3b; color: #ecfdf5; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #059669;">
+                                <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #10b981; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
+                                    &#10003;
+                                </span>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Success</div>
+                                    <div style="font-size: 0.85rem; color: #d1fae5; line-height: 1.4;">{{ session('status') ?? session('success') }}</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    @click="show = false"
+                                    style="background: transparent; border: none; color: #a7f3d0; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
+                                    aria-label="Close notification"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        </div>
+                    @endif
 
-            @if (session('error'))
-                <div class="flash-banner flash-banner--error" role="alert" x-data="{ show: true }" x-show="show">
-                    {{ session('error') }}
-                    <button type="button" class="flash-close" @click="show = false" aria-label="Dismiss">×</button>
+                    @if (session('error'))
+                        <div
+                            x-data="{ show: true }"
+                            x-show="show"
+                            x-init="setTimeout(() => show = false, 6000)"
+                            x-transition.duration.300ms
+                            style="pointer-events: auto; width: 100%; max-width: 440px;"
+                            role="alert"
+                            aria-live="assertive"
+                        >
+                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #7f1d1d; color: #fef2f2; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #dc2626;">
+                                <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #ef4444; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
+                                    &times;
+                                </span>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Error</div>
+                                    <div style="font-size: 0.85rem; color: #fee2e2; line-height: 1.4;">{{ session('error') }}</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    @click="show = false"
+                                    style="background: transparent; border: none; color: #fca5a5; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
+                                    aria-label="Close notification"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if (session('warning'))
+                        <div
+                            x-data="{ show: true }"
+                            x-show="show"
+                            x-init="setTimeout(() => show = false, 6000)"
+                            x-transition.duration.300ms
+                            style="pointer-events: auto; width: 100%; max-width: 440px;"
+                            role="alert"
+                            aria-live="polite"
+                        >
+                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #78350f; color: #fffbeb; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #d97706;">
+                                <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #f59e0b; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
+                                    !
+                                </span>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Notice</div>
+                                    <div style="font-size: 0.85rem; color: #fef3c7; line-height: 1.4;">{{ session('warning') }}</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    @click="show = false"
+                                    style="background: transparent; border: none; color: #fde68a; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
+                                    aria-label="Close notification"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @endif
 
@@ -602,7 +844,16 @@
                 query: '',
                 open: false,
                 loading: false,
-                results: { projects: [], manpower: [], resources: [], total: 0 },
+                results: {
+                    projects: [],
+                    manpower: [],
+                    resources: [],
+                    major_tasks: [],
+                    specific_tasks: [],
+                    files: [],
+                    expenses: [],
+                    total: 0
+                },
                 selectedIndex: -1,
                 searchUrl: '{{ route('global-search') }}',
                 abortController: null,
@@ -616,10 +867,31 @@
                     });
                 },
 
+                getItemIndex(category, idx) {
+                    const order = ['projects', 'manpower', 'resources', 'major_tasks', 'specific_tasks', 'files', 'expenses'];
+                    let offset = 0;
+                    for (const cat of order) {
+                        if (cat === category) {
+                            return offset + idx;
+                        }
+                        offset += (this.results[cat] ? this.results[cat].length : 0);
+                    }
+                    return idx;
+                },
+
                 async performSearch() {
                     const q = this.query.trim();
                     if (q.length < 1) {
-                        this.results = { projects: [], manpower: [], resources: [], total: 0 };
+                        this.results = {
+                            projects: [],
+                            manpower: [],
+                            resources: [],
+                            major_tasks: [],
+                            specific_tasks: [],
+                            files: [],
+                            expenses: [],
+                            total: 0
+                        };
                         this.open = false;
                         this.selectedIndex = -1;
                         return;
@@ -660,7 +932,11 @@
                     return [
                         ...(this.results.projects || []).map(item => ({ ...item, category: 'project' })),
                         ...(this.results.manpower || []).map(item => ({ ...item, category: 'manpower' })),
-                        ...(this.results.resources || []).map(item => ({ ...item, category: 'resource' }))
+                        ...(this.results.resources || []).map(item => ({ ...item, category: 'resource' })),
+                        ...(this.results.major_tasks || []).map(item => ({ ...item, category: 'major_task' })),
+                        ...(this.results.specific_tasks || []).map(item => ({ ...item, category: 'specific_task' })),
+                        ...(this.results.files || []).map(item => ({ ...item, category: 'file' })),
+                        ...(this.results.expenses || []).map(item => ({ ...item, category: 'expense' }))
                     ];
                 },
 

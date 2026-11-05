@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\OtpService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,6 +12,11 @@ use Illuminate\View\View;
 
 class LoginController extends Controller
 {
+    public function __construct(
+        protected OtpService $otpService,
+    ) {
+    }
+
     /**
      * Show the login form.
      *
@@ -24,13 +30,18 @@ class LoginController extends Controller
     /**
      * Handle an incoming authentication request.
      *
-     * Validation and throttle checking are delegated to LoginRequest.
-     * If the user is Admin and has 2FA enabled, redirect to the 2FA
-     * challenge view instead of the dashboard directly.
+     * Validates credentials and verifies device/browser/location via OTP if unknown.
      */
     public function store(LoginRequest $request): RedirectResponse
     {
-        $request->authenticate();
+        $result = $request->validateCredentialsAndCheckDevice($this->otpService);
+
+        if ($result['needs_device_verification']) {
+            $request->session()->put('device_verification_user_id', $result['user']->id);
+            $request->session()->put('device_verification_remember', $request->boolean('remember'));
+
+            return redirect()->route('auth.device-verification');
+        }
 
         $request->session()->regenerate();
 
@@ -43,7 +54,7 @@ class LoginController extends Controller
             return redirect()->route('auth.two-factor');
         }
 
-        // Mandatory first-login password change check
+        // Mandatory first-login or reset password change check
         if ($user->must_change_password) {
             return redirect()->route('password.first-login');
         }

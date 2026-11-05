@@ -277,6 +277,10 @@ class ProjectService
                         'updated_by' => $user->id,
                     ]);
 
+                    if ($newQty < 5) {
+                        $this->notificationService->notifyLowStockMaterial($resource);
+                    }
+
                     \App\Models\ResourceAllocation::create([
                         'project_id' => $project->id,
                         'resource_id' => $resource->id,
@@ -295,6 +299,9 @@ class ProjectService
                 'actual_spend' => number_format($totalSpend, 2, '.', ''),
                 'updated_by' => $user->id,
             ]);
+
+            // Notify Admin and Manager users about the newly logged expense
+            $this->notificationService->notifyExpenseLogged($project, $cost);
 
             return $cost;
         });
@@ -580,7 +587,7 @@ class ProjectService
         $folder = "projects/{$project->id}/" . ($subtask ? "tasks/{$subtask->id}" : ($fileType === 'invoice' ? 'invoices' : 'files'));
         $path = $file->store($folder, 'public');
 
-        return $project->files()->create([
+        $projectFile = $project->files()->create([
             'project_subtask_id' => $subtask?->id,
             'uploaded_by' => $userId ?? Auth::id(),
             'file_type' => $fileType,
@@ -590,5 +597,9 @@ class ProjectService
             'file_size' => $file->getSize(),
             'description' => $description,
         ]);
+
+        $this->notificationService->notifyFileUpload($project, $projectFile);
+
+        return $projectFile;
     }
 }

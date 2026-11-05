@@ -145,7 +145,7 @@
                             value="{{ $search ?? '' }}"
                             placeholder="Search by code, item name, model or specs..."
                             class="form-control"
-                            style="padding-left: 2.25rem; font-size: 0.875rem;"
+                            style="padding-left: 2.25rem; font-size: 0.875rem; border-radius: var(--radius-pill, 9999px);"
                         >
                         <svg style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--color-muted);" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>

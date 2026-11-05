@@ -2303,6 +2303,16 @@ document.addEventListener('alpine:init', () => {
 
 function projectDetail() {
     return {
+        init() {
+            const params = new URLSearchParams(window.location.search);
+            const taskIdParam = params.get('task_id');
+            if (taskIdParam) {
+                const parsedId = parseInt(taskIdParam, 10);
+                if (!isNaN(parsedId)) {
+                    this.activeTaskId = parsedId;
+                }
+            }
+        },
         timelineMode: 'minimized',
         addCostModalOpen: false,
         assignModalOpen: false,

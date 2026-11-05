@@ -270,7 +270,12 @@ class ProjectTaskController extends Controller
         }
 
         // Notify Admin and Manager users about the new sub task
-        app(NotificationService::class)->notifyNewTask($project, $task, $subtask->title);
+        $notificationService = app(NotificationService::class);
+        $notificationService->notifyNewTask($project, $task, $subtask->title);
+
+        if ($subtask->due_date && $subtask->due_date->isBetween(now()->startOfDay(), now()->addDays(2)->endOfDay())) {
+            $notificationService->notifyUpcomingDueTask($project, $task, $subtask);
+        }
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -308,11 +313,18 @@ class ProjectTaskController extends Controller
             'completed_at' => $newCompleted ? now() : null,
         ]);
 
+        $wasCompleted = $task->status === 'completed';
+
         // Sync major task status based on progress
         $task->load('subtasks');
+        $newStatus = $task->computed_status;
         $task->update([
-            'status' => $task->computed_status,
+            'status' => $newStatus,
         ]);
+
+        if (! $wasCompleted && $newStatus === 'completed') {
+            app(NotificationService::class)->notifyMajorTaskCompleted($project, $task);
+        }
 
         $statusTransitionedToOngoing = false;
         $statusTransitionedToPending = false;
@@ -512,6 +524,10 @@ class ProjectTaskController extends Controller
             'due_date' => $validated['due_date'] ?? null,
         ]);
 
+        if ($subtask->due_date && ! $subtask->is_completed && $subtask->due_date->isBetween(now()->startOfDay(), now()->addDays(2)->endOfDay())) {
+            app(NotificationService::class)->notifyUpcomingDueTask($project, $task, $subtask);
+        }
+
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
@@ -536,10 +552,16 @@ class ProjectTaskController extends Controller
         $subtask->delete();
 
         // Refresh task status
+        $wasCompleted = $task->status === 'completed';
         $task->load('subtasks');
+        $newStatus = $task->computed_status;
         $task->update([
-            'status' => $task->computed_status,
+            'status' => $newStatus,
         ]);
+
+        if (! $wasCompleted && $newStatus === 'completed') {
+            app(NotificationService::class)->notifyMajorTaskCompleted($project, $task);
+        }
 
         if ($request->wantsJson()) {
             return response()->json([
