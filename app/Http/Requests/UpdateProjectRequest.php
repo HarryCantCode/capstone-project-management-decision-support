@@ -115,7 +115,7 @@ class UpdateProjectRequest extends FormRequest
 
             if ($name !== '') {
                 $existing = \App\Models\Project::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
-                    ->when($currentId, fn($q) => $q->where('id', '!=', $currentId))
+                    ->when($currentId, fn ($q) => $q->where('id', '!=', $currentId))
                     ->first();
                 if ($existing) {
                     $validator->errors()->add('name', "Another project named '{$existing->name}' already exists ({$existing->project_code}). Please choose a different project name.");

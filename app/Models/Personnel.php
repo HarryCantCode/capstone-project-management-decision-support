@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -156,6 +157,16 @@ class Personnel extends \Illuminate\Database\Eloquent\Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * Historical and active project assignments for this personnel.
+     */
+    public function assignmentHistory(): HasMany
+    {
+        return $this->hasMany(ProjectPersonnelHistory::class, 'personnel_id')
+            ->orderByDesc('assigned_at')
+            ->orderByDesc('id');
     }
 
     /**

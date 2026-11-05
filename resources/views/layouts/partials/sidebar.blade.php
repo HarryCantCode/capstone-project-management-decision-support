@@ -108,13 +108,14 @@
         <span class="nav-section-label">Insights</span>
         <ul class="nav-list" role="list">
             <li>
-                <span class="nav-link nav-link--disabled" aria-disabled="true" title="Coming Soon">
+                <a href="{{ route('reports.index') }}"
+                   class="nav-link {{ request()->routeIs('reports.*') ? 'nav-link--active' : '' }}"
+                   aria-current="{{ request()->routeIs('reports.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M6 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.414A2 2 0 0 0 15.414 7L11 2.586A2 2 0 0 0 9.586 2H6zm2 10a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H8zm0-4a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H8z" clip-rule="evenodd"/>
                     </svg>
-                    <span>Reports</span>
-                    <span class="nav-badge nav-badge--coming">Soon</span>
-                </span>
+                    Reports
+                </a>
             </li>
             <li>
                 <span class="nav-link nav-link--disabled" aria-disabled="true" title="Coming Soon">

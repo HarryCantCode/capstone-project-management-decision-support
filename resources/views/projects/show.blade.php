@@ -40,6 +40,20 @@
             </p>
         </div>
         <div class="page-actions">
+            @can('view', $project)
+                <a
+                    href="{{ route('reports.project.pdf', $project) }}"
+                    class="btn btn-secondary"
+                    style="display: inline-flex; align-items: center; gap: 0.35rem;"
+                    title="Export project overview, financials, elevator specs, expenditures, and manpower as PDF"
+                    id="btn-export-project-pdf"
+                >
+                    <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1zm3.293-7.707a1 1 0 0 1 1.414 0L9 10.586V3a1 1 0 1 1 2 0v7.586l1.293-1.293a1 1 0 1 1 1.414 1.414l-3 3a1 1 0 0 1-1.414 0l-3-3a1 1 0 0 1 0-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                    Export PDF
+                </a>
+            @endcan
             @if ($project->trashed())
                 @can('restore', $project)
                     <form method="POST" action="{{ route('projects.restore', $project->id) }}" class="inline-form" onsubmit="return confirm('Restore archived project back to active work?');">
