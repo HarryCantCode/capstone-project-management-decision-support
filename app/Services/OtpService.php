@@ -299,8 +299,8 @@ class OtpService
         $otp->delete();
 
         // Clear send throttle locks on successful verification
-        Cache::forget("otp_send_count:{$user->id}:{$purpose}");
-        Cache::forget("otp_send_lock:{$user->id}:{$purpose}");
+        Cache::forget("otp_send_count:{$user->id}:device_verification");
+        Cache::forget("otp_send_lock:{$user->id}:device_verification");
 
         return ['success' => true];
     }
