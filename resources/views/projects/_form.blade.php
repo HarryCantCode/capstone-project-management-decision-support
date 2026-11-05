@@ -32,7 +32,8 @@
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
                 <div class="form-group form-group-premium" style="margin-bottom: 0;">
                     <label for="name" class="form-label">Project Name <span class="text-danger">*</span></label>
-                    <input id="name" name="name" type="text" class="form-control @error('name') is-invalid @enderror" value="{{ old('name', $project->name ?? '') }}" maxlength="255" required autofocus placeholder="e.g. Makati Tower Elevator Overhaul">
+                    <input id="name" name="name" type="text" class="form-control @error('name') is-invalid @enderror" value="{{ old('name', $project->name ?? '') }}" maxlength="255" required autofocus placeholder="e.g. Makati Tower Elevator Overhaul" autocomplete="off">
+                    <div id="name-similarity-feedback" style="display: none; font-size: 0.75rem; margin-top: 4px; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--color-border);"></div>
                     @error('name')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                 </div>
 
@@ -932,5 +933,112 @@
         updatePaymentPill();
         updateLocation();
         updateElevatorSpecs();
+
+        // ─── Real-Time Similarity & Duplicate Checker ──────────────────────
+        const nameInput = document.getElementById('name');
+        const nameFeedback = document.getElementById('name-similarity-feedback');
+        const excludeProjectId = @js($project->id ?? null);
+        let similarityTimeout = null;
+        let lastNotifiedKey = '';
+
+        function checkProjectSimilarity() {
+            if (!nameInput) return;
+            const nameVal = (nameInput.value || '').trim();
+
+            if (nameVal.length < 2) {
+                if (nameFeedback) { nameFeedback.style.display = 'none'; nameFeedback.innerHTML = ''; }
+                return;
+            }
+
+            const queryParams = new URLSearchParams({
+                name: nameVal
+            });
+            if (excludeProjectId) {
+                queryParams.append('exclude_id', excludeProjectId);
+            }
+
+            fetch(`{{ route('projects.check-similarity') }}?${queryParams.toString()}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (!data || !data.matches || data.matches.length === 0) {
+                    if (nameFeedback) { nameFeedback.style.display = 'none'; nameFeedback.innerHTML = ''; }
+                    return;
+                }
+
+                const matches = data.matches;
+                const exactDuplicate = matches.find(m => m.exact_name);
+                const similarMatches = matches.filter(m => !m.exact_name);
+
+                if (exactDuplicate) {
+                    const noticeText = `A project with this exact name already exists: <strong>${exactDuplicate.name}</strong> (${exactDuplicate.project_code}, Client: ${exactDuplicate.client_name})`;
+                    if (nameFeedback) {
+                        nameFeedback.style.display = 'block';
+                        nameFeedback.style.background = '#fef2f2';
+                        nameFeedback.style.borderColor = '#f87171';
+                        nameFeedback.style.color = '#991b1b';
+                        nameFeedback.innerHTML = `&#9888; ${noticeText}`;
+                    }
+
+                    const notifyKey = `exact_${exactDuplicate.id}_${nameVal}`;
+                    if (lastNotifiedKey !== notifyKey) {
+                        lastNotifiedKey = notifyKey;
+                        window.dispatchEvent(new CustomEvent('show-toast', {
+                            detail: {
+                                type: 'error',
+                                title: 'Duplicate Project Name',
+                                message: `A project with the name "${exactDuplicate.name}" (${exactDuplicate.project_code}) already exists.`,
+                                duration: 6000
+                            }
+                        }));
+                    }
+                } else if (similarMatches.length > 0) {
+                    const first = similarMatches[0];
+                    const count = similarMatches.length;
+                    const summary = count === 1 
+                        ? `Similar project name found: <strong>${first.name}</strong> (${first.project_code})`
+                        : `Found ${count} projects with similar names (e.g. <strong>${first.name}</strong> - ${first.project_code})`;
+
+                    if (nameFeedback) {
+                        nameFeedback.style.display = 'block';
+                        nameFeedback.style.background = '#fffbeb';
+                        nameFeedback.style.borderColor = '#fcd34d';
+                        nameFeedback.style.color = '#92400e';
+                        nameFeedback.innerHTML = `&#8505; ${summary}`;
+                    }
+
+                    const notifyKey = `similar_${first.id}_${nameVal}`;
+                    if (lastNotifiedKey !== notifyKey && nameVal.length >= 4) {
+                        lastNotifiedKey = notifyKey;
+                        window.dispatchEvent(new CustomEvent('show-toast', {
+                            detail: {
+                                type: 'warning',
+                                title: 'Similar Project Name Found',
+                                message: `Existing project "${first.name}" (${first.project_code}) has a very similar name.`,
+                                duration: 5000
+                            }
+                        }));
+                    }
+                }
+            })
+            .catch(() => {
+                // Silent catch on network / abort
+            });
+        }
+
+        if (nameInput) {
+            nameInput.addEventListener('input', function () {
+                clearTimeout(similarityTimeout);
+                similarityTimeout = setTimeout(checkProjectSimilarity, 400);
+            });
+            nameInput.addEventListener('blur', function () {
+                clearTimeout(similarityTimeout);
+                checkProjectSimilarity();
+            });
+        }
     });
 </script>

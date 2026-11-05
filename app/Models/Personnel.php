@@ -84,6 +84,13 @@ class Personnel extends \Illuminate\Database\Eloquent\Model
                 $personnel->employee_id = static::generateEmployeeId();
             }
         });
+
+        // Keep dashboard manpower statistics real-time: any change to
+        // personnel (assign / unassign / archive / restore) busts the cache.
+        $flush = fn () => cache()->forget('dashboard.stats.global');
+        static::saved($flush);
+        static::deleted($flush);
+        static::restored($flush);
     }
 
     /**

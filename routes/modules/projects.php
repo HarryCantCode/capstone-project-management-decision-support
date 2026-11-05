@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Route;
 | All routes inside the 'auth + two-factor' middleware group.
 */
 
+Route::get('projects/check-similarity', [ProjectController::class, 'checkSimilarity'])
+    ->name('projects.check-similarity');
+
 Route::resource('projects', ProjectController::class)
     ->withTrashed(['show', 'edit']);
 

@@ -21,9 +21,15 @@
         </div>
         <div class="page-actions">
             @can('update', $project)
-                <button type="button" class="btn btn-primary" @click="addCostModalOpen = true">
-                    + Log New Expense / Cost
-                </button>
+                @if ($project->trashed())
+                    <button type="button" class="btn btn-secondary" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot log expenses on an archived project">
+                        + Log New Expense / Cost
+                    </button>
+                @else
+                    <button type="button" class="btn btn-primary" @click="addCostModalOpen = true">
+                        + Log New Expense / Cost
+                    </button>
+                @endif
             @endcan
             <a href="{{ route('projects.show', $project) }}" class="btn btn-secondary">Project Details</a>
         </div>
@@ -224,9 +230,15 @@
                 </span>
             </div>
             @can('update', $project)
-                <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
-                    + Log New Expense / Cost
-                </button>
+                @if ($project->trashed())
+                    <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot log expenses on an archived project">
+                        + Log New Expense / Cost
+                    </button>
+                @else
+                    <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
+                        + Log New Expense / Cost
+                    </button>
+                @endif
             @endcan
         </div>
 
@@ -248,9 +260,15 @@
                         <a href="{{ route('costing.show', $project) }}" class="btn btn-secondary btn-sm">Clear Active Filters</a>
                     @else
                         @can('update', $project)
-                            <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
-                                + Log First Expense Item
-                            </button>
+                            @if ($project->trashed())
+                                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot log expenses on an archived project">
+                                    + Log First Expense Item
+                                </button>
+                            @else
+                                <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
+                                    + Log First Expense Item
+                                </button>
+                            @endif
                         @endcan
                     @endif
                 </div>
@@ -295,14 +313,16 @@
                                 </td>
                                 <td class="text-right">
                                     @can('update', $project)
-                                        <form method="POST" action="{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Delete this cost entry of ₱{{ number_format($cost->amount, 2) }}?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <input type="hidden" name="redirect_to" value="costing">
-                                            <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
-                                                Delete
-                                            </button>
-                                        </form>
+                                        @if (!$project->trashed())
+                                            <form method="POST" action="{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Delete this cost entry of ₱{{ number_format($cost->amount, 2) }}?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="redirect_to" value="costing">
+                                                <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        @endif
                                     @endcan
                                 </td>
                             </tr>
@@ -324,7 +344,7 @@
                 <span>Log Project Expense / Cost</span>
                 <button type="button" class="flash-close" @click="addCostModalOpen = false" aria-label="Close modal">&times;</button>
             </div>
-            <form action="{{ route('projects.costs.store', $project) }}" method="POST">
+            <form action="{{ route('projects.costs.store', $project) }}" method="POST" @submit="if (!validateCostSubmission($event)) { $event.preventDefault(); }">
                 @csrf
                 <input type="hidden" name="redirect_to" value="costing">
                 <input type="hidden" name="resource_id" :value="selectedMaterialId || ''">
@@ -385,6 +405,9 @@
                                                 <span style="font-weight: 600; color: var(--color-ink);" x-text="item.name"></span>
                                             </div>
                                             <div x-show="item.model" class="text-muted" style="font-size: 0.75rem; line-height: 1.3;" x-text="'Model / Spec: ' + item.model"></div>
+                                            <div style="font-size: 0.72rem; color: var(--color-muted);">
+                                                Available: <span class="font-mono font-bold" :class="item.quantity_available > 0 ? 'text-success' : 'text-danger'" x-text="item.quantity_available"></span> units
+                                            </div>
                                         </div>
                                         <div style="text-align: right; flex-shrink: 0;">
                                             <div class="font-mono text-success" style="font-weight: 700; font-size: 0.875rem;">
@@ -402,17 +425,27 @@
 
                         <div x-show="selectedMaterialId" x-cloak style="margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--color-border); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); font-size: 0.8125rem;">
                             <div>
-                                <label for="costing_material_qty_input" class="form-label" style="font-size: 0.75rem; margin-bottom: 4px;">Quantity (Cannot be 0)</label>
+                                <label for="costing_material_qty_input" class="form-label" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 4px;">
+                                    <span>Quantity (Cannot be 0)</span>
+                                    <span style="font-weight: 600;" :class="isQuantityExcessive ? 'text-danger' : 'text-muted'">
+                                        Avail: <span class="font-mono" x-text="selectedMaterialStock"></span>
+                                    </span>
+                                </label>
                                 <input
                                     type="number"
                                     id="costing_material_qty_input"
                                     min="1"
+                                    :max="selectedMaterialStock"
                                     step="1"
                                     class="form-control font-mono"
+                                    :style="isQuantityExcessive ? 'border-color: #ef4444; background: #fff5f5;' : ''"
                                     x-model.number="materialQuantity"
                                     @input="recalculateMaterialTotal()"
                                     placeholder="Qty"
                                 >
+                                <p x-show="isQuantityExcessive" class="text-danger" style="font-size: 0.72rem; margin-top: 4px; margin-bottom: 0;">
+                                    Quantity exceeds available stock (<span x-text="selectedMaterialStock"></span>)!
+                                </p>
                             </div>
                             <div>
                                 <label class="form-label" style="font-size: 0.75rem; margin-bottom: 4px;">Unit Price</label>
@@ -538,10 +571,35 @@ function costingBreakdown() {
                 name: @js($mat->name),
                 resource_code: @js($mat->resource_code),
                 model: @js($mat->model ?? ''),
-                price: {{ (float) ($mat->price > 0 ? $mat->price : $mat->unit_cost) }}
+                price: {{ (float) ($mat->price > 0 ? $mat->price : $mat->unit_cost) }},
+                quantity_available: {{ (int) $mat->quantity_available }}
             },
             @endforeach
         ],
+        get selectedMaterial() {
+            if (!this.selectedMaterialId) return null;
+            return this.catalogMaterialsList.find(item => item.id == this.selectedMaterialId) || null;
+        },
+        get selectedMaterialStock() {
+            return this.selectedMaterial ? (this.selectedMaterial.quantity_available || 0) : 0;
+        },
+        get isQuantityExcessive() {
+            if (!this.selectedMaterialId || !this.selectedMaterial) return false;
+            const qty = parseInt(this.materialQuantity, 10) || 0;
+            return qty > this.selectedMaterialStock;
+        },
+        validateCostSubmission(e) {
+            if (this.selectedMaterialId && this.isQuantityExcessive) {
+                const stock = this.selectedMaterialStock;
+                const matName = this.selectedMaterial ? this.selectedMaterial.name : 'material';
+                const msg = `Quantity entered (${this.materialQuantity}) exceeds available stock (${stock}) for ${matName}. Please adjust before proceeding.`;
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: { type: 'error', title: 'Excessive Quantity', message: msg, duration: 6000 }
+                }));
+                return false;
+            }
+            return true;
+        },
         get filteredMaterials() {
             if (!this.materialSearch) {
                 return this.catalogMaterialsList;
@@ -581,6 +639,19 @@ function costingBreakdown() {
                 this.materialQuantity = qty;
                 const total = (qty * this.materialUnitPrice).toFixed(2);
                 this.costForm.amount = total;
+
+                if (this.isQuantityExcessive) {
+                    const stock = this.selectedMaterialStock;
+                    const matName = this.selectedMaterial ? this.selectedMaterial.name : 'material';
+                    window.dispatchEvent(new CustomEvent('show-toast', {
+                        detail: {
+                            type: 'warning',
+                            title: 'Quantity Exceeds Available Stock',
+                            message: `Requested ${qty} units of "${matName}", but only ${stock} units are currently available.`,
+                            duration: 5000
+                        }
+                    }));
+                }
             }
         }
     };

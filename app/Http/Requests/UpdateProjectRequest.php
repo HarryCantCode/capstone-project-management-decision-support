@@ -109,6 +109,18 @@ class UpdateProjectRequest extends FormRequest
                     $validator->errors()->add('invoice_file', 'An invoice attachment (PDF, DOCX, or Image) is required when payment status is Paid in full.');
                 }
             }
+
+            $name = trim((string) $this->input('name', ''));
+            $currentId = $project ? $project->id : null;
+
+            if ($name !== '') {
+                $existing = \App\Models\Project::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+                    ->when($currentId, fn($q) => $q->where('id', '!=', $currentId))
+                    ->first();
+                if ($existing) {
+                    $validator->errors()->add('name', "Another project named '{$existing->name}' already exists ({$existing->project_code}). Please choose a different project name.");
+                }
+            }
         });
     }
 

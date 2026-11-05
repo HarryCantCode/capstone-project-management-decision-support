@@ -103,6 +103,15 @@ class StoreProjectRequest extends FormRequest
             if ($this->input('payment_status') === 'Paid' && !$this->hasFile('invoice_file')) {
                 $validator->errors()->add('invoice_file', 'An invoice attachment (PDF, DOCX, or Image) is required when payment status is Paid in full.');
             }
+
+            $name = trim((string) $this->input('name', ''));
+
+            if ($name !== '') {
+                $existing = \App\Models\Project::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->first();
+                if ($existing) {
+                    $validator->errors()->add('name', "A project named '{$existing->name}' already exists ({$existing->project_code}). Please choose a different project name.");
+                }
+            }
         });
     }
 

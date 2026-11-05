@@ -141,6 +141,7 @@ class GlobalSearchController extends Controller
                     $q->where('name', 'like', "%{$query}%")
                         ->orWhere('resource_code', 'like', "%{$query}%")
                         ->orWhere('type', 'like', "%{$query}%")
+                        ->orWhere('demand_status', 'like', "%{$query}%")
                         ->orWhere('condition', 'like', "%{$query}%");
                 })
                 ->orderBy('name', 'asc')
@@ -148,13 +149,10 @@ class GlobalSearchController extends Controller
                 ->get();
 
             $resources = $resourceResults->map(function (Resource $r) {
-                $cond = strtolower((string) $r->condition);
-                $statusClass = match ($cond) {
-                    'good', 'new', 'operational' => 'completed',
-                    'fair', 'maintenance', 'in use' => 'ongoing',
-                    'poor', 'damaged' => 'delayed',
-                    default => 'pending',
-                };
+                $demand = strtolower((string) ($r->demand_status ?: 'fast-moving'));
+                $isFastMoving = $demand === 'fast-moving';
+                $statusText = $isFastMoving ? 'Fast-moving' : 'Slow-moving';
+                $statusClass = $isFastMoving ? 'completed' : 'ongoing';
 
                 return [
                     'id' => $r->id,
@@ -163,7 +161,7 @@ class GlobalSearchController extends Controller
                     'title' => $r->name,
                     'subtitle' => "Type: {$r->type}",
                     'meta' => "Available: {$r->quantity_available} units · " . ($r->condition ?: 'Normal'),
-                    'status' => $r->condition ?: 'Available',
+                    'status' => $statusText,
                     'status_class' => $statusClass,
                     'url' => route('resources.show', $r),
                 ];

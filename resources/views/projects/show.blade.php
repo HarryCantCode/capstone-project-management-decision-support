@@ -171,9 +171,15 @@
                         <span class="badge font-mono" style="background: var(--color-surface-alt); font-size: 0.75rem; font-weight: 600;">{{ $project->files->count() }}</span>
                     </div>
                     @can('update', $project)
-                        <button type="button" class="btn btn-primary btn-sm" @click="uploadFileModalOpen = true" style="white-space: nowrap; font-size: 0.75rem; padding: 4px 10px;">
-                            + Upload File
-                        </button>
+                        @if ($project->trashed())
+                            <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap; font-size: 0.75rem; padding: 4px 10px;" title="Cannot upload files to an archived project">
+                                + Upload File
+                            </button>
+                        @else
+                            <button type="button" class="btn btn-primary btn-sm" @click="uploadFileModalOpen = true" style="white-space: nowrap; font-size: 0.75rem; padding: 4px 10px;">
+                                + Upload File
+                            </button>
+                        @endif
                     @endcan
                 </div>
                 <div class="card-body" style="padding: var(--space-3) var(--space-4);">
@@ -351,14 +357,27 @@
                 @endif
 
                 @can('update', $project)
-                    <button
-                        type="button"
-                        class="btn btn-primary btn-sm"
-                        @click="createMajorTaskModalOpen = true"
-                        id="btn-add-major-task"
-                    >
-                        + Add Major Task
-                    </button>
+                    @if ($project->trashed())
+                        <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            disabled
+                            style="opacity: 0.6; cursor: not-allowed;"
+                            title="Cannot add major tasks to an archived project"
+                            id="btn-add-major-task"
+                        >
+                            + Add Major Task
+                        </button>
+                    @else
+                        <button
+                            type="button"
+                            class="btn btn-primary btn-sm"
+                            @click="createMajorTaskModalOpen = true"
+                            id="btn-add-major-task"
+                        >
+                            + Add Major Task
+                        </button>
+                    @endif
                 @endcan
 
                 @if ($tasks->isNotEmpty())
@@ -413,9 +432,15 @@
                     </p>
                     @can('update', $project)
                         <div style="display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap;">
-                            <button type="button" class="btn btn-primary" @click="createMajorTaskModalOpen = true" id="btn-add-first-major-task">
-                                + Add First Major Task
-                            </button>
+                            @if ($project->trashed())
+                                <button type="button" class="btn btn-secondary" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot add tasks to an archived project" id="btn-add-first-major-task">
+                                    + Add First Major Task
+                                </button>
+                            @else
+                                <button type="button" class="btn btn-primary" @click="createMajorTaskModalOpen = true" id="btn-add-first-major-task">
+                                    + Add First Major Task
+                                </button>
+                            @endif
                         </div>
                     @endcan
                 </div>
@@ -520,29 +545,31 @@
                                 </div>
 
                                 @can('update', $project)
-                                    <div style="display: flex; gap: var(--space-2); align-items: center;">
-                                        <button 
-                                            type="button" 
-                                            class="btn btn-secondary btn-sm"
-                                            @click="openEditTaskModal({{ json_encode($task) }})"
-                                            id="btn-edit-major-task-{{ $task->id }}"
-                                        >
-                                            ✎ Edit Major Task
-                                        </button>
-                                        
-                                        <form 
-                                            method="POST" 
-                                            action="{{ route('projects.tasks.destroy', [$project, $task]) }}" 
-                                            class="inline-form"
-                                            onsubmit="return confirm('Delete this major task and all its sub tasks? This action cannot be undone.');"
-                                        >
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;" id="btn-delete-major-task-{{ $task->id }}">
-                                                🗑 Delete
+                                    @if (!$project->trashed())
+                                        <div style="display: flex; gap: var(--space-2); align-items: center;">
+                                            <button 
+                                                type="button" 
+                                                class="btn btn-secondary btn-sm"
+                                                @click="openEditTaskModal({{ json_encode($task) }})"
+                                                id="btn-edit-major-task-{{ $task->id }}"
+                                            >
+                                                ✎ Edit Major Task
                                             </button>
-                                        </form>
-                                    </div>
+                                            
+                                            <form 
+                                                method="POST" 
+                                                action="{{ route('projects.tasks.destroy', [$project, $task]) }}" 
+                                                class="inline-form"
+                                                onsubmit="return confirm('Delete this major task and all its sub tasks? This action cannot be undone.');"
+                                            >
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;" id="btn-delete-major-task-{{ $task->id }}">
+                                                    🗑 Delete
+                                                </button>
+                                            </form>
+                                        </div>
+                                    @endif
                                 @endcan
                             </div>
 
@@ -576,14 +603,15 @@
                                                 style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); background: var(--color-surface); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); transition: background 0.15s ease;"
                                                 id="subtask-row-{{ $subtask->id }}"
                                             >
-                                                <label style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: pointer;">
+                                                <label style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: {{ $project->trashed() ? 'not-allowed' : 'pointer' }};">
                                                     <input 
                                                         type="checkbox" 
                                                         class="subtask-checkbox subtask-check-{{ $subtask->id }}"
                                                         id="subtask-check-{{ $subtask->id }}"
                                                         {{ $subtask->is_completed ? 'checked' : '' }}
+                                                        {{ $project->trashed() ? 'disabled' : '' }}
                                                         @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
-                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: pointer;"
+                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ $project->trashed() ? 'not-allowed' : 'pointer' }};"
                                                     >
                                                     <span 
                                                         class="subtask-title-{{ $subtask->id }}"
@@ -604,7 +632,7 @@
                                                     <button 
                                                         type="button" 
                                                         class="btn-icon" 
-                                                        title="Upload or view files for this sub task ({{ $subtask->files->count() }} attached)"
+                                                        title="{{ $project->trashed() ? 'View files for this sub task (' . $subtask->files->count() . ' attached)' : 'Upload or view files for this sub task (' . $subtask->files->count() . ' attached)' }}"
                                                         @click="openSubtaskUploadModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', {{ json_encode($subtask->files->map(fn($f) => ['id' => $f->id, 'name' => $f->file_name, 'size' => $f->formatted_size, 'url' => route('projects.files.download', [$project, $f]), 'is_img' => $f->is_image, 'is_pdf' => $f->is_pdf, 'is_word' => $f->is_word])) }})"
                                                         style="background: none; border: none; cursor: pointer; color: {{ $subtask->files->isNotEmpty() ? 'var(--color-primary)' : 'var(--color-muted)' }}; padding: 4px; border-radius: var(--radius-sm); position: relative;"
                                                         id="btn-files-subtask-{{ $subtask->id }}"
@@ -618,39 +646,41 @@
                                                     </button>
 
                                                     @can('update', $project)
-                                                        <button 
-                                                            type="button" 
-                                                            class="btn-icon" 
-                                                            title="Edit Sub Task"
-                                                            @click="openEditSubtaskModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', '{{ $subtask->due_date ? $subtask->due_date->format('Y-m-d') : '' }}', '{{ $task->start_date->format('Y-m-d') }}', '{{ $task->end_date->format('Y-m-d') }}')"
-                                                            style="background: none; border: none; cursor: pointer; color: var(--color-muted); padding: 4px; border-radius: var(--radius-sm);"
-                                                            id="btn-edit-subtask-{{ $subtask->id }}"
-                                                        >
-                                                            <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor">
-                                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                                            </svg>
-                                                        </button>
-
-                                                        <form 
-                                                            method="POST" 
-                                                            action="{{ route('projects.tasks.subtasks.destroy', [$project, $task, $subtask]) }}"
-                                                            onsubmit="return confirm('Delete this specific sub task?');"
-                                                            class="inline-form"
-                                                        >
-                                                            @csrf
-                                                            @method('DELETE')
+                                                        @if (!$project->trashed())
                                                             <button 
-                                                                type="submit" 
+                                                                type="button" 
                                                                 class="btn-icon" 
-                                                                title="Delete Sub Task"
-                                                                style="background: none; border: none; cursor: pointer; color: var(--color-danger); padding: 4px; border-radius: var(--radius-sm);"
-                                                                id="btn-delete-subtask-{{ $subtask->id }}"
+                                                                title="Edit Sub Task"
+                                                                @click="openEditSubtaskModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', '{{ $subtask->due_date ? $subtask->due_date->format('Y-m-d') : '' }}', '{{ $task->start_date->format('Y-m-d') }}', '{{ $task->end_date->format('Y-m-d') }}')"
+                                                                style="background: none; border: none; cursor: pointer; color: var(--color-muted); padding: 4px; border-radius: var(--radius-sm);"
+                                                                id="btn-edit-subtask-{{ $subtask->id }}"
                                                             >
                                                                 <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor">
-                                                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                                                                 </svg>
                                                             </button>
-                                                        </form>
+
+                                                            <form 
+                                                                method="POST" 
+                                                                action="{{ route('projects.tasks.subtasks.destroy', [$project, $task, $subtask]) }}" 
+                                                                onsubmit="return confirm('Delete this specific sub task?');" 
+                                                                class="inline-form"
+                                                            >
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button 
+                                                                    type="submit" 
+                                                                    class="btn-icon" 
+                                                                    title="Delete Sub Task"
+                                                                    style="background: none; border: none; cursor: pointer; color: var(--color-danger); padding: 4px; border-radius: var(--radius-sm);"
+                                                                    id="btn-delete-subtask-{{ $subtask->id }}"
+                                                                >
+                                                                    <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor">
+                                                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                                                    </svg>
+                                                                </button>
+                                                            </form>
+                                                        @endif
                                                     @endcan
                                                 </div>
                                             </li>
@@ -660,37 +690,52 @@
 
                                 {{-- Quick Add Sub Task Form --}}
                                 @can('update', $project)
-                                    <form 
-                                        method="POST" 
-                                        action="{{ route('projects.tasks.subtasks.store', [$project, $task]) }}" 
-                                        style="display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap;"
-                                    >
-                                        @csrf
-                                        <input 
-                                            type="text" 
-                                            name="title" 
-                                            placeholder="+ Add a specific sub task for Week {{ $taskIndex + 1 }}..." 
-                                            required 
-                                            class="form-control form-control--compact" 
-                                            style="flex: 2; min-width: 220px;"
-                                        >
-                                        <div style="display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap;">
-                                            <label class="form-hint" style="margin-bottom: 0; font-size: 0.75rem; white-space: nowrap;">Target Date (Week: {{ $task->start_date->format('M j') }}–{{ $task->end_date->format('M j') }}):</label>
+                                    @if ($project->trashed())
+                                        <div style="display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap;">
                                             <input 
-                                                type="date" 
-                                                name="due_date" 
+                                                type="text" 
+                                                placeholder="+ Add a specific sub task for Week {{ $taskIndex + 1 }}..." 
+                                                disabled 
                                                 class="form-control form-control--compact" 
-                                                style="width: 150px;"
-                                                value="{{ $task->start_date->format('Y-m-d') }}"
-                                                min="{{ $task->start_date->format('Y-m-d') }}"
-                                                max="{{ $task->end_date->format('Y-m-d') }}"
-                                                title="Allowed dates: {{ $task->start_date->format('M j, Y') }} to {{ $task->end_date->format('M j, Y') }}"
+                                                style="flex: 2; min-width: 220px; opacity: 0.6; cursor: not-allowed;"
                                             >
+                                            <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot add sub tasks to an archived project">
+                                                + Add Sub Task
+                                            </button>
                                         </div>
-                                        <button type="submit" class="btn btn-primary btn-sm">
-                                            + Add Sub Task
-                                        </button>
-                                    </form>
+                                    @else
+                                        <form 
+                                            method="POST" 
+                                            action="{{ route('projects.tasks.subtasks.store', [$project, $task]) }}" 
+                                            style="display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap;"
+                                        >
+                                            @csrf
+                                            <input 
+                                                type="text" 
+                                                name="title" 
+                                                placeholder="+ Add a specific sub task for Week {{ $taskIndex + 1 }}..." 
+                                                required 
+                                                class="form-control form-control--compact" 
+                                                style="flex: 2; min-width: 220px;"
+                                            >
+                                            <div style="display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap;">
+                                                <label class="form-hint" style="margin-bottom: 0; font-size: 0.75rem; white-space: nowrap;">Target Date (Week: {{ $task->start_date->format('M j') }}–{{ $task->end_date->format('M j') }}):</label>
+                                                <input 
+                                                    type="date" 
+                                                    name="due_date" 
+                                                    class="form-control form-control--compact" 
+                                                    style="width: 150px;"
+                                                    value="{{ $task->start_date->format('Y-m-d') }}"
+                                                    min="{{ $task->start_date->format('Y-m-d') }}"
+                                                    max="{{ $task->end_date->format('Y-m-d') }}"
+                                                    title="Allowed dates: {{ $task->start_date->format('M j, Y') }} to {{ $task->end_date->format('M j, Y') }}"
+                                                >
+                                            </div>
+                                            <button type="submit" class="btn btn-primary btn-sm">
+                                                + Add Sub Task
+                                            </button>
+                                        </form>
+                                    @endif
                                 @endcan
                             </div>
                         </div>
@@ -771,13 +816,14 @@
                                                 <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-1); padding: 0; margin-bottom: 0;">
                                                     @foreach ($task->subtasks as $subtask)
                                                         <li style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: 0.8125rem;">
-                                                            <label style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: pointer; flex: 1;">
+                                                            <label style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: {{ $project->trashed() ? 'not-allowed' : 'pointer' }}; flex: 1;">
                                                                 <input 
                                                                     type="checkbox" 
                                                                     class="subtask-checkbox subtask-check-{{ $subtask->id }}"
                                                                     {{ $subtask->is_completed ? 'checked' : '' }}
+                                                                    {{ $project->trashed() ? 'disabled' : '' }}
                                                                     @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
-                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: pointer;"
+                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ $project->trashed() ? 'not-allowed' : 'pointer' }};"
                                                                 >
                                                                 <span 
                                                                     class="subtask-title-{{ $subtask->id }}"
@@ -834,9 +880,15 @@
                     Full Breakdown ↗
                 </a>
                 @can('update', $project)
-                    <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true" style="white-space: nowrap;">
-                        + Log New Expense / Cost
-                    </button>
+                    @if ($project->trashed())
+                        <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap;" title="Cannot log expenses on an archived project">
+                            + Log New Expense / Cost
+                        </button>
+                    @else
+                        <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true" style="white-space: nowrap;">
+                            + Log New Expense / Cost
+                        </button>
+                    @endif
                 @endcan
             </div>
         </div>
@@ -852,9 +904,15 @@
                         Manually type down what each cost is for (materials, labor, equipment rental, permits) to keep an accurate spend ledger.
                     </p>
                     @can('update', $project)
-                        <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
-                            + Log First Cost Entry
-                        </button>
+                        @if ($project->trashed())
+                            <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot log expenses on an archived project">
+                                + Log First Cost Entry
+                            </button>
+                        @else
+                            <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
+                                + Log First Cost Entry
+                            </button>
+                        @endif
                     @endcan
                 </div>
             </div>
@@ -900,13 +958,15 @@
                                 <td>{{ $cost->creator ? $cost->creator->name : 'System' }}</td>
                                 <td class="text-right">
                                     @can('update', $project)
-                                        <form method="POST" action="{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Remove this cost entry?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
-                                                Delete
-                                            </button>
-                                        </form>
+                                        @if (!$project->trashed())
+                                            <form method="POST" action="{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Remove this cost entry?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        @endif
                                     @endcan
                                 </td>
                             </tr>
@@ -945,9 +1005,15 @@
             </div>
             @if ($project->status !== 'completed')
                 @can('update', $project)
-                    <button type="button" class="btn btn-primary btn-sm" @click="assignModalOpen = true" id="btn-assign-personnel">
-                        + Assign Personnel
-                    </button>
+                    @if ($project->trashed())
+                        <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot assign personnel to an archived project" id="btn-assign-personnel">
+                            + Assign Personnel
+                        </button>
+                    @else
+                        <button type="button" class="btn btn-primary btn-sm" @click="assignModalOpen = true" id="btn-assign-personnel">
+                            + Assign Personnel
+                        </button>
+                    @endif
                 @endcan
             @endif
         </div>
@@ -1032,9 +1098,15 @@
                             Assign field workers, engineers, and foremen to track project manpower.
                         </p>
                         @can('update', $project)
-                            <button type="button" class="btn btn-primary btn-sm" @click="assignModalOpen = true">
-                                + Assign First Worker
-                            </button>
+                            @if ($project->trashed())
+                                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot assign manpower to an archived project">
+                                    + Assign First Worker
+                                </button>
+                            @else
+                                <button type="button" class="btn btn-primary btn-sm" @click="assignModalOpen = true">
+                                    + Assign First Worker
+                                </button>
+                            @endif
                         @endcan
                     </div>
                 </div>
@@ -1072,12 +1144,14 @@
                                     </td>
                                     <td class="text-right">
                                         @can('update', $project)
-                                            <form method="POST" action="{{ route('projects.unassign-personnel', ['project' => $project, 'personnel' => $person]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Are you sure you want to unassign {{ $person->full_name }} from this project?');">
-                                                @csrf
-                                                <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
-                                                    Unassign
-                                                </button>
-                                            </form>
+                                            @if (!$project->trashed())
+                                                <form method="POST" action="{{ route('projects.unassign-personnel', ['project' => $project, 'personnel' => $person]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Are you sure you want to unassign {{ $person->full_name }} from this project?');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
+                                                        Unassign
+                                                    </button>
+                                                </form>
+                                            @endif
                                         @endcan
                                     </td>
                                 </tr>
@@ -1143,7 +1217,7 @@
                 <span>Add Cost Entry to Project</span>
                 <button type="button" class="flash-close" @click="addCostModalOpen = false" aria-label="Close modal">&times;</button>
             </div>
-            <form action="{{ route('projects.costs.store', $project) }}" method="POST">
+            <form action="{{ route('projects.costs.store', $project) }}" method="POST" @submit="if (!validateCostSubmission($event)) { $event.preventDefault(); }">
                 @csrf
                 <input type="hidden" name="resource_id" :value="selectedMaterialId || ''">
                 <div class="card-body">
@@ -1203,6 +1277,9 @@
                                                 <span style="font-weight: 600; color: var(--color-ink);" x-text="item.name"></span>
                                             </div>
                                             <div x-show="item.model" class="text-muted" style="font-size: 0.75rem; line-height: 1.3;" x-text="'Model / Spec: ' + item.model"></div>
+                                            <div style="font-size: 0.72rem; color: var(--color-muted);">
+                                                Available: <span class="font-mono font-bold" :class="item.quantity_available > 0 ? 'text-success' : 'text-danger'" x-text="item.quantity_available"></span> units
+                                            </div>
                                         </div>
                                         <div style="text-align: right; flex-shrink: 0;">
                                             <div class="font-mono text-success" style="font-weight: 700; font-size: 0.875rem;">
@@ -1220,17 +1297,27 @@
 
                         <div x-show="selectedMaterialId" x-cloak style="margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--color-border); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); font-size: 0.8125rem;">
                             <div>
-                                <label for="material_qty_input" class="form-label" style="font-size: 0.75rem; margin-bottom: 4px;">Quantity (Cannot be 0)</label>
+                                <label for="material_qty_input" class="form-label" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 4px;">
+                                    <span>Quantity (Cannot be 0)</span>
+                                    <span style="font-weight: 600;" :class="isQuantityExcessive ? 'text-danger' : 'text-muted'">
+                                        Avail: <span class="font-mono" x-text="selectedMaterialStock"></span>
+                                    </span>
+                                </label>
                                 <input
                                     type="number"
                                     id="material_qty_input"
                                     min="1"
+                                    :max="selectedMaterialStock"
                                     step="1"
                                     class="form-control font-mono"
+                                    :style="isQuantityExcessive ? 'border-color: #ef4444; background: #fff5f5;' : ''"
                                     x-model.number="materialQuantity"
                                     @input="recalculateMaterialTotal()"
                                     placeholder="Qty"
                                 >
+                                <p x-show="isQuantityExcessive" class="text-danger" style="font-size: 0.72rem; margin-top: 4px; margin-bottom: 0;">
+                                    Quantity exceeds available stock (<span x-text="selectedMaterialStock"></span>)!
+                                </p>
                             </div>
                             <div>
                                 <label class="form-label" style="font-size: 0.75rem; margin-bottom: 4px;">Unit Price</label>
@@ -2024,37 +2111,50 @@
 
                 {{-- Upload New Attachment Form --}}
                 @can('update', $project)
-                    <div style="border-top: 1px solid var(--color-border); padding-top: var(--space-3);">
-                        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-2);">
-                            + Upload New Attachment
-                        </div>
-                        <form :action="activeSubtaskData.uploadUrl" method="POST" enctype="multipart/form-data">
-                            @csrf
-                            <div class="form-group form-group-premium" style="margin-bottom: var(--space-3);">
-                                <input
-                                    type="file"
-                                    name="file"
-                                    class="form-control"
-                                    accept=".pdf,.doc,.docx,image/*"
-                                    required
-                                >
-                                <p class="form-hint" style="margin-top: 4px;">PDF, DOCX, or Images up to 20MB.</p>
+                    @if ($project->trashed())
+                        <div style="border-top: 1px solid var(--color-border); padding-top: var(--space-3);">
+                            <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-2);">
+                                Attach File (Archived)
                             </div>
-                            <div class="form-group form-group-premium" style="margin-bottom: var(--space-3);">
-                                <input
-                                    type="text"
-                                    name="description"
-                                    class="form-control"
-                                    maxlength="255"
-                                    placeholder="Description / note (e.g. Approved Permit Certificate)"
-                                >
-                            </div>
+                            <p class="text-muted" style="font-size: 0.8125rem; margin-bottom: var(--space-3);">New attachments cannot be uploaded to an archived project.</p>
                             <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
                                 <button type="button" class="btn btn-secondary" @click="subtaskFileModalOpen = false">Close</button>
-                                <button type="submit" class="btn btn-primary btn-sm">Attach File</button>
+                                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot upload files to an archived project">Attach File</button>
                             </div>
-                        </form>
-                    </div>
+                        </div>
+                    @else
+                        <div style="border-top: 1px solid var(--color-border); padding-top: var(--space-3);">
+                            <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-2);">
+                                + Upload New Attachment
+                            </div>
+                            <form :action="activeSubtaskData.uploadUrl" method="POST" enctype="multipart/form-data">
+                                @csrf
+                                <div class="form-group form-group-premium" style="margin-bottom: var(--space-3);">
+                                    <input
+                                        type="file"
+                                        name="file"
+                                        class="form-control"
+                                        accept=".pdf,.doc,.docx,image/*"
+                                        required
+                                    >
+                                    <p class="form-hint" style="margin-top: 4px;">PDF, DOCX, or Images up to 20MB.</p>
+                                </div>
+                                <div class="form-group form-group-premium" style="margin-bottom: var(--space-3);">
+                                    <input
+                                        type="text"
+                                        name="description"
+                                        class="form-control"
+                                        maxlength="255"
+                                        placeholder="Description / note (e.g. Approved Permit Certificate)"
+                                    >
+                                </div>
+                                <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                                    <button type="button" class="btn btn-secondary" @click="subtaskFileModalOpen = false">Close</button>
+                                    <button type="submit" class="btn btn-primary btn-sm">Attach File</button>
+                                </div>
+                            </form>
+                        </div>
+                    @endif
                 @endcan
             </div>
         </div>
@@ -2340,10 +2440,35 @@ function projectDetail() {
                 name: @js($mat->name),
                 resource_code: @js($mat->resource_code),
                 model: @js($mat->model ?? ''),
-                price: {{ (float) ($mat->price > 0 ? $mat->price : $mat->unit_cost) }}
+                price: {{ (float) ($mat->price > 0 ? $mat->price : $mat->unit_cost) }},
+                quantity_available: {{ (int) $mat->quantity_available }}
             },
             @endforeach
         ],
+        get selectedMaterial() {
+            if (!this.selectedMaterialId) return null;
+            return this.catalogMaterialsList.find(item => item.id == this.selectedMaterialId) || null;
+        },
+        get selectedMaterialStock() {
+            return this.selectedMaterial ? (this.selectedMaterial.quantity_available || 0) : 0;
+        },
+        get isQuantityExcessive() {
+            if (!this.selectedMaterialId || !this.selectedMaterial) return false;
+            const qty = parseInt(this.materialQuantity, 10) || 0;
+            return qty > this.selectedMaterialStock;
+        },
+        validateCostSubmission(e) {
+            if (this.selectedMaterialId && this.isQuantityExcessive) {
+                const stock = this.selectedMaterialStock;
+                const matName = this.selectedMaterial ? this.selectedMaterial.name : 'material';
+                const msg = `Quantity entered (${this.materialQuantity}) exceeds available stock (${stock}) for ${matName}. Please adjust before proceeding.`;
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: { type: 'error', title: 'Excessive Quantity', message: msg, duration: 6000 }
+                }));
+                return false;
+            }
+            return true;
+        },
         get filteredMaterials() {
             if (!this.materialSearch) {
                 return this.catalogMaterialsList;
@@ -2383,6 +2508,19 @@ function projectDetail() {
                 this.materialQuantity = qty;
                 const total = (qty * this.materialUnitPrice).toFixed(2);
                 this.costForm.amount = total;
+
+                if (this.isQuantityExcessive) {
+                    const stock = this.selectedMaterialStock;
+                    const matName = this.selectedMaterial ? this.selectedMaterial.name : 'material';
+                    window.dispatchEvent(new CustomEvent('show-toast', {
+                        detail: {
+                            type: 'warning',
+                            title: 'Quantity Exceeds Available Stock',
+                            message: `Requested ${qty} units of "${matName}", but only ${stock} units are currently available.`,
+                            duration: 5000
+                        }
+                    }));
+                }
             }
         },
         activeFileData: {

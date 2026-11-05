@@ -732,103 +732,192 @@
             </header>
 
             {{-- Global Toast Notifications (Centered auto-dismissing floating alert) --}}
-            @if (session('status') || session('success') || session('error') || session('warning'))
-                <div
-                    style="position: fixed; top: 1.5rem; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; z-index: 99999; pointer-events: none; padding: 0 1rem;"
-                    role="region"
-                    aria-label="Notification alerts"
-                >
-                    @if (session('status') || session('success'))
-                        <div
-                            x-data="{ show: true }"
-                            x-show="show"
-                            x-init="setTimeout(() => show = false, 5000)"
-                            x-transition.duration.300ms
-                            style="pointer-events: auto; width: 100%; max-width: 440px;"
-                            role="status"
-                            aria-live="polite"
-                        >
-                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #064e3b; color: #ecfdf5; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #059669;">
-                                <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #10b981; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
-                                    &#10003;
-                                </span>
-                                <div style="flex: 1;">
-                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Success</div>
-                                    <div style="font-size: 0.85rem; color: #d1fae5; line-height: 1.4;">{{ session('status') ?? session('success') }}</div>
-                                </div>
-                                <button
-                                    type="button"
-                                    @click="show = false"
-                                    style="background: transparent; border: none; color: #a7f3d0; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
-                                    aria-label="Close notification"
-                                >
-                                    &times;
-                                </button>
+            <div
+                x-data="{
+                    toasts: [],
+                    add(toast) {
+                        const id = Date.now() + Math.random();
+                        const t = {
+                            id,
+                            type: toast.type || 'info',
+                            title: toast.title || (toast.type === 'error' ? 'Error' : (toast.type === 'warning' ? 'Notice' : 'Notification')),
+                            message: toast.message || ''
+                        };
+                        this.toasts.push(t);
+                        setTimeout(() => this.remove(id), toast.duration || 6000);
+                    },
+                    remove(id) {
+                        this.toasts = this.toasts.filter(t => t.id !== id);
+                    }
+                }"
+                @show-toast.window="add($event.detail)"
+                style="position: fixed; top: 1.5rem; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; z-index: 99999; pointer-events: none; padding: 0 1rem;"
+                role="region"
+                aria-label="Notification alerts"
+            >
+                @if (session('status') || session('success'))
+                    <div
+                        x-data="{ show: true }"
+                        x-show="show"
+                        x-init="setTimeout(() => show = false, 5000)"
+                        x-transition.duration.300ms
+                        style="pointer-events: auto; width: 100%; max-width: 440px;"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #064e3b; color: #ecfdf5; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #059669;">
+                            <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #10b981; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
+                                &#10003;
+                            </span>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Success</div>
+                                <div style="font-size: 0.85rem; color: #d1fae5; line-height: 1.4;">{{ session('status') ?? session('success') }}</div>
                             </div>
+                            <button
+                                type="button"
+                                @click="show = false"
+                                style="background: transparent; border: none; color: #a7f3d0; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
+                                aria-label="Close notification"
+                            >
+                                &times;
+                            </button>
                         </div>
-                    @endif
+                    </div>
+                @endif
 
-                    @if (session('error'))
-                        <div
-                            x-data="{ show: true }"
-                            x-show="show"
-                            x-init="setTimeout(() => show = false, 6000)"
-                            x-transition.duration.300ms
-                            style="pointer-events: auto; width: 100%; max-width: 440px;"
-                            role="alert"
-                            aria-live="assertive"
-                        >
-                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #7f1d1d; color: #fef2f2; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #dc2626;">
-                                <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #ef4444; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
-                                    &times;
-                                </span>
-                                <div style="flex: 1;">
-                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Error</div>
-                                    <div style="font-size: 0.85rem; color: #fee2e2; line-height: 1.4;">{{ session('error') }}</div>
-                                </div>
-                                <button
-                                    type="button"
-                                    @click="show = false"
-                                    style="background: transparent; border: none; color: #fca5a5; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
-                                    aria-label="Close notification"
-                                >
-                                    &times;
-                                </button>
+                @if (session('error'))
+                    <div
+                        x-data="{ show: true }"
+                        x-show="show"
+                        x-init="setTimeout(() => show = false, 6000)"
+                        x-transition.duration.300ms
+                        style="pointer-events: auto; width: 100%; max-width: 440px;"
+                        role="alert"
+                        aria-live="assertive"
+                    >
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #7f1d1d; color: #fef2f2; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #dc2626;">
+                            <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #ef4444; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
+                                &times;
+                            </span>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Error</div>
+                                <div style="font-size: 0.85rem; color: #fee2e2; line-height: 1.4;">{{ session('error') }}</div>
                             </div>
+                            <button
+                                type="button"
+                                @click="show = false"
+                                style="background: transparent; border: none; color: #fca5a5; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
+                                aria-label="Close notification"
+                            >
+                                &times;
+                            </button>
                         </div>
-                    @endif
+                    </div>
+                @endif
 
-                    @if (session('warning'))
-                        <div
-                            x-data="{ show: true }"
-                            x-show="show"
-                            x-init="setTimeout(() => show = false, 6000)"
-                            x-transition.duration.300ms
-                            style="pointer-events: auto; width: 100%; max-width: 440px;"
-                            role="alert"
-                            aria-live="polite"
-                        >
+                @if (session('warning'))
+                    <div
+                        x-data="{ show: true }"
+                        x-show="show"
+                        x-init="setTimeout(() => show = false, 6000)"
+                        x-transition.duration.300ms
+                        style="pointer-events: auto; width: 100%; max-width: 440px;"
+                        role="alert"
+                        aria-live="polite"
+                    >
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #78350f; color: #fffbeb; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #d97706;">
+                            <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #f59e0b; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
+                                !
+                            </span>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Notice</div>
+                                <div style="font-size: 0.85rem; color: #fef3c7; line-height: 1.4;">{{ session('warning') }}</div>
+                            </div>
+                            <button
+                                type="button"
+                                @click="show = false"
+                                style="background: transparent; border: none; color: #fde68a; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
+                                aria-label="Close notification"
+                            >
+                                &times;
+                            </button>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Dynamic Client-Side Toasts --}}
+                <template x-for="t in toasts" :key="t.id">
+                    <div
+                        x-transition.duration.300ms
+                        style="pointer-events: auto; width: 100%; max-width: 440px;"
+                        :role="t.type === 'error' ? 'alert' : 'status'"
+                        aria-live="polite"
+                    >
+                        {{-- Warning Toast --}}
+                        <template x-if="t.type === 'warning'">
                             <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #78350f; color: #fffbeb; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #d97706;">
                                 <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #f59e0b; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
                                     !
                                 </span>
                                 <div style="flex: 1;">
-                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Notice</div>
-                                    <div style="font-size: 0.85rem; color: #fef3c7; line-height: 1.4;">{{ session('warning') }}</div>
+                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;" x-text="t.title || 'Notice'"></div>
+                                    <div style="font-size: 0.85rem; color: #fef3c7; line-height: 1.4;" x-text="t.message"></div>
                                 </div>
                                 <button
                                     type="button"
-                                    @click="show = false"
+                                    @click="remove(t.id)"
                                     style="background: transparent; border: none; color: #fde68a; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
                                     aria-label="Close notification"
                                 >
                                     &times;
                                 </button>
                             </div>
-                        </div>
-                    @endif
-                </div>
-            @endif
+                        </template>
+
+                        {{-- Error Toast --}}
+                        <template x-if="t.type === 'error'">
+                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #7f1d1d; color: #fef2f2; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #dc2626;">
+                                <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #ef4444; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
+                                    &times;
+                                </span>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;" x-text="t.title || 'Error'"></div>
+                                    <div style="font-size: 0.85rem; color: #fee2e2; line-height: 1.4;" x-text="t.message"></div>
+                                </div>
+                                <button
+                                    type="button"
+                                    @click="remove(t.id)"
+                                    style="background: transparent; border: none; color: #fca5a5; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
+                                    aria-label="Close notification"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        </template>
+
+                        {{-- Success Toast --}}
+                        <template x-if="t.type === 'success' || t.type === 'status'">
+                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #064e3b; color: #ecfdf5; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #059669;">
+                                <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #10b981; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
+                                    &#10003;
+                                </span>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;" x-text="t.title || 'Success'"></div>
+                                    <div style="font-size: 0.85rem; color: #d1fae5; line-height: 1.4;" x-text="t.message"></div>
+                                </div>
+                                <button
+                                    type="button"
+                                    @click="remove(t.id)"
+                                    style="background: transparent; border: none; color: #a7f3d0; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
+                                    aria-label="Close notification"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
 
             {{-- Page content --}}
             <main id="main-content" class="app-content" tabindex="-1">

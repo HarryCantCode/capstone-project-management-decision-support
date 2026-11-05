@@ -122,6 +122,15 @@ class Project extends \Illuminate\Database\Eloquent\Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Project create/archive/restore changes "assigned" manpower counts.
+        $flush = fn () => cache()->forget('dashboard.stats.global');
+        static::saved($flush);
+        static::deleted($flush);
+        static::restored($flush);
+    }
+
     // ─── Accessors & Helpers ──────────────────────────────────────────────────
 
     /**

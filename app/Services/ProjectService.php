@@ -267,10 +267,16 @@ class ProjectService
                 'updated_by' => $user->id,
             ]);
 
-            // If selected from catalog, deduct stock and record in ResourceAllocation history
+            // If selected from catalog, validate stock, deduct stock and record in ResourceAllocation history
             if ($resourceId) {
                 $resource = \App\Models\Resource::query()->lockForUpdate()->find($resourceId);
                 if ($resource) {
+                    if ($qty > $resource->quantity_available) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'quantity' => ["The requested quantity ({$qty}) exceeds the available quantity ({$resource->quantity_available}) for {$resource->name}."],
+                        ]);
+                    }
+
                     $newQty = max(0, $resource->quantity_available - $qty);
                     $resource->update([
                         'quantity_available' => $newQty,
