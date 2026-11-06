@@ -982,7 +982,7 @@
                     {{-- Right: Direct Quick-Select Exporter --}}
                     <div style="background: var(--color-surface-alt); padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border);">
                         <label for="quick-project-select" class="form-label" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 6px;">
-                            Quick Project PDF Generator
+                            Generate customized project data template
                         </label>
                         <div class="reports-filter-group">
                             <select id="quick-project-select" x-model="quickProjectId" class="form-control form-control--compact reports-select" style="flex: 1 1 180px; max-width: 100%;">

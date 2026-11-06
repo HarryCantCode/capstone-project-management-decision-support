@@ -34,6 +34,33 @@
     </script>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        [data-theme="dark"] .form-control,
+        [data-theme="dark"] .form-group-premium .form-control {
+            background-color: #0E1522 !important;
+            border-color: #243042;
+            color: #F1F5F9 !important;
+            color-scheme: dark;
+        }
+        [data-theme="dark"] .form-control:focus,
+        [data-theme="dark"] .form-group-premium .form-control:focus {
+            background-color: #0E1522 !important;
+            color: #F1F5F9 !important;
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+        }
+        [data-theme="dark"] .form-control:-webkit-autofill,
+        [data-theme="dark"] .form-control:-webkit-autofill:hover,
+        [data-theme="dark"] .form-control:-webkit-autofill:focus,
+        [data-theme="dark"] .form-group-premium .form-control:-webkit-autofill,
+        [data-theme="dark"] .form-group-premium .form-control:-webkit-autofill:hover,
+        [data-theme="dark"] .form-group-premium .form-control:-webkit-autofill:focus {
+            -webkit-text-fill-color: #F1F5F9 !important;
+            -webkit-box-shadow: 0 0 0 1000px #0E1522 inset !important;
+            transition: background-color 5000s ease-in-out 0s;
+            caret-color: #F1F5F9;
+        }
+    </style>
     @stack('styles')
 </head>
 <body class="app-body" x-data="{

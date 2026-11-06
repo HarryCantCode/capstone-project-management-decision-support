@@ -439,9 +439,11 @@ class ProjectController extends Controller
             'resource_id' => ['nullable', 'exists:resources,id'],
             'description' => ['required', 'string', 'max:255'],
             'cost_type' => ['required', 'string', 'in:materials,equipment,labor,subcontractor,other'],
-            'amount' => ['required', 'numeric', 'min:0.01', 'max:999999999.99'],
+            'amount' => ['required', 'numeric', 'min:100', 'max:999999999.99'],
             'quantity' => ['nullable', 'integer', 'min:1'],
             'incurred_date' => ['nullable', 'date'],
+        ], [
+            'amount.min' => 'Expenditure amount cannot be less than ₱100.00.',
         ]);
 
         if (!empty($validated['resource_id'])) {

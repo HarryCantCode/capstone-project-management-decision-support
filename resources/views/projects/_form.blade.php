@@ -617,15 +617,15 @@
                         name="contract_price"
                         type="number"
                         step="0.01"
-                        min="0"
+                        min="100000"
                         class="form-control @error('contract_price') is-invalid @enderror font-mono"
                         style="padding-left: 32px;"
                         value="{{ old('contract_price', isset($project) ? $project->contract_price : '') }}"
                         required
-                        placeholder="0.00"
+                        placeholder="100,000.00"
                     >
                 </div>
-                <p class="form-hint">Total agreed budget projected onto Project Costing.</p>
+                <p class="form-hint">Total agreed budget projected onto Project Costing (minimum ₱100,000.00).</p>
                 @error('contract_price')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
             </div>
 

@@ -373,12 +373,12 @@
 
                         <div class="form-group-premium">
                             <label for="add_price" class="form-label" style="font-weight: 600; font-size: 0.8125rem;">Price (PHP) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="add_price" name="price" class="form-control font-mono" min="0" placeholder="0.00" required>
+                            <input type="number" step="0.01" id="add_price" name="price" class="form-control font-mono" min="100" placeholder="100.00" required>
                         </div>
 
                         <div class="form-group-premium">
                             <label for="add_unit_cost" class="form-label" style="font-weight: 600; font-size: 0.8125rem;">Unit Cost (PHP) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="add_unit_cost" name="unit_cost" class="form-control font-mono" min="0" placeholder="0.00" required>
+                            <input type="number" step="0.01" id="add_unit_cost" name="unit_cost" class="form-control font-mono" min="100" placeholder="100.00" required>
                         </div>
                     </div>
 
@@ -472,12 +472,12 @@
 
                         <div class="form-group-premium">
                             <label for="edit_price" class="form-label" style="font-weight: 600; font-size: 0.8125rem;">Price (PHP) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="edit_price" name="price" class="form-control font-mono" min="0" x-model="editForm.price" required>
+                            <input type="number" step="0.01" id="edit_price" name="price" class="form-control font-mono" min="100" x-model="editForm.price" required>
                         </div>
 
                         <div class="form-group-premium">
                             <label for="edit_unit_cost" class="form-label" style="font-weight: 600; font-size: 0.8125rem;">Unit Cost (PHP) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="edit_unit_cost" name="unit_cost" class="form-control font-mono" min="0" x-model="editForm.unit_cost" required>
+                            <input type="number" step="0.01" id="edit_unit_cost" name="unit_cost" class="form-control font-mono" min="100" x-model="editForm.unit_cost" required>
                         </div>
                     </div>
 

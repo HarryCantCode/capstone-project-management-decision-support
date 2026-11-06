@@ -118,13 +118,14 @@
                 </a>
             </li>
             <li>
-                <span class="nav-link nav-link--disabled" aria-disabled="true" title="Coming Soon">
+                <a href="{{ route('decision-support.index') }}"
+                   class="nav-link {{ request()->routeIs('decision-support.*') ? 'nav-link--active' : '' }}"
+                   aria-current="{{ request()->routeIs('decision-support.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M11 3a1 1 0 1 0-2 0v1a1 1 0 1 0 2 0V3zM15.657 5.757a1 1 0 0 0-1.414-1.414l-.707.707a1 1 0 0 0 1.414 1.414l.707-.707zM18 10a1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM5.05 6.464A1 1 0 1 0 6.464 5.05l-.707-.707a1 1 0 0 0-1.414 1.414l.707.707zM5 10a1 1 0 0 1-1 1H3a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM8 16v-1h4v1a2 2 0 1 1-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 1 0-4.954 0c.27.213.462.519.476.859h4.001z"/>
                     </svg>
-                    <span>Decision Support</span>
-                    <span class="nav-badge nav-badge--coming">Soon</span>
-                </span>
+                    Decision Support
+                </a>
             </li>
         </ul>
     </div>

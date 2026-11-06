@@ -438,7 +438,7 @@
                                     :max="selectedMaterialStock"
                                     step="1"
                                     class="form-control font-mono"
-                                    :style="isQuantityExcessive ? 'border-color: #ef4444; background: #fff5f5;' : ''"
+                                    :style="isQuantityExcessive ? 'border-color: var(--color-danger); background: var(--color-danger-light);' : ''"
                                     x-model.number="materialQuantity"
                                     @input="recalculateMaterialTotal()"
                                     placeholder="Qty"
@@ -522,18 +522,18 @@
                                 name="amount"
                                 type="number"
                                 step="0.01"
-                                min="0.01"
+                                min="100"
                                 class="form-control font-mono"
                                 style="padding-left: 32px;"
                                 x-model="costForm.amount"
                                 :readonly="Boolean(selectedMaterialId)"
                                 :style="selectedMaterialId ? 'background: var(--color-surface-alt); cursor: not-allowed;' : ''"
-                                placeholder="0.00"
+                                placeholder="100.00"
                                 required
                             >
                         </div>
-                        <p class="form-hint" x-show="selectedMaterialId">Calculated as Quantity &times; Unit Price (locked for catalog materials).</p>
-                        <p class="form-hint" x-show="!selectedMaterialId">This will automatically recalculate the actual spend and remaining balance for this project.</p>
+                        <p class="form-hint" x-show="selectedMaterialId">Calculated as Quantity &times; Unit Price (locked for catalog materials, minimum ₱100.00).</p>
+                        <p class="form-hint" x-show="!selectedMaterialId">This will automatically recalculate the actual spend and remaining balance for this project (minimum ₱100.00).</p>
                     </div>
                 </div>
                 <div class="card-footer">
@@ -589,6 +589,14 @@ function costingBreakdown() {
             return qty > this.selectedMaterialStock;
         },
         validateCostSubmission(e) {
+            const amt = parseFloat(this.costForm.amount);
+            if (isNaN(amt) || amt < 100) {
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: { type: 'error', title: 'Minimum Amount Required', message: 'Expenditure amount cannot be less than ₱100.00.', duration: 5000 }
+                }));
+                return false;
+            }
+
             if (this.selectedMaterialId && this.isQuantityExcessive) {
                 const stock = this.selectedMaterialStock;
                 const matName = this.selectedMaterial ? this.selectedMaterial.name : 'material';

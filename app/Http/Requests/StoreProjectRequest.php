@@ -93,7 +93,7 @@ class StoreProjectRequest extends FormRequest
                     }
                 },
             ],
-            'contract_price' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
+            'contract_price' => ['required', 'numeric', 'min:100000', 'max:999999999.99'],
         ];
     }
 
@@ -152,7 +152,7 @@ class StoreProjectRequest extends FormRequest
             'target_completion_date.after_or_equal' => 'Target completion date must be on or after the start date.',
             'contract_price.required' => 'Contract price is required.',
             'contract_price.numeric' => 'Contract price must be a valid number.',
-            'contract_price.min' => 'Contract price cannot be negative.',
+            'contract_price.min' => 'Contract price cannot be less than ₱100,000.',
         ];
     }
 }

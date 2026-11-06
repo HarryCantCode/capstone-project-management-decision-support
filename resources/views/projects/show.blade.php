@@ -25,6 +25,24 @@
     $projectOverallProgress = $totalSubtasksAcrossProject > 0
         ? (int) round(($completedSubtasksAcrossProject / $totalSubtasksAcrossProject) * 100)
         : ($project->status === 'completed' ? 100 : 0);
+
+    // Build initial subtask lock map for sequential dependency enforcement
+    $initialSubtaskLocks = [];
+    $foundFirstUncompleted = false;
+    foreach ($tasks as $t) {
+        foreach ($t->subtasks as $st) {
+            if ($st->is_completed) {
+                $initialSubtaskLocks[$st->id] = false;
+            } else {
+                if (!$foundFirstUncompleted) {
+                    $initialSubtaskLocks[$st->id] = false;
+                    $foundFirstUncompleted = true;
+                } else {
+                    $initialSubtaskLocks[$st->id] = true;
+                }
+            }
+        }
+    }
 @endphp
 
 @section('content')
@@ -613,23 +631,35 @@
                                 @else
                                     <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-2); padding: 0; margin-bottom: var(--space-4);">
                                         @foreach ($task->subtasks as $subtask)
+                                            @php
+                                                $isSubtaskLocked = $initialSubtaskLocks[$subtask->id] ?? false;
+                                            @endphp
                                             <li 
                                                 style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); background: var(--color-surface); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); transition: background 0.15s ease;"
+                                                :class="{ 'subtask-row-locked': !!subtaskLocks[{{ $subtask->id }}] }"
                                                 id="subtask-row-{{ $subtask->id }}"
                                             >
-                                                <label style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: {{ $project->trashed() ? 'not-allowed' : 'pointer' }};">
+                                                <label 
+                                                    style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
+                                                    :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
+                                                    :title="subtaskLocks[{{ $subtask->id }}] ? 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task' : ''"
+                                                >
                                                     <input 
                                                         type="checkbox" 
                                                         class="subtask-checkbox subtask-check-{{ $subtask->id }}"
                                                         id="subtask-check-{{ $subtask->id }}"
                                                         {{ $subtask->is_completed ? 'checked' : '' }}
-                                                        {{ $project->trashed() ? 'disabled' : '' }}
+                                                        {{ ($project->trashed() || $isSubtaskLocked) ? 'disabled' : '' }}
+                                                        :disabled="{{ $project->trashed() ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
                                                         @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
-                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ $project->trashed() ? 'not-allowed' : 'pointer' }};"
+                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
+                                                        :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important; opacity: 0.45; filter: grayscale(100%);' : ''"
+                                                        :title="subtaskLocks[{{ $subtask->id }}] ? 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task' : ''"
                                                     >
                                                     <span 
                                                         class="subtask-title-{{ $subtask->id }}"
                                                         style="font-size: 0.875rem; {{ $subtask->is_completed ? 'text-decoration: line-through; color: var(--color-muted);' : 'color: var(--color-ink); font-weight: 500;' }}"
+                                                        :style="subtaskLocks[{{ $subtask->id }}] ? 'color: var(--color-muted) !important;' : ''"
                                                     >
                                                         {{ $subtask->title }}
                                                     </span>
@@ -829,19 +859,35 @@
                                                 </span>
                                                 <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-1); padding: 0; margin-bottom: 0;">
                                                     @foreach ($task->subtasks as $subtask)
-                                                        <li style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: 0.8125rem;">
-                                                            <label style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: {{ $project->trashed() ? 'not-allowed' : 'pointer' }}; flex: 1;">
+                                                        @php
+                                                            $isSubtaskLocked = $initialSubtaskLocks[$subtask->id] ?? false;
+                                                        @endphp
+                                                        <li 
+                                                            style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: 0.8125rem;"
+                                                            :class="{ 'subtask-row-locked': !!subtaskLocks[{{ $subtask->id }}] }"
+                                                            id="expanded-subtask-row-{{ $subtask->id }}"
+                                                        >
+                                                            <label 
+                                                                style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }}; flex: 1;"
+                                                                :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
+                                                                :title="subtaskLocks[{{ $subtask->id }}] ? 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task' : ''"
+                                                            >
                                                                 <input 
                                                                     type="checkbox" 
                                                                     class="subtask-checkbox subtask-check-{{ $subtask->id }}"
+                                                                    id="expanded-subtask-check-{{ $subtask->id }}"
                                                                     {{ $subtask->is_completed ? 'checked' : '' }}
-                                                                    {{ $project->trashed() ? 'disabled' : '' }}
+                                                                    {{ ($project->trashed() || $isSubtaskLocked) ? 'disabled' : '' }}
+                                                                    :disabled="{{ $project->trashed() ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
                                                                     @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
-                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ $project->trashed() ? 'not-allowed' : 'pointer' }};"
+                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
+                                                                    :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important; opacity: 0.45; filter: grayscale(100%);' : ''"
+                                                                    :title="subtaskLocks[{{ $subtask->id }}] ? 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task' : ''"
                                                                 >
                                                                 <span 
                                                                     class="subtask-title-{{ $subtask->id }}"
                                                                     style="{{ $subtask->is_completed ? 'text-decoration: line-through; color: var(--color-muted);' : 'color: var(--color-ink);' }}"
+                                                                    :style="subtaskLocks[{{ $subtask->id }}] ? 'color: var(--color-muted) !important;' : ''"
                                                                 >
                                                                     {{ $subtask->title }}
                                                                 </span>
@@ -1324,7 +1370,7 @@
                                     :max="selectedMaterialStock"
                                     step="1"
                                     class="form-control font-mono"
-                                    :style="isQuantityExcessive ? 'border-color: #ef4444; background: #fff5f5;' : ''"
+                                    :style="isQuantityExcessive ? 'border-color: var(--color-danger); background: var(--color-danger-light);' : ''"
                                     x-model.number="materialQuantity"
                                     @input="recalculateMaterialTotal()"
                                     placeholder="Qty"
@@ -1408,18 +1454,18 @@
                                 name="amount"
                                 type="number"
                                 step="0.01"
-                                min="0.01"
+                                min="100"
                                 class="form-control font-mono"
                                 style="padding-left: 32px;"
                                 x-model="costForm.amount"
                                 :readonly="Boolean(selectedMaterialId)"
                                 :style="selectedMaterialId ? 'background: var(--color-surface-alt); cursor: not-allowed;' : ''"
-                                placeholder="0.00"
+                                placeholder="100.00"
                                 required
                             >
                         </div>
-                        <p class="form-hint" x-show="selectedMaterialId">Calculated as Quantity &times; Unit Price (locked for catalog materials).</p>
-                        <p class="form-hint" x-show="!selectedMaterialId">This will be added to the project's actual spend and reflected in Costing.</p>
+                        <p class="form-hint" x-show="selectedMaterialId">Calculated as Quantity &times; Unit Price (locked for catalog materials, minimum ₱100.00).</p>
+                        <p class="form-hint" x-show="!selectedMaterialId">This will be added to the project's actual spend and reflected in Costing (minimum ₱100.00).</p>
                     </div>
                 </div>
                 <div class="card-footer">
@@ -2406,6 +2452,27 @@
     flex-shrink: 0 !important;
     white-space: nowrap !important;
 }
+
+/* ─── Disabled / Locked Subtask Styles ───────────────────────────────── */
+.subtask-checkbox:disabled {
+    opacity: 0.45;
+    cursor: not-allowed !important;
+    filter: grayscale(100%);
+}
+
+.subtask-row-locked {
+    opacity: 0.6;
+    background: var(--color-surface-alt) !important;
+    border-style: dashed !important;
+}
+
+.subtask-row-locked label {
+    cursor: not-allowed !important;
+}
+
+.subtask-row-locked span[class*="subtask-title-"] {
+    color: var(--color-muted) !important;
+}
 </style>
 @endpush
 
@@ -2472,6 +2539,14 @@ function projectDetail() {
             return qty > this.selectedMaterialStock;
         },
         validateCostSubmission(e) {
+            const amt = parseFloat(this.costForm.amount);
+            if (isNaN(amt) || amt < 100) {
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: { type: 'error', title: 'Minimum Amount Required', message: 'Expenditure amount cannot be less than ₱100.00.', duration: 5000 }
+                }));
+                return false;
+            }
+
             if (this.selectedMaterialId && this.isQuantityExcessive) {
                 const stock = this.selectedMaterialStock;
                 const matName = this.selectedMaterial ? this.selectedMaterial.name : 'material';
@@ -2561,6 +2636,7 @@ function projectDetail() {
             uploadUrl: ''
         },
         activeTaskId: {{ $project->tasks->first()?->id ?? 'null' }},
+        subtaskLocks: @js($initialSubtaskLocks),
         initialSubtasks: [{ title: '', due_date: '{{ $defaultStartDate->format('Y-m-d') }}' }],
         editingTask: {
             id: null,
@@ -2812,6 +2888,23 @@ function projectDetail() {
                     if (data.prompt_completion) {
                         this.markCompletedModalOpen = true;
                     }
+
+                    // 8. Update subtaskLocks map so succeeding checkboxes unlock or lock sequentially
+                    if (data.subtask_locks) {
+                        this.subtaskLocks = data.subtask_locks;
+                    }
+                } else if (data.message) {
+                    if (checkboxEl) {
+                        checkboxEl.checked = !checkboxEl.checked;
+                    }
+                    window.dispatchEvent(new CustomEvent('show-toast', {
+                        detail: {
+                            type: 'warning',
+                            title: 'Sequential Task Progression',
+                            message: data.message,
+                            duration: 5000
+                        }
+                    }));
                 }
             })
             .catch(err => {

@@ -2915,15 +2915,32 @@ input::-ms-clear {
     border-top-color: var(--color-border);
 }
 
-[data-theme="dark"] .form-control {
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-group-premium .form-control {
     background: #0E1522;
     border-color: #243042;
     color: #F1F5F9;
+    color-scheme: dark;
 }
 
-[data-theme="dark"] .form-control:focus {
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .form-group-premium .form-control:focus {
+    background: #0E1522;
+    color: #F1F5F9;
     border-color: var(--color-accent);
     box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+
+[data-theme="dark"] .form-control:-webkit-autofill,
+[data-theme="dark"] .form-control:-webkit-autofill:hover,
+[data-theme="dark"] .form-control:-webkit-autofill:focus,
+[data-theme="dark"] .form-group-premium .form-control:-webkit-autofill,
+[data-theme="dark"] .form-group-premium .form-control:-webkit-autofill:hover,
+[data-theme="dark"] .form-group-premium .form-control:-webkit-autofill:focus {
+    -webkit-text-fill-color: #F1F5F9;
+    -webkit-box-shadow: 0 0 0 1000px #0E1522 inset !important;
+    transition: background-color 5000s ease-in-out 0s;
+    caret-color: #F1F5F9;
 }
 
 [data-theme="dark"] select.form-control option {

@@ -621,7 +621,7 @@
                         <span class="section-title">Financials &amp; Budget</span>
                     </td>
                     <td class="section-meta">
-                        Health: {{ $financials['costing_status'] }} · Payment: {{ $financials['payment_status'] }} · Without Taxes
+                        Health: {{ $financials['costing_status'] }} · Payment: {{ $financials['payment_status'] }}
                     </td>
                 </tr>
             </table>
@@ -631,7 +631,7 @@
         <table class="fin-kpi-table">
             <tr>
                 <td class="fin-kpi-card">
-                    <div class="fin-kpi-label">Contract Price (Without Taxes)</div>
+                    <div class="fin-kpi-label">Contract Price</div>
                     <div class="fin-kpi-val mono text-success">&#8369;{{ number_format($financials['contract_price'], 2) }}</div>
                 </td>
                 <td class="fin-kpi-card">
@@ -678,7 +678,7 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td>Total Project Spend vs. Contract Budget (Without Taxes)</td>
+                    <td>Total Project Spend vs. Contract Budget</td>
                     <td class="text-center mono">{{ $costs->count() }} entries</td>
                     <td class="text-right mono">&#8369;{{ number_format($financials['actual_spend'], 2) }}</td>
                     <td class="text-right mono">{{ number_format($financials['spend_percentage'], 1) }}% of Contract</td>

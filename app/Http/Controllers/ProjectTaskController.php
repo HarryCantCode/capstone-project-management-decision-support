@@ -308,6 +308,57 @@ class ProjectTaskController extends Controller
         abort_if($task->project_id !== $project->id || $subtask->project_task_id !== $task->id, 404);
 
         $newCompleted = ! $subtask->is_completed;
+
+        // If ticking to complete: verify sequential prerequisites across tasks and subtasks
+        if ($newCompleted) {
+            $sortedTasks = $project->tasks()->with(['subtasks' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')])
+                ->orderBy('sort_order')
+                ->orderBy('start_date')
+                ->orderBy('id')
+                ->get();
+
+            $currentTaskIndex = $sortedTasks->search(fn ($t) => $t->id === $task->id);
+
+            // 1. All previous major tasks must have all their subtasks completed
+            if ($currentTaskIndex > 0) {
+                for ($i = 0; $i < $currentTaskIndex; $i++) {
+                    $prevTask = $sortedTasks[$i];
+                    $hasUncompletedInPrev = $prevTask->subtasks->contains(fn ($st) => ! $st->is_completed);
+                    if ($hasUncompletedInPrev) {
+                        $msg = 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task';
+                        if ($request->wantsJson() || $request->ajax()) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => $msg,
+                            ], 422);
+                        }
+
+                        return back()->withErrors(['subtask' => $msg]);
+                    }
+                }
+            }
+
+            // 2. In the current major task, all previous subtasks before this one must be completed
+            $currentSubtasks = $task->subtasks()->orderBy('sort_order')->orderBy('id')->get();
+            $currentSubtaskIndex = $currentSubtasks->search(fn ($st) => $st->id === $subtask->id);
+
+            if ($currentSubtaskIndex > 0) {
+                for ($j = 0; $j < $currentSubtaskIndex; $j++) {
+                    if (! $currentSubtasks[$j]->is_completed) {
+                        $msg = 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task';
+                        if ($request->wantsJson() || $request->ajax()) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => $msg,
+                            ], 422);
+                        }
+
+                        return back()->withErrors(['subtask' => $msg]);
+                    }
+                }
+            }
+        }
+
         $subtask->update([
             'is_completed' => $newCompleted,
             'completed_at' => $newCompleted ? now() : null,
@@ -439,6 +490,29 @@ class ProjectTaskController extends Controller
         }
 
         if ($request->wantsJson() || $request->ajax()) {
+            $tasksForLock = $project->tasks()->with(['subtasks' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')])
+                ->orderBy('sort_order')
+                ->orderBy('start_date')
+                ->orderBy('id')
+                ->get();
+
+            $subtaskLockMap = [];
+            $foundFirstUncompleted = false;
+            foreach ($tasksForLock as $stask) {
+                foreach ($stask->subtasks as $st) {
+                    if ($st->is_completed) {
+                        $subtaskLockMap[$st->id] = false;
+                    } else {
+                        if (! $foundFirstUncompleted) {
+                            $subtaskLockMap[$st->id] = false;
+                            $foundFirstUncompleted = true;
+                        } else {
+                            $subtaskLockMap[$st->id] = true;
+                        }
+                    }
+                }
+            }
+
             $responsePayload = [
                 'success' => true,
                 'is_completed' => $subtask->is_completed,
@@ -452,6 +526,7 @@ class ProjectTaskController extends Controller
                 'project_status' => $projectStatus,
                 'project_status_label' => $projectStatusLabel,
                 'prompt_completion' => $promptCompletion,
+                'subtask_locks' => $subtaskLockMap,
                 'audit_entry' => [
                     'date_time' => $history->changed_at->format('M j, Y · g:i A'),
                     'status' => $projectStatus,

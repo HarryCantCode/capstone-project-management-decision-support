@@ -21,8 +21,8 @@ class StoreResourceRequest extends FormRequest
             'type' => ['nullable', 'string', 'in:material,tool,equipment'],
             'model' => ['nullable', 'string', 'max:255'],
             'quantity_available' => ['required', 'integer', 'min:0', 'max:999999'],
-            'price' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
-            'unit_cost' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
+            'price' => ['required', 'numeric', 'min:100', 'max:999999999.99'],
+            'unit_cost' => ['required', 'numeric', 'min:100', 'max:999999999.99'],
             'demand_status' => ['required', 'string', 'in:fast-moving,slow-moving'],
             'description' => ['nullable', 'string', 'max:2000'],
         ];
@@ -42,8 +42,10 @@ class StoreResourceRequest extends FormRequest
             'quantity_available.min' => 'Quantity cannot be negative.',
             'price.required' => 'Price is required.',
             'price.numeric' => 'Price must be a valid amount.',
+            'price.min' => 'Price cannot be less than ₱100.00.',
             'unit_cost.required' => 'Unit cost is required.',
             'unit_cost.numeric' => 'Unit cost must be a valid amount.',
+            'unit_cost.min' => 'Unit cost cannot be less than ₱100.00.',
             'demand_status.required' => 'Demand status is required.',
             'demand_status.in' => 'Demand status must be either fast-moving or slow-moving.',
         ];
