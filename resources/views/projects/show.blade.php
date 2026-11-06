@@ -27,19 +27,31 @@
         : ($project->status === 'completed' ? 100 : 0);
 
     // Build initial subtask lock map for sequential dependency enforcement
+    // 1. Forward lock: an uncompleted subtask is locked if any previous subtask is uncompleted.
+    // 2. Reverse lock: a completed subtask is locked from being unchecked if any subsequent subtask is completed.
+    $orderedSubtasks = $tasks->flatMap(fn ($t) => $t->subtasks)->values();
     $initialSubtaskLocks = [];
+    $initialSubtaskCompleted = [];
     $foundFirstUncompleted = false;
-    foreach ($tasks as $t) {
-        foreach ($t->subtasks as $st) {
-            if ($st->is_completed) {
-                $initialSubtaskLocks[$st->id] = false;
-            } else {
-                if (!$foundFirstUncompleted) {
-                    $initialSubtaskLocks[$st->id] = false;
-                    $foundFirstUncompleted = true;
-                } else {
-                    $initialSubtaskLocks[$st->id] = true;
+    $totalOrderedSubtasks = $orderedSubtasks->count();
+
+    foreach ($orderedSubtasks as $idx => $st) {
+        $initialSubtaskCompleted[$st->id] = (bool) $st->is_completed;
+        if ($st->is_completed) {
+            $hasCompletedAfter = false;
+            for ($k = $idx + 1; $k < $totalOrderedSubtasks; $k++) {
+                if ($orderedSubtasks[$k]->is_completed) {
+                    $hasCompletedAfter = true;
+                    break;
                 }
+            }
+            $initialSubtaskLocks[$st->id] = $hasCompletedAfter;
+        } else {
+            if (!$foundFirstUncompleted) {
+                $initialSubtaskLocks[$st->id] = false;
+                $foundFirstUncompleted = true;
+            } else {
+                $initialSubtaskLocks[$st->id] = true;
             }
         }
     }
@@ -510,7 +522,7 @@
                                 <div 
                                     class="timeline-stage-card card" 
                                     :class="{ 'timeline-stage-card--active': activeTaskId === {{ $task->id }} }"
-                                    @click="activeTaskId = {{ $task->id }}"
+                                    @click="activeTaskId = {{ $task->id }}; checklistMinimized = false"
                                     style="cursor: pointer;"
                                     id="card-task-{{ $task->id }}"
                                 >
@@ -555,7 +567,7 @@
 
                     {{-- Selected Major Task Details & Sub Tasks Checklist --}}
                     @foreach ($tasks as $taskIndex => $task)
-                        <div x-show="activeTaskId === {{ $task->id }}" x-cloak style="margin-top: var(--space-6); background: var(--color-surface-alt); padding: var(--space-5); border-radius: var(--radius-lg); border: 1px solid var(--color-border);" id="task-detail-{{ $task->id }}">
+                        <div x-show="activeTaskId === {{ $task->id }} && !checklistMinimized" x-cloak style="margin-top: var(--space-6); background: var(--color-surface-alt); padding: var(--space-5); border-radius: var(--radius-lg); border: 1px solid var(--color-border);" id="task-detail-{{ $task->id }}">
                             
                             {{-- Header row with week title, dates, and actions --}}
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3);">
@@ -576,9 +588,20 @@
                                     </span>
                                 </div>
 
-                                @can('update', $project)
-                                    @if (!$project->trashed())
-                                        <div style="display: flex; gap: var(--space-2); align-items: center;">
+                                <div style="display: flex; gap: var(--space-2); align-items: center;">
+                                    <button 
+                                        type="button" 
+                                        class="btn btn-secondary btn-sm"
+                                        @click="checklistMinimized = true"
+                                        title="Minimize checklist section"
+                                        id="btn-minimize-checklist-{{ $task->id }}"
+                                        style="display: inline-flex; align-items: center; gap: 4px;"
+                                    >
+                                        − Minimize
+                                    </button>
+
+                                    @can('update', $project)
+                                        @if (!$project->trashed())
                                             <button 
                                                 type="button" 
                                                 class="btn btn-secondary btn-sm"
@@ -600,9 +623,9 @@
                                                     🗑 Delete
                                                 </button>
                                             </form>
-                                        </div>
-                                    @endif
-                                @endcan
+                                        @endif
+                                    @endcan
+                                </div>
                             </div>
 
                             @if ($task->description)
@@ -636,30 +659,49 @@
                                             @endphp
                                             <li 
                                                 style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); background: var(--color-surface); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); transition: background 0.15s ease;"
-                                                :class="{ 'subtask-row-locked': !!subtaskLocks[{{ $subtask->id }}] }"
+                                                :class="{ 
+                                                    'subtask-row-locked': !!subtaskLocks[{{ $subtask->id }}],
+                                                    'subtask-row-forward-locked': !!subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}]
+                                                }"
                                                 id="subtask-row-{{ $subtask->id }}"
+                                                x-data="{ showLockedTooltip: false }"
+                                                class="dex-tooltip-wrap"
+                                                @mouseleave="showLockedTooltip = false"
                                             >
+                                                {{-- Floating Brand-Orange Tooltip on Hover when untickable --}}
+                                                <div 
+                                                    x-show="showLockedTooltip && !!subtaskLocks[{{ $subtask->id }}]"
+                                                    x-cloak
+                                                    class="dex-tooltip-bubble"
+                                                >
+                                                    <span x-text="subtaskCompleted[{{ $subtask->id }}] ? 'You cannot uncheck your previous task unless you uncheck the task that comes after it.' : 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task.'"></span>
+                                                </div>
+
                                                 <label 
                                                     style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
                                                     :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
-                                                    :title="subtaskLocks[{{ $subtask->id }}] ? 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task' : ''"
+                                                    @mouseenter="if (subtaskLocks[{{ $subtask->id }}]) showLockedTooltip = true"
+                                                    @click="if (subtaskLocks[{{ $subtask->id }}]) showLockedTooltip = true"
                                                 >
                                                     <input 
                                                         type="checkbox" 
                                                         class="subtask-checkbox subtask-check-{{ $subtask->id }}"
+                                                        :class="{
+                                                            'is-forward-locked': !!subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}],
+                                                            'is-reverse-locked': !!subtaskLocks[{{ $subtask->id }}] && !!subtaskCompleted[{{ $subtask->id }}]
+                                                        }"
                                                         id="subtask-check-{{ $subtask->id }}"
                                                         {{ $subtask->is_completed ? 'checked' : '' }}
                                                         {{ ($project->trashed() || $isSubtaskLocked) ? 'disabled' : '' }}
                                                         :disabled="{{ $project->trashed() ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
                                                         @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
                                                         style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
-                                                        :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important; opacity: 0.45; filter: grayscale(100%);' : ''"
-                                                        :title="subtaskLocks[{{ $subtask->id }}] ? 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task' : ''"
+                                                        :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
                                                     >
                                                     <span 
                                                         class="subtask-title-{{ $subtask->id }}"
                                                         style="font-size: 0.875rem; {{ $subtask->is_completed ? 'text-decoration: line-through; color: var(--color-muted);' : 'color: var(--color-ink); font-weight: 500;' }}"
-                                                        :style="subtaskLocks[{{ $subtask->id }}] ? 'color: var(--color-muted) !important;' : ''"
+                                                        :style="(subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}]) ? 'color: var(--color-muted) !important;' : ''"
                                                     >
                                                         {{ $subtask->title }}
                                                     </span>
@@ -864,30 +906,49 @@
                                                         @endphp
                                                         <li 
                                                             style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: 0.8125rem;"
-                                                            :class="{ 'subtask-row-locked': !!subtaskLocks[{{ $subtask->id }}] }"
+                                                            :class="{ 
+                                                                'subtask-row-locked': !!subtaskLocks[{{ $subtask->id }}],
+                                                                'subtask-row-forward-locked': !!subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}]
+                                                            }"
                                                             id="expanded-subtask-row-{{ $subtask->id }}"
+                                                            x-data="{ showExpandedLockedTooltip: false }"
+                                                            class="dex-tooltip-wrap"
+                                                            @mouseleave="showExpandedLockedTooltip = false"
                                                         >
+                                                            {{-- Floating Brand-Orange Tooltip on Hover when untickable --}}
+                                                            <div 
+                                                                x-show="showExpandedLockedTooltip && !!subtaskLocks[{{ $subtask->id }}]"
+                                                                x-cloak
+                                                                class="dex-tooltip-bubble"
+                                                            >
+                                                                <span x-text="subtaskCompleted[{{ $subtask->id }}] ? 'You cannot uncheck your previous task unless you uncheck the task that comes after it.' : 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task.'"></span>
+                                                            </div>
+
                                                             <label 
                                                                 style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }}; flex: 1;"
                                                                 :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
-                                                                :title="subtaskLocks[{{ $subtask->id }}] ? 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task' : ''"
+                                                                @mouseenter="if (subtaskLocks[{{ $subtask->id }}]) showExpandedLockedTooltip = true"
+                                                                @click="if (subtaskLocks[{{ $subtask->id }}]) showExpandedLockedTooltip = true"
                                                             >
                                                                 <input 
                                                                     type="checkbox" 
                                                                     class="subtask-checkbox subtask-check-{{ $subtask->id }}"
+                                                                    :class="{
+                                                                        'is-forward-locked': !!subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}],
+                                                                        'is-reverse-locked': !!subtaskLocks[{{ $subtask->id }}] && !!subtaskCompleted[{{ $subtask->id }}]
+                                                                    }"
                                                                     id="expanded-subtask-check-{{ $subtask->id }}"
                                                                     {{ $subtask->is_completed ? 'checked' : '' }}
                                                                     {{ ($project->trashed() || $isSubtaskLocked) ? 'disabled' : '' }}
                                                                     :disabled="{{ $project->trashed() ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
                                                                     @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
                                                                     style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
-                                                                    :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important; opacity: 0.45; filter: grayscale(100%);' : ''"
-                                                                    :title="subtaskLocks[{{ $subtask->id }}] ? 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task' : ''"
+                                                                    :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
                                                                 >
                                                                 <span 
                                                                     class="subtask-title-{{ $subtask->id }}"
                                                                     style="{{ $subtask->is_completed ? 'text-decoration: line-through; color: var(--color-muted);' : 'color: var(--color-ink);' }}"
-                                                                    :style="subtaskLocks[{{ $subtask->id }}] ? 'color: var(--color-muted) !important;' : ''"
+                                                                    :style="(subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}]) ? 'color: var(--color-muted) !important;' : ''"
                                                                 >
                                                                     {{ $subtask->title }}
                                                                 </span>
@@ -2455,23 +2516,84 @@
 
 /* ─── Disabled / Locked Subtask Styles ───────────────────────────────── */
 .subtask-checkbox:disabled {
-    opacity: 0.45;
     cursor: not-allowed !important;
+}
+
+/* Only gray out uncompleted locked tasks (forward lock) */
+.subtask-checkbox.is-forward-locked:disabled {
+    opacity: 0.45;
     filter: grayscale(100%);
 }
 
+/* Completed locked tasks (reverse lock) retain normal check styling without being grayed out */
+.subtask-checkbox.is-reverse-locked:disabled {
+    opacity: 0.95;
+    filter: none;
+    accent-color: var(--color-success);
+}
+
 .subtask-row-locked {
-    opacity: 0.6;
     background: var(--color-surface-alt) !important;
     border-style: dashed !important;
+}
+
+.subtask-row-forward-locked {
+    opacity: 0.6;
 }
 
 .subtask-row-locked label {
     cursor: not-allowed !important;
 }
 
-.subtask-row-locked span[class*="subtask-title-"] {
+.subtask-row-forward-locked span[class*="subtask-title-"] {
     color: var(--color-muted) !important;
+}
+
+/* ─── Custom Floating Orange Tooltip ────────────────────────────────── */
+.dex-tooltip-wrap {
+    position: relative;
+}
+
+.dex-tooltip-bubble {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 28px;
+    z-index: 100;
+    pointer-events: none;
+    white-space: normal;
+    min-width: 260px;
+    max-width: 380px;
+    padding: 0.5rem 0.75rem;
+    background: #C98A2C; /* Brand Amber/Orange */
+    color: #FFFFFF;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.35;
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 14px rgba(201, 138, 44, 0.35), 0 2px 6px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    animation: dexTooltipFadeIn 0.15s ease-out;
+}
+
+.dex-tooltip-bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 18px;
+    border-width: 6px;
+    border-style: solid;
+    border-color: #C98A2C transparent transparent transparent;
+}
+
+@keyframes dexTooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 </style>
 @endpush
@@ -2491,6 +2613,7 @@ function projectDetail() {
                 const parsedId = parseInt(taskIdParam, 10);
                 if (!isNaN(parsedId)) {
                     this.activeTaskId = parsedId;
+                    this.checklistMinimized = false;
                 }
             }
         },
@@ -2636,7 +2759,9 @@ function projectDetail() {
             uploadUrl: ''
         },
         activeTaskId: {{ $project->tasks->first()?->id ?? 'null' }},
+        checklistMinimized: true,
         subtaskLocks: @js($initialSubtaskLocks),
+        subtaskCompleted: @js($initialSubtaskCompleted),
         initialSubtasks: [{ title: '', due_date: '{{ $defaultStartDate->format('Y-m-d') }}' }],
         editingTask: {
             id: null,
@@ -2892,6 +3017,11 @@ function projectDetail() {
                     // 8. Update subtaskLocks map so succeeding checkboxes unlock or lock sequentially
                     if (data.subtask_locks) {
                         this.subtaskLocks = data.subtask_locks;
+                    }
+                    if (data.subtask_completed) {
+                        this.subtaskCompleted = data.subtask_completed;
+                    } else {
+                        this.subtaskCompleted[subtaskId] = data.is_completed;
                     }
                 } else if (data.message) {
                     if (checkboxEl) {

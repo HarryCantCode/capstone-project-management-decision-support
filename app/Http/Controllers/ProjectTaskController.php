@@ -309,16 +309,18 @@ class ProjectTaskController extends Controller
 
         $newCompleted = ! $subtask->is_completed;
 
+        $sortedTasks = $project->tasks()->with(['subtasks' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')])
+            ->orderBy('sort_order')
+            ->orderBy('start_date')
+            ->orderBy('id')
+            ->get();
+
+        $currentTaskIndex = $sortedTasks->search(fn ($t) => $t->id === $task->id);
+        $currentSubtasks = $task->subtasks()->orderBy('sort_order')->orderBy('id')->get();
+        $currentSubtaskIndex = $currentSubtasks->search(fn ($st) => $st->id === $subtask->id);
+
         // If ticking to complete: verify sequential prerequisites across tasks and subtasks
         if ($newCompleted) {
-            $sortedTasks = $project->tasks()->with(['subtasks' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')])
-                ->orderBy('sort_order')
-                ->orderBy('start_date')
-                ->orderBy('id')
-                ->get();
-
-            $currentTaskIndex = $sortedTasks->search(fn ($t) => $t->id === $task->id);
-
             // 1. All previous major tasks must have all their subtasks completed
             if ($currentTaskIndex > 0) {
                 for ($i = 0; $i < $currentTaskIndex; $i++) {
@@ -339,9 +341,6 @@ class ProjectTaskController extends Controller
             }
 
             // 2. In the current major task, all previous subtasks before this one must be completed
-            $currentSubtasks = $task->subtasks()->orderBy('sort_order')->orderBy('id')->get();
-            $currentSubtaskIndex = $currentSubtasks->search(fn ($st) => $st->id === $subtask->id);
-
             if ($currentSubtaskIndex > 0) {
                 for ($j = 0; $j < $currentSubtaskIndex; $j++) {
                     if (! $currentSubtasks[$j]->is_completed) {
@@ -355,6 +354,36 @@ class ProjectTaskController extends Controller
 
                         return back()->withErrors(['subtask' => $msg]);
                     }
+                }
+            }
+        } else {
+            // If unticking: cannot uncheck a previous specific task if a subsequent specific task is still completed
+            for ($j = $currentSubtaskIndex + 1; $j < $currentSubtasks->count(); $j++) {
+                if ($currentSubtasks[$j]->is_completed) {
+                    $msg = 'You cannot uncheck your previous task unless you uncheck the task that comes after it.';
+                    if ($request->wantsJson() || $request->ajax()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => $msg,
+                        ], 422);
+                    }
+
+                    return back()->withErrors(['subtask' => $msg]);
+                }
+            }
+
+            for ($i = $currentTaskIndex + 1; $i < $sortedTasks->count(); $i++) {
+                $nextTask = $sortedTasks[$i];
+                if ($nextTask->subtasks->contains(fn ($st) => $st->is_completed)) {
+                    $msg = 'You cannot uncheck your previous task unless you uncheck the task that comes after it.';
+                    if ($request->wantsJson() || $request->ajax()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => $msg,
+                        ], 422);
+                    }
+
+                    return back()->withErrors(['subtask' => $msg]);
                 }
             }
         }
@@ -496,19 +525,29 @@ class ProjectTaskController extends Controller
                 ->orderBy('id')
                 ->get();
 
+            $orderedSubtasks = $tasksForLock->flatMap(fn ($t) => $t->subtasks)->values();
             $subtaskLockMap = [];
+            $subtaskCompletedMap = [];
             $foundFirstUncompleted = false;
-            foreach ($tasksForLock as $stask) {
-                foreach ($stask->subtasks as $st) {
-                    if ($st->is_completed) {
-                        $subtaskLockMap[$st->id] = false;
-                    } else {
-                        if (! $foundFirstUncompleted) {
-                            $subtaskLockMap[$st->id] = false;
-                            $foundFirstUncompleted = true;
-                        } else {
-                            $subtaskLockMap[$st->id] = true;
+            $totalOrderedSubtasks = $orderedSubtasks->count();
+
+            foreach ($orderedSubtasks as $idx => $st) {
+                $subtaskCompletedMap[$st->id] = (bool) $st->is_completed;
+                if ($st->is_completed) {
+                    $hasCompletedAfter = false;
+                    for ($k = $idx + 1; $k < $totalOrderedSubtasks; $k++) {
+                        if ($orderedSubtasks[$k]->is_completed) {
+                            $hasCompletedAfter = true;
+                            break;
                         }
+                    }
+                    $subtaskLockMap[$st->id] = $hasCompletedAfter;
+                } else {
+                    if (! $foundFirstUncompleted) {
+                        $subtaskLockMap[$st->id] = false;
+                        $foundFirstUncompleted = true;
+                    } else {
+                        $subtaskLockMap[$st->id] = true;
                     }
                 }
             }
@@ -527,6 +566,7 @@ class ProjectTaskController extends Controller
                 'project_status_label' => $projectStatusLabel,
                 'prompt_completion' => $promptCompletion,
                 'subtask_locks' => $subtaskLockMap,
+                'subtask_completed' => $subtaskCompletedMap,
                 'audit_entry' => [
                     'date_time' => $history->changed_at->format('M j, Y · g:i A'),
                     'status' => $projectStatus,
