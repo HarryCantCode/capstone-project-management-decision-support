@@ -112,6 +112,9 @@
 
                 const status = deficit > 0 ? 'critical' : (availNow < needed ? 'warning' : 'ok');
                 const coveragePct = needed > 0 ? Math.min(100, Math.round((effectiveAvail / needed) * 100)) : 100;
+                const rgFormula = freeByStart > 0
+                    ? `Gap = max(0, ${needed} Req − (${availNow} Avail + ${freeByStart} Free by Start)) = ${deficit}`
+                    : `Gap = max(0, ${needed} Req − ${availNow} Avail) = ${deficit}`;
 
                 roleGaps.push({
                     expertise,
@@ -121,7 +124,7 @@
                     deficit,
                     coverage_pct: coveragePct,
                     status,
-                    formula: `Gap = max(0, ${needed} Req − (${availNow} Avail + ${freeByStart} Free by Start)) = ${deficit}`
+                    formula: rgFormula
                 });
 
                 availNowList.slice(0, needed).forEach(cand => {
@@ -238,12 +241,13 @@
             const slip = Math.max(0, Math.min(365, parseInt(this.delaySlipDays || 0, 10)));
             const origDateStr = proj.schedule?.target_completion_date || proj.target_date;
             const origDateMs = Date.parse(origDateStr) || Date.now();
+            const origDateFormatted = new Date(origDateMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             const newDateObj = new Date(origDateMs + slip * 86400000);
             const newDateFormatted = newDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
             const assignedCrew = (proj.manpower?.assigned_crew || []).map(c => ({
                 ...c,
-                original_release: origDateStr,
+                original_release: origDateFormatted,
                 delayed_release: newDateFormatted,
                 slip_days: slip
             }));
@@ -284,7 +288,7 @@
                 slipDays: slip,
                 origDays,
                 slipRatioPct,
-                origTargetDate: origDateStr,
+                origTargetDate: origDateFormatted,
                 newTargetDate: newDateFormatted,
                 affectedCrew: assignedCrew,
                 downstreamProjects: downstream,
@@ -1192,7 +1196,7 @@
                                     <div>
                                         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; margin-bottom: 3px;">
                                             <strong x-text="rg.expertise"></strong>
-                                            <span class="font-mono" :style="{ color: statusColorHex(rg.status) }" x-text="`${rg.available_now} Avail + ${rg.free_by_start} Free / ${rg.required} Req`"></span>
+                                            <span class="font-mono" :style="{ color: statusColorHex(rg.status) }" x-text="rg.free_by_start > 0 ? `${rg.available_now} Avail + ${rg.free_by_start} Free / ${rg.required} Req` : `${rg.available_now} Avail / ${rg.required} Req`"></span>
                                         </div>
                                         <div class="dss-mini-meter-track" style="height: 10px;">
                                             <div class="dss-mini-meter-fill" :style="{ width: rg.coverage_pct + '%', background: statusColorHex(rg.status) }"></div>
@@ -1261,15 +1265,13 @@
                                 <button type="button" class="btn btn-secondary btn-sm dss-btn" @click="delaySlipDays = 14">+14d</button>
                                 <button type="button" class="btn btn-secondary btn-sm dss-btn" @click="delaySlipDays = 30">+30d</button>
                             </div>
-
-                            <div class="font-mono text-muted" style="font-size: 0.76rem;" x-text="`${delaySimResult.origTargetDate} → ${delaySimResult.newTargetDate}`"></div>
                         </div>
 
                         {{-- Visual Gantt-Style Timeline Shift Bar --}}
                         <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-bottom: 1.25rem;">
                             <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 6px;">
                                 <strong x-text="`${delaySimResult.project.project_code} Schedule Window + Simulated Slip`"></strong>
-                                <span class="font-mono font-bold text-danger" x-text="`+${delaySimResult.slipDays}d Extension (New End: ${delaySimResult.newTargetDate})`"></span>
+                                <span class="font-mono font-bold text-danger" x-text="`+${delaySimResult.slipDays}d Extension (New End: ${delaySimResult.newTargetDate} | Previous end date: ${delaySimResult.origTargetDate})`"></span>
                             </div>
                             <div style="display: flex; width: 100%; height: 18px; border-radius: 999px; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border);">
                                 <div :style="{ width: (100 - delaySimResult.slipRatioPct) + '%', background: '#2563EB' }" title="Original Planned Duration"></div>

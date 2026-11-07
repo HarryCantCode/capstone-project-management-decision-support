@@ -94,7 +94,7 @@
         projectSearch: '',
         projectStatus: '',
         projectScope: 'active',
-        quickProjectId: '{{ $projects->first()?->id ?? '' }}',
+        quickProjectId: '{{ request('project_id') ?: ($projects->first()?->id ?? '') }}',
         sections: {
             overview: true,
             financials: true,

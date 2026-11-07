@@ -34,6 +34,7 @@
     $initialSubtaskCompleted = [];
     $foundFirstUncompleted = false;
     $totalOrderedSubtasks = $orderedSubtasks->count();
+    $isProjectReadOnly = $project->trashed() || $project->status === 'completed';
 
     foreach ($orderedSubtasks as $idx => $st) {
         $initialSubtaskCompleted[$st->id] = (bool) $st->is_completed;
@@ -72,13 +73,13 @@
         <div class="page-actions">
             @can('view', $project)
                 <a
-                    href="{{ route('reports.project.pdf', $project) }}"
-                    class="btn btn-secondary"
+                    href="{{ route('reports.index', ['project_id' => $project->id]) }}"
+                    class="btn btn-primary btn-sm"
                     style="display: inline-flex; align-items: center; gap: 0.35rem;"
                     title="Export project overview, financials, elevator specs, expenditures, and manpower as PDF"
                     id="btn-export-project-pdf"
                 >
-                    <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M3 17a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1zm3.293-7.707a1 1 0 0 1 1.414 0L9 10.586V3a1 1 0 1 1 2 0v7.586l1.293-1.293a1 1 0 1 1 1.414 1.414l-3 3a1 1 0 0 1-1.414 0l-3-3a1 1 0 0 1 0-1.414z" clip-rule="evenodd"/>
                     </svg>
                     Export PDF
@@ -91,37 +92,73 @@
                         <button type="submit" class="btn btn-primary">Restore Project</button>
                     </form>
                 @endcan
-            @elseif ($project->status === 'completed')
-                @can('archive', $project)
-                    <form method="POST" action="{{ route('projects.archive', $project) }}" class="inline-form" onsubmit="return confirm('Move project {{ addslashes($project->name) }} to archived projects?');">
-                        @csrf
-                        <button type="submit" class="btn btn-secondary" style="color: var(--color-muted); border-color: var(--color-border);">
-                            Archive Project
-                        </button>
-                    </form>
-                @endcan
             @else
-                @can('transition', $project)
-                    <button type="button" class="btn btn-secondary" @click="markCompletedModalOpen = true" style="color: var(--color-success); border-color: var(--color-success);" id="btn-header-mark-completed">
-                        ✓ Mark as Completed
+                @can('update', $project)
+                    @if ($project->status === 'completed')
+                        {{-- Completed project: direct Edit Project link, no mark as completed, no x button --}}
+                        <a href="{{ route('projects.edit', $project) }}" class="btn btn-secondary" id="btn-header-edit-project">
+                            Edit Project
+                        </a>
+                    @else
+                        <div x-data="{ editingActionsOpen: false }" style="display: inline-flex; align-items: center; gap: var(--space-2);">
+                            {{-- Default state: Edit Project button --}}
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                x-show="!editingActionsOpen"
+                                @click="editingActionsOpen = true"
+                                id="btn-header-edit-project"
+                            >
+                                Edit Project
+                            </button>
+
+                            {{-- Expanded state when Edit Project is clicked --}}
+                            <div x-show="editingActionsOpen" x-cloak style="display: inline-flex; align-items: center; gap: var(--space-2);">
+                                @can('transition', $project)
+                                    <button
+                                        type="button"
+                                        class="btn btn-secondary"
+                                        @click="markCompletedModalOpen = true"
+                                        style="color: var(--color-success); border-color: var(--color-success);"
+                                        id="btn-header-mark-completed"
+                                    >
+                                        ✓ Mark as Completed
+                                    </button>
+                                @endcan
+
+                                <a href="{{ route('projects.edit', $project) }}" class="btn btn-secondary">
+                                    Edit Project
+                                </a>
+
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary"
+                                    style="padding: var(--space-2) var(--space-3); line-height: 1; font-weight: 700;"
+                                    @click="editingActionsOpen = false"
+                                    title="Cancel and hide actions"
+                                    aria-label="Cancel editing options"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                    @endif
+                @endcan
+                @cannot('update', $project)
+                    @if ($project->status !== 'completed')
+                        @can('transition', $project)
+                            <button type="button" class="btn btn-secondary" @click="markCompletedModalOpen = true" style="color: var(--color-success); border-color: var(--color-success);" id="btn-header-mark-completed">
+                                ✓ Mark as Completed
+                            </button>
+                        @endcan
+                    @endif
+                @endcannot
+                @can('archive', $project)
+                    <button type="button" class="btn btn-danger" @click="archiveModalOpen = true" id="btn-header-archive-project">
+                        Archive Project
                     </button>
                 @endcan
             @endif
-            @can('update', $project)
-                <a href="{{ route('projects.edit', $project) }}" class="btn btn-secondary">Edit Project</a>
-            @endcan
-            @can('delete', $project)
-                <div x-data="{ confirmingDeletion: false }">
-                    <button type="button" class="btn btn-danger" x-show="!confirmingDeletion" @click="confirmingDeletion = true">Delete Project</button>
-                    <form method="POST" action="{{ route('projects.destroy', $project) }}" x-show="confirmingDeletion" x-cloak class="inline-form">
-                        @csrf
-                        @method('DELETE')
-                        <span class="delete-confirmation">Delete this project?</span>
-                        <button type="submit" class="btn btn-danger btn-sm">Yes, Delete</button>
-                        <button type="button" class="btn btn-secondary btn-sm" @click="confirmingDeletion = false">Cancel</button>
-                    </form>
-                </div>
-            @endcan
         </div>
     </div>
 
@@ -215,8 +252,8 @@
                         <span class="badge font-mono" style="background: var(--color-surface-alt); font-size: 0.75rem; font-weight: 600;">{{ $project->files->count() }}</span>
                     </div>
                     @can('update', $project)
-                        @if ($project->trashed())
-                            <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap; font-size: 0.75rem; padding: 4px 10px;" title="Cannot upload files to an archived project">
+                        @if ($isProjectReadOnly)
+                            <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap; font-size: 0.75rem; padding: 4px 10px;" title="{{ $project->trashed() ? 'Cannot upload files to an archived project' : 'Cannot upload files to a completed project unless reactivated' }}">
                                 + Upload File
                             </button>
                         @else
@@ -401,13 +438,13 @@
                 @endif
 
                 @can('update', $project)
-                    @if ($project->trashed())
+                    @if ($isProjectReadOnly)
                         <button
                             type="button"
                             class="btn btn-secondary btn-sm"
                             disabled
                             style="opacity: 0.6; cursor: not-allowed;"
-                            title="Cannot add major tasks to an archived project"
+                            title="{{ $project->trashed() ? 'Cannot add major tasks to an archived project' : 'Cannot add major tasks to a completed project unless reactivated' }}"
                             id="btn-add-major-task"
                         >
                             + Add Major Task
@@ -476,8 +513,8 @@
                     </p>
                     @can('update', $project)
                         <div style="display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap;">
-                            @if ($project->trashed())
-                                <button type="button" class="btn btn-secondary" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot add tasks to an archived project" id="btn-add-first-major-task">
+                            @if ($isProjectReadOnly)
+                                <button type="button" class="btn btn-secondary" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot add tasks to an archived project' : 'Cannot add tasks to a completed project unless reactivated' }}" id="btn-add-first-major-task">
                                     + Add First Major Task
                                 </button>
                             @else
@@ -601,7 +638,7 @@
                                     </button>
 
                                     @can('update', $project)
-                                        @if (!$project->trashed())
+                                        @if (!$isProjectReadOnly)
                                             <button 
                                                 type="button" 
                                                 class="btn btn-secondary btn-sm"
@@ -678,7 +715,7 @@
                                                 </div>
 
                                                 <label 
-                                                    style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
+                                                    style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
                                                     :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
                                                     @mouseenter="if (subtaskLocks[{{ $subtask->id }}]) showLockedTooltip = true"
                                                     @click="if (subtaskLocks[{{ $subtask->id }}]) showLockedTooltip = true"
@@ -692,10 +729,10 @@
                                                         }"
                                                         id="subtask-check-{{ $subtask->id }}"
                                                         {{ $subtask->is_completed ? 'checked' : '' }}
-                                                        {{ ($project->trashed() || $isSubtaskLocked) ? 'disabled' : '' }}
-                                                        :disabled="{{ $project->trashed() ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
+                                                        {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'disabled' : '' }}
+                                                        :disabled="{{ $isProjectReadOnly ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
                                                         @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
-                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
+                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
                                                         :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
                                                     >
                                                     <span 
@@ -718,7 +755,7 @@
                                                     <button 
                                                         type="button" 
                                                         class="btn-icon" 
-                                                        title="{{ $project->trashed() ? 'View files for this sub task (' . $subtask->files->count() . ' attached)' : 'Upload or view files for this sub task (' . $subtask->files->count() . ' attached)' }}"
+                                                        title="{{ $isProjectReadOnly ? 'View files for this sub task (' . $subtask->files->count() . ' attached)' : 'Upload or view files for this sub task (' . $subtask->files->count() . ' attached)' }}"
                                                         @click="openSubtaskUploadModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', {{ json_encode($subtask->files->map(fn($f) => ['id' => $f->id, 'name' => $f->file_name, 'size' => $f->formatted_size, 'url' => route('projects.files.download', [$project, $f]), 'is_img' => $f->is_image, 'is_pdf' => $f->is_pdf, 'is_word' => $f->is_word])) }})"
                                                         style="background: none; border: none; cursor: pointer; color: {{ $subtask->files->isNotEmpty() ? 'var(--color-primary)' : 'var(--color-muted)' }}; padding: 4px; border-radius: var(--radius-sm); position: relative;"
                                                         id="btn-files-subtask-{{ $subtask->id }}"
@@ -732,7 +769,7 @@
                                                     </button>
 
                                                     @can('update', $project)
-                                                        @if (!$project->trashed())
+                                                        @if (!$isProjectReadOnly)
                                                             <button 
                                                                 type="button" 
                                                                 class="btn-icon" 
@@ -776,7 +813,7 @@
 
                                 {{-- Quick Add Sub Task Form --}}
                                 @can('update', $project)
-                                    @if ($project->trashed())
+                                    @if ($isProjectReadOnly)
                                         <div style="display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap;">
                                             <input 
                                                 type="text" 
@@ -785,7 +822,7 @@
                                                 class="form-control form-control--compact" 
                                                 style="flex: 2; min-width: 220px; opacity: 0.6; cursor: not-allowed;"
                                             >
-                                            <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot add sub tasks to an archived project">
+                                            <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot add sub tasks to an archived project' : 'Cannot add sub tasks to a completed project unless reactivated' }}">
                                                 + Add Sub Task
                                             </button>
                                         </div>
@@ -925,7 +962,7 @@
                                                             </div>
 
                                                             <label 
-                                                                style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }}; flex: 1;"
+                                                                style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }}; flex: 1;"
                                                                 :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
                                                                 @mouseenter="if (subtaskLocks[{{ $subtask->id }}]) showExpandedLockedTooltip = true"
                                                                 @click="if (subtaskLocks[{{ $subtask->id }}]) showExpandedLockedTooltip = true"
@@ -939,10 +976,10 @@
                                                                     }"
                                                                     id="expanded-subtask-check-{{ $subtask->id }}"
                                                                     {{ $subtask->is_completed ? 'checked' : '' }}
-                                                                    {{ ($project->trashed() || $isSubtaskLocked) ? 'disabled' : '' }}
-                                                                    :disabled="{{ $project->trashed() ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
+                                                                    {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'disabled' : '' }}
+                                                                    :disabled="{{ $isProjectReadOnly ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
                                                                     @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
-                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ ($project->trashed() || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
+                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
                                                                     :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
                                                                 >
                                                                 <span 
@@ -1001,8 +1038,8 @@
                     Full Breakdown ↗
                 </a>
                 @can('update', $project)
-                    @if ($project->trashed())
-                        <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap;" title="Cannot log expenses on an archived project">
+                    @if ($isProjectReadOnly)
+                        <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}">
                             + Log New Expense / Cost
                         </button>
                     @else
@@ -1025,8 +1062,8 @@
                         Manually type down what each cost is for (materials, labor, equipment rental, permits) to keep an accurate spend ledger.
                     </p>
                     @can('update', $project)
-                        @if ($project->trashed())
-                            <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot log expenses on an archived project">
+                        @if ($isProjectReadOnly)
+                            <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}">
                                 + Log First Cost Entry
                             </button>
                         @else
@@ -1079,7 +1116,7 @@
                                 <td>{{ $cost->creator ? $cost->creator->name : 'System' }}</td>
                                 <td class="text-right">
                                     @can('update', $project)
-                                        @if (!$project->trashed())
+                                        @if (!$isProjectReadOnly)
                                             <form method="POST" action="{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Remove this cost entry?');">
                                                 @csrf
                                                 @method('DELETE')
@@ -1265,7 +1302,7 @@
                                     </td>
                                     <td class="text-right">
                                         @can('update', $project)
-                                            @if (!$project->trashed())
+                                            @if (!$isProjectReadOnly)
                                                 <form method="POST" action="{{ route('projects.unassign-personnel', ['project' => $project, 'personnel' => $person]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Are you sure you want to unassign {{ $person->full_name }} from this project?');">
                                                     @csrf
                                                     <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
@@ -2001,7 +2038,7 @@
                 <input type="hidden" name="status" value="completed">
                 <div class="card-body" style="padding: var(--space-5);">
                     <p style="margin-top: 0; margin-bottom: var(--space-3); font-size: 0.9375rem; color: var(--color-ink);">
-                        All timeline checklist tasks and milestones for <strong>{{ $project->name }}</strong> have been finished (100% completion reached).
+                        All timeline, checklist, tasks, and milestones for <strong>{{ $project->name }}</strong> have been finished.
                     </p>
                     <div style="background: var(--color-surface-alt); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); margin-bottom: var(--space-4); font-size: 0.8125rem;">
                         <ul style="margin: 0; padding-left: var(--space-4); color: var(--color-muted);">
@@ -2029,6 +2066,38 @@
             </form>
         </div>
     </div>
+
+    {{-- ─── Modal: Archive Project Confirmation Modal ──────────────────────── --}}
+    @can('archive', $project)
+        <div class="reassign-modal-overlay" style="display: none;" x-show="archiveModalOpen" x-cloak>
+            <div class="reassign-modal-backdrop" @click="archiveModalOpen = false"></div>
+            <div class="reassign-modal-content card" x-show="archiveModalOpen" x-transition style="max-width: 480px; border-top: 4px solid var(--color-danger);">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: var(--space-2);">
+                        <svg style="width: 20px; height: 20px; color: var(--color-danger);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 8v13H3V8"></path>
+                            <path d="M1 3h22v5H1z"></path>
+                            <path d="M10 12h4"></path>
+                        </svg>
+                        <span style="font-weight: 700; font-size: 1rem;">You are archiving this project:</span>
+                    </div>
+                    <button type="button" class="flash-close" @click="archiveModalOpen = false" aria-label="Close modal">&times;</button>
+                </div>
+                <form action="{{ route('projects.archive', $project) }}" method="POST">
+                    @csrf
+                    <div class="card-body" style="padding: var(--space-5);">
+                        <p style="margin: 0; font-size: 0.9375rem; color: var(--color-ink); line-height: 1.5;">
+                            If you archive <strong>{{ $project->name }}</strong>, you will not be able to see it from your active project list and you will not be able to edit it unless you reactivate it.
+                        </p>
+                    </div>
+                    <div class="card-footer" style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                        <button type="button" class="btn btn-secondary" @click="archiveModalOpen = false">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Confirm</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endcan
 
     {{-- ─── Modal 7: Upload Project File (Invoice or General Document) ──── --}}
     <div class="reassign-modal-overlay" style="display: none;" x-show="uploadFileModalOpen" x-cloak>
@@ -2232,15 +2301,15 @@
 
                 {{-- Upload New Attachment Form --}}
                 @can('update', $project)
-                    @if ($project->trashed())
+                    @if ($isProjectReadOnly)
                         <div style="border-top: 1px solid var(--color-border); padding-top: var(--space-3);">
                             <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-2);">
-                                Attach File (Archived)
+                                Attach File ({{ $project->trashed() ? 'Archived' : 'Completed' }})
                             </div>
-                            <p class="text-muted" style="font-size: 0.8125rem; margin-bottom: var(--space-3);">New attachments cannot be uploaded to an archived project.</p>
+                            <p class="text-muted" style="font-size: 0.8125rem; margin-bottom: var(--space-3);">New attachments cannot be uploaded to a {{ $project->trashed() ? 'archived' : 'completed' }} project.</p>
                             <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
                                 <button type="button" class="btn btn-secondary" @click="subtaskFileModalOpen = false">Close</button>
-                                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot upload files to an archived project">Attach File</button>
+                                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot upload files to an archived project' : 'Cannot upload files to a completed project unless reactivated' }}">Attach File</button>
                             </div>
                         </div>
                     @else
@@ -2618,6 +2687,7 @@ function projectDetail() {
             }
         },
         timelineMode: 'minimized',
+        archiveModalOpen: false,
         addCostModalOpen: false,
         assignModalOpen: false,
         createMajorTaskModalOpen: false,

@@ -43,12 +43,14 @@
                 @endcan
             @elseif ($project->status === 'completed')
                 @can('archive', $project)
-                    <form method="POST" action="{{ route('projects.archive', $project) }}" class="inline-form" onsubmit="return confirm('Move project {{ addslashes($project->name) }} to archived projects?');">
-                        @csrf
-                        <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-muted); border-color: var(--color-border);" title="Archive completed project">
-                            Archive
-                        </button>
-                    </form>
+                    <button
+                        type="button"
+                        class="btn btn-danger btn-sm"
+                        title="Archive completed project"
+                        @click="openArchiveModal('{{ route('projects.archive', $project) }}', '{{ addslashes($project->name) }}')"
+                    >
+                        Archive
+                    </button>
                 @endcan
             @endif
         </div>

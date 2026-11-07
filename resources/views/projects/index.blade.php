@@ -4,6 +4,16 @@
 @section('meta-description', 'View and manage Dex International Co. projects.')
 
 @section('content')
+<div x-data="{
+    archiveModalOpen: false,
+    archiveUrl: '',
+    archiveProjectName: '',
+    openArchiveModal(url, name) {
+        this.archiveUrl = url;
+        this.archiveProjectName = name;
+        this.archiveModalOpen = true;
+    }
+}">
     <div class="page-header">
         <div>
             <h1>Projects</h1>
@@ -154,4 +164,35 @@
             </div>
         @endif
     </div>
+
+    {{-- ─── Archive Project Confirmation Modal ──────────────────────────── --}}
+    <div class="reassign-modal-overlay" style="display: none;" x-show="archiveModalOpen" x-cloak>
+        <div class="reassign-modal-backdrop" @click="archiveModalOpen = false"></div>
+        <div class="reassign-modal-content card" x-show="archiveModalOpen" x-transition style="max-width: 480px; border-top: 4px solid var(--color-danger);">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <svg style="width: 20px; height: 20px; color: var(--color-danger);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 8v13H3V8"></path>
+                        <path d="M1 3h22v5H1z"></path>
+                        <path d="M10 12h4"></path>
+                    </svg>
+                    <span style="font-weight: 700; font-size: 1rem;">You are archiving this project:</span>
+                </div>
+                <button type="button" class="flash-close" @click="archiveModalOpen = false" aria-label="Close modal">&times;</button>
+            </div>
+            <form :action="archiveUrl" method="POST">
+                @csrf
+                <div class="card-body" style="padding: var(--space-5);">
+                    <p style="margin: 0; font-size: 0.9375rem; color: var(--color-ink); line-height: 1.5;">
+                        If you archive <strong x-text="archiveProjectName"></strong>, you will not be able to see it from your active project list and you will not be able to edit it unless you reactivate it.
+                    </p>
+                </div>
+                <div class="card-footer" style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                    <button type="button" class="btn btn-secondary" @click="archiveModalOpen = false">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Confirm</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
