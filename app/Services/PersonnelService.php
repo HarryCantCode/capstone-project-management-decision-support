@@ -126,18 +126,18 @@ class PersonnelService
                 }
             }
 
-            // Update core attributes
-            $personnel->first_name = $data['first_name'];
-            $personnel->middle_name = $data['middle_name'] ?? null;
-            $personnel->last_name = $data['last_name'];
-            $personnel->date_of_birth = $data['date_of_birth'];
-            $personnel->address = $data['address'];
+            // Update core attributes (preserve existing values if omitted or empty during archive)
+            $personnel->first_name = $data['first_name'] ?? $personnel->first_name;
+            $personnel->middle_name = array_key_exists('middle_name', $data) ? $data['middle_name'] : $personnel->middle_name;
+            $personnel->last_name = $data['last_name'] ?? $personnel->last_name;
+            $personnel->date_of_birth = $data['date_of_birth'] ?? $personnel->date_of_birth;
+            $personnel->address = $data['address'] ?? $personnel->address;
             $personnel->barangay = $data['barangay'] ?? $personnel->barangay;
             $personnel->city = $data['city'] ?? $personnel->city;
             $personnel->province = $data['province'] ?? $personnel->province;
             $personnel->region = $data['region'] ?? $personnel->region;
             $personnel->postal_code = $data['postal_code'] ?? $personnel->postal_code;
-            $personnel->expertise = $data['expertise'];
+            $personnel->expertise = $data['expertise'] ?? $personnel->expertise;
             $personnel->project_id = $newProjectId;
             $personnel->date_assigned = $newProjectId
                 ? ($oldProjectId == $newProjectId && $personnel->date_assigned ? $personnel->date_assigned : $now)

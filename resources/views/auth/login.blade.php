@@ -168,7 +168,7 @@
 
                     <div class="card-body">
                         <p class="text-muted small mb-3" style="font-size: 0.8125rem; line-height: 1.5;">
-                            Enter your email address or 7-digit account number. We will send a secure randomized password directly to your registered inbox.
+                            Enter your email address or 7-digit account number. We will send a secure password creation link directly to your registered email address.
                         </p>
 
                         <div id="forgot-password-feedback" class="d-none alert mb-3" role="alert"></div>
@@ -202,7 +202,7 @@
                             class="btn btn-primary btn-sm"
                         >
                             <span id="pwd-btn-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" style="width: 13px; height: 13px; border-width: 2px;"></span>
-                            <span>Request a new password</span>
+                            <span>Send Reset Link</span>
                         </button>
                     </div>
                 </form>

@@ -29,6 +29,11 @@
     isAllSelected() {
         return this.visibleIds.length > 0 && this.selectedIds.length === this.visibleIds.length;
     },
+    archiveModalOpen: false,
+    archivePersonnelTarget: {
+        id: null,
+        name: ''
+    },
     editModalOpen: false,
     editForm: {
         id: null,
@@ -108,11 +113,14 @@
         }
     },
     archiveDirectly(id, name) {
-        if (confirm('Archive personnel profile for ' + name + '? They will be unassigned and moved to the inactive roster.')) {
-            const form = document.getElementById('standalone-archive-form');
-            form.action = '/scheduling/' + id;
-            form.submit();
-        }
+        this.archivePersonnelTarget = { id: id, name: name };
+        this.archiveModalOpen = true;
+    },
+    confirmArchive() {
+        if (!this.archivePersonnelTarget.id) return;
+        const form = document.getElementById('standalone-archive-form');
+        form.action = '/scheduling/' + this.archivePersonnelTarget.id;
+        form.submit();
     }
 }">
     <div class="page-header">

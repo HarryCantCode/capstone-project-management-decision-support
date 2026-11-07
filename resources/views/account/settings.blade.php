@@ -160,6 +160,24 @@
             accountTab: 'active',
             searchQuery: '',
             roleFilter: 'all',
+            archiveUserModalOpen: false,
+            archiveUserTarget: {
+                url: '',
+                name: ''
+            },
+            openArchiveUserModal(url, name) {
+                this.archiveUserTarget = {
+                    url: url,
+                    name: name
+                };
+                this.archiveUserModalOpen = true;
+            },
+            confirmArchiveUser() {
+                if (!this.archiveUserTarget.url) return;
+                const form = document.getElementById('archive-user-form');
+                form.action = this.archiveUserTarget.url;
+                form.submit();
+            },
             matchRow(accountNo, employeeId, name, email, jobTitle, role) {
                 const q = this.searchQuery.toLowerCase().trim();
                 const matchesRole = this.roleFilter === 'all' || role.toLowerCase() === this.roleFilter.toLowerCase();
@@ -310,11 +328,13 @@
                                         @endif
                                         <a href="{{ route('account.users.edit', $u) }}" class="btn btn-secondary btn-sm">Edit</a>
                                         @if (Auth::id() !== $u->id)
-                                            <form method="POST" action="{{ route('account.users.destroy', $u) }}" onsubmit="return confirm('Archive user account {{ $u->name }}? The user will not be able to log in until reactivated.');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-secondary btn-sm action-btn--danger">Archive</button>
-                                            </form>
+                                            <button
+                                                type="button"
+                                                class="btn btn-secondary btn-sm action-btn--danger"
+                                                @click="openArchiveUserModal('{{ route('account.users.destroy', $u) }}', '{{ addslashes($u->name) }}')"
+                                            >
+                                                Archive
+                                            </button>
                                         @else
                                             <button type="button" class="btn btn-secondary btn-sm" disabled title="Cannot archive your own active account">Archive</button>
                                         @endif
@@ -408,6 +428,64 @@
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        {{-- Hidden form for archiving user --}}
+        <form id="archive-user-form" method="POST" style="display: none;">
+            @csrf
+            @method('DELETE')
+        </form>
+
+        {{-- Centered In-App Archive User Confirmation Modal --}}
+        <div
+            class="reassign-modal-overlay"
+            style="display: none;"
+            x-show="archiveUserModalOpen"
+            x-cloak
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="archive-user-modal-title"
+        >
+            <div class="reassign-modal-backdrop" @click="archiveUserModalOpen = false"></div>
+            <div
+                class="reassign-modal-content card"
+                style="max-width: 480px; width: 100%; text-align: center; padding: var(--space-6);"
+                x-show="archiveUserModalOpen"
+                x-transition:enter="modal-enter"
+                x-transition:leave="modal-leave"
+            >
+                <div style="width: 54px; height: 54px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4); color: var(--color-danger, #ef4444);">
+                    <svg style="width: 28px; height: 28px;" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+
+                <h3 id="archive-user-modal-title" style="margin: 0 0 var(--space-2); font-size: 1.15rem; font-weight: 700; color: var(--color-ink);">
+                    Archive User Account
+                </h3>
+                <p style="color: var(--color-muted); font-size: 0.875rem; line-height: 1.5; margin: 0 0 var(--space-5);">
+                    Are you sure you want to archive the user account for <strong style="color: var(--color-ink);" x-text="archiveUserTarget.name"></strong>? The user will not be able to log in until reactivated.
+                </p>
+
+                <div style="display: flex; gap: var(--space-3); justify-content: center;">
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        style="min-width: 110px;"
+                        @click="archiveUserModalOpen = false"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-danger"
+                        style="min-width: 110px; background: var(--color-danger, #ef4444); border-color: var(--color-danger, #ef4444); color: #fff;"
+                        @click="confirmArchiveUser()"
+                    >
+                        Confirm
+                    </button>
+                </div>
             </div>
         </div>
     </section>

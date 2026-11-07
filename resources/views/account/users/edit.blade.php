@@ -7,23 +7,39 @@
     <div
         x-data="{
             confirmModalOpen: false,
-            sendTempModalOpen: false,
-            generateTempModalOpen: false,
+            sendResetModalOpen: false,
             adminPassword: '',
             adminPasswordError: '',
-            generatedPassword: '{{ session('generated_temporary_password') ?? '' }}',
-            copied: false,
-            copyPassword() {
-                if (!this.generatedPassword) return;
-                navigator.clipboard.writeText(this.generatedPassword);
-                this.copied = true;
-                setTimeout(() => this.copied = false, 2500);
+            sendResetPassword: '',
+            acknowledgeCorrect: false,
+            reviewData: {
+                name: '',
+                email: '',
+                job_title: '',
+                role: '',
+                birthdate: ''
             },
             triggerSave() {
                 const editForm = document.getElementById('edit-user-form');
                 if (!editForm.reportValidity()) {
                     return;
                 }
+
+                // Gather review information from inputs
+                const firstName = (document.getElementById('first_name')?.value || '').trim();
+                const middleName = (document.getElementById('middle_name')?.value || '').trim();
+                const lastName = (document.getElementById('last_name')?.value || '').trim();
+                this.reviewData.name = [firstName, middleName, lastName].filter(Boolean).join(' ') || firstName;
+
+                this.reviewData.email = (document.getElementById('email')?.value || '').trim();
+                this.reviewData.birthdate = document.getElementById('birthdate')?.value || 'Not specified';
+
+                const jobChoice = document.getElementById('job_title_choice')?.value || '';
+                const jobOther = (document.getElementById('job_title_other')?.value || '').trim();
+                this.reviewData.job_title = jobChoice === 'Others' ? jobOther : jobChoice;
+
+                this.reviewData.role = document.getElementById('role')?.value || '';
+
                 this.adminPassword = '';
                 this.adminPasswordError = '';
                 this.confirmModalOpen = true;
@@ -42,6 +58,15 @@
                     hiddenInput.value = this.adminPassword;
                 }
                 document.getElementById('edit-user-form').submit();
+            },
+            openSendResetModal() {
+                this.sendResetPassword = '';
+                this.acknowledgeCorrect = false;
+                this.sendResetModalOpen = true;
+                this.$nextTick(() => {
+                    const pwdInput = document.getElementById('admin_pwd_reset');
+                    if (pwdInput) pwdInput.focus();
+                });
             }
         }"
     >
@@ -177,86 +202,43 @@
         </form>
 
         {{-- Security / Password Management Section (Dedicated Action Buttons) --}}
-        <section class="card card-glass mt-8" style="margin-top: 2rem;">
+        <section class="card card-glass project-form" style="margin-top: 1.5rem;">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h2 style="font-size: 1rem; margin: 0; font-weight: 600;">Security & Credentials</h2>
                     <p class="text-muted" style="font-size: 0.8125rem; margin-top: 0.2rem; margin-bottom: 0;">
-                        Generate or send a randomized temporary password for <strong>{{ $user->name }}</strong>.
+                        Manage password reset access and dispatch a secure password creation link to <strong>{{ $user->name }}</strong>.
                     </p>
                 </div>
                 @if($user->must_change_password)
                     <span class="status-pill status-pill--pending" title="User is required to rotate their password upon next sign-in">Pending Password Change</span>
-                @else
-                    <span class="status-pill status-pill--completed">Active Password</span>
                 @endif
             </div>
 
             <div class="card-body">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
-                    {{-- Action Card 1: Send Temporary Password to User Email --}}
-                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-accent);"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                                <strong style="font-size: 0.9375rem;">Send Temporary Password</strong>
-                            </div>
-                            <p class="text-muted" style="font-size: 0.8125rem; line-height: 1.45; margin-bottom: 1rem;">
-                                Automatically generates an 8-character randomized password and sends it directly to <strong>{{ $user->email }}</strong>. The user will be required to change it on their next login.
-                            </p>
+                <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-accent);"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                            <strong style="font-size: 0.9375rem;">Send Password Reset Link</strong>
                         </div>
-                        <button
-                            type="button"
-                            class="btn btn-secondary btn-sm"
-                            style="width: fit-content;"
-                            @click="sendTempModalOpen = true"
-                        >
-                            <span>Send Temporary Password</span>
-                        </button>
+                        <p class="text-muted" style="font-size: 0.8125rem; line-height: 1.45; margin-bottom: 1.25rem;">
+                            Senda single-use, secure password creation link directly to <strong>{{ $user->email }}</strong>(expires in 60 minutes). The recipient will be guided through setting their new account password.
+                        </p>
                     </div>
-
-                    {{-- Action Card 2: Generate & View Temporary Password --}}
-                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-accent);"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                                <strong style="font-size: 0.9375rem;">Generate Temporary Password</strong>
-                            </div>
-                            <p class="text-muted" style="font-size: 0.8125rem; line-height: 1.45; margin-bottom: 1rem;">
-                                Generates a randomized temporary password that you can view and copy immediately on-screen to provide directly to the employee.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            class="btn btn-secondary btn-sm"
-                            style="width: fit-content;"
-                            @click="generateTempModalOpen = true"
-                        >
-                            <span>Generate & View Password</span>
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        style="width: fit-content;"
+                        @click="openSendResetModal()"
+                    >
+                        <span>Send Password Reset Link</span>
+                    </button>
                 </div>
-
-                {{-- Display generated password banner if set from session --}}
-                <template x-if="generatedPassword">
-                    <div style="margin-top: 1.25rem; padding: 1rem 1.25rem; background: var(--color-surface-alt); border: 1px solid var(--color-accent); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
-                        <div>
-                            <span class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; display: block; margin-bottom: 0.2rem;">Generated Temporary Password</span>
-                            <span class="font-mono" style="font-size: 1.15rem; font-weight: 700; letter-spacing: 1px; color: var(--color-ink);" x-text="generatedPassword"></span>
-                        </div>
-                        <button
-                            type="button"
-                            class="btn btn-primary btn-sm"
-                            @click="copyPassword()"
-                        >
-                            <span x-text="copied ? '✓ Copied!' : 'Copy Password'"></span>
-                        </button>
-                    </div>
-                </template>
             </div>
         </section>
 
-        {{-- ─── Modal 1: Confirm Details Update (Requires Admin Password) ─── --}}
+        {{-- ─── Modal 1: Confirm Details Update (Requires Admin Password & Review Changes) ─── --}}
         <div
             class="reassign-modal-overlay"
             x-show="confirmModalOpen"
@@ -265,15 +247,38 @@
             style="display: none;"
         >
             <div class="reassign-modal-backdrop" @click="confirmModalOpen = false"></div>
-            <div class="reassign-modal-content card" style="max-width: 440px;">
+            <div class="reassign-modal-content card" style="max-width: 500px;">
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: 600; font-size: 0.95rem;">Confirm Account Changes</span>
                     <button type="button" class="flash-close" @click="confirmModalOpen = false" aria-label="Close modal">&times;</button>
                 </div>
                 <div class="card-body">
                     <p class="text-muted" style="font-size: 0.8125rem; line-height: 1.5; margin-bottom: 1rem;">
-                        For security purposes, please enter your administrator password to confirm the updates for <strong>{{ $user->name }}</strong>.
+                        Please review the updated information below. Enter your administrator password to confirm and apply these changes.
                     </p>
+
+                    {{-- Review Changes Information Box --}}
+                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0.875rem 1rem; margin-bottom: 1.25rem; font-size: 0.8125rem;">
+                        <div style="font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); margin-bottom: 0.5rem;">
+                            Updated User Information
+                        </div>
+                        <div style="display: grid; grid-template-columns: 130px 1fr; gap: 0.4rem; line-height: 1.4;">
+                            <span class="text-muted">Full Name:</span>
+                            <strong x-text="reviewData.name || '—'"></strong>
+
+                            <span class="text-muted">Email Address:</span>
+                            <strong style="color: var(--color-primary);" x-text="reviewData.email || '—'"></strong>
+
+                            <span class="text-muted">Job Title:</span>
+                            <span x-text="reviewData.job_title || '—'"></span>
+
+                            <span class="text-muted">System Role:</span>
+                            <span x-text="reviewData.role || '—'"></span>
+
+                            <span class="text-muted">Birthdate:</span>
+                            <span x-text="reviewData.birthdate || '—'"></span>
+                        </div>
+                    </div>
 
                     <div class="form-group-premium mb-0">
                         <label for="admin-save-password" class="form-label" style="font-size: 0.8125rem; font-weight: 600;">
@@ -300,89 +305,101 @@
             </div>
         </div>
 
-        {{-- ─── Modal 2: Send Temporary Password via Email (Requires Admin Password) ─── --}}
+        {{-- ─── Modal 2: Send Password Reset Link (Requires Admin Password & Acknowledgment) ─── --}}
         <div
             class="reassign-modal-overlay"
-            x-show="sendTempModalOpen"
+            x-show="sendResetModalOpen"
             x-cloak
-            @keydown.escape.window="sendTempModalOpen = false"
+            @keydown.escape.window="sendResetModalOpen = false"
             style="display: none;"
         >
-            <div class="reassign-modal-backdrop" @click="sendTempModalOpen = false"></div>
-            <div class="reassign-modal-content card" style="max-width: 440px;">
-                <form method="POST" action="{{ route('account.users.send-temporary-password', $user) }}">
+            <div class="reassign-modal-backdrop" @click="sendResetModalOpen = false"></div>
+            <div class="reassign-modal-content card" style="max-width: 520px;">
+                <form method="POST" action="{{ route('account.users.send-reset-link', $user) }}">
                     @csrf
                     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; font-size: 0.95rem;">Send Temporary Password</span>
-                        <button type="button" class="flash-close" @click="sendTempModalOpen = false" aria-label="Close modal">&times;</button>
+                        <span style="font-weight: 600; font-size: 0.95rem;">Send Password Reset Link</span>
+                        <button type="button" class="flash-close" @click="sendResetModalOpen = false" aria-label="Close modal">&times;</button>
                     </div>
                     <div class="card-body">
                         <p class="text-muted" style="font-size: 0.8125rem; line-height: 1.5; margin-bottom: 1rem;">
-                            A new 8-character randomized temporary password will be dispatched to <strong>{{ $user->email }}</strong>. Please enter your administrator password to proceed:
+                            A secure, single-use password creation link will be sent to <strong>{{ $user->email }}</strong>. Please review the user details and enter your administrator password to proceed:
                         </p>
 
+                        {{-- User Information List for Admin Review --}}
+                        <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0.875rem 1rem; margin-bottom: 1.25rem; font-size: 0.8125rem;">
+                            <div style="font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); margin-bottom: 0.5rem;">
+                                User Information to Review
+                            </div>
+                            <div style="display: grid; grid-template-columns: 130px 1fr; gap: 0.4rem; line-height: 1.4;">
+                                <span class="text-muted">Full Name:</span>
+                                <strong>{{ $user->name }}</strong>
+
+                                <span class="text-muted">Email Address:</span>
+                                <strong style="color: var(--color-primary);">{{ $user->email }}</strong>
+
+                                @if($user->account_number)
+                                    <span class="text-muted">Account No.:</span>
+                                    <span class="font-mono">{{ $user->account_number }}</span>
+                                @endif
+
+                                @if($user->employee_number)
+                                    <span class="text-muted">Employee No.:</span>
+                                    <span class="font-mono">{{ $user->employee_number }}</span>
+                                @endif
+
+                                <span class="text-muted">Job Title:</span>
+                                <span>{{ $user->job_title ?: '—' }}</span>
+
+                                <span class="text-muted">System Role:</span>
+                                <span>{{ $user->getRoleNames()->first() ?: 'User' }}</span>
+                            </div>
+                        </div>
+
+                        {{-- Mandatory Acknowledgment Checkbox --}}
+                        <div style="margin-bottom: 1.25rem;">
+                            <label class="form-check" style="cursor: pointer; display: flex; align-items: flex-start; gap: 0.5rem; user-select: none;">
+                                <input
+                                    type="checkbox"
+                                    name="acknowledge_correct"
+                                    value="1"
+                                    class="form-check-input"
+                                    x-model="acknowledgeCorrect"
+                                    id="modal_acknowledge_correct"
+                                    style="margin-top: 0.15rem;"
+                                    required
+                                >
+                                <span class="form-check-label" style="font-size: 0.8125rem; line-height: 1.4; color: var(--color-ink);">
+                                    I acknowledge and confirm that the user information above is reviewed, accurate, and ready for a password reset request.
+                                </span>
+                            </label>
+                        </div>
+
+                        {{-- Administrator Current Password --}}
                         <div class="form-group-premium mb-0">
-                            <label for="admin_pwd_send" class="form-label" style="font-size: 0.8125rem; font-weight: 600;">
-                                Your Administrator Password <span class="required" aria-hidden="true">*</span>
+                            <label for="admin_pwd_reset" class="form-label" style="font-size: 0.8125rem; font-weight: 600;">
+                                Confirm Account Changes — Your Administrator Password <span class="required" aria-hidden="true">*</span>
                             </label>
                             <input
                                 type="password"
-                                id="admin_pwd_send"
+                                id="admin_pwd_reset"
                                 name="admin_password"
                                 class="form-control"
-                                placeholder="Enter your account password"
+                                x-model="sendResetPassword"
+                                placeholder="Enter your administrator password"
                                 required
-                                autofocus
                             >
                         </div>
                     </div>
                     <div class="card-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem;">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="sendTempModalOpen = false">Cancel</button>
-                        <button type="submit" class="btn btn-primary btn-sm">Send to User</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        {{-- ─── Modal 3: Generate Temporary Password on Screen (Requires Admin Password) ─── --}}
-        <div
-            class="reassign-modal-overlay"
-            x-show="generateTempModalOpen"
-            x-cloak
-            @keydown.escape.window="generateTempModalOpen = false"
-            style="display: none;"
-        >
-            <div class="reassign-modal-backdrop" @click="generateTempModalOpen = false"></div>
-            <div class="reassign-modal-content card" style="max-width: 440px;">
-                <form method="POST" action="{{ route('account.users.generate-temporary-password', $user) }}">
-                    @csrf
-                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 600; font-size: 0.95rem;">Generate Temporary Password</span>
-                        <button type="button" class="flash-close" @click="generateTempModalOpen = false" aria-label="Close modal">&times;</button>
-                    </div>
-                    <div class="card-body">
-                        <p class="text-muted" style="font-size: 0.8125rem; line-height: 1.5; margin-bottom: 1rem;">
-                            Enter your administrator password to generate an 8-character temporary password that you can view and copy immediately:
-                        </p>
-
-                        <div class="form-group-premium mb-0">
-                            <label for="admin_pwd_gen" class="form-label" style="font-size: 0.8125rem; font-weight: 600;">
-                                Your Administrator Password <span class="required" aria-hidden="true">*</span>
-                            </label>
-                            <input
-                                type="password"
-                                id="admin_pwd_gen"
-                                name="admin_password"
-                                class="form-control"
-                                placeholder="Enter your account password"
-                                required
-                                autofocus
-                            >
-                        </div>
-                    </div>
-                    <div class="card-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem;">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="generateTempModalOpen = false">Cancel</button>
-                        <button type="submit" class="btn btn-primary btn-sm">Generate Password</button>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="sendResetModalOpen = false">Cancel</button>
+                        <button
+                            type="submit"
+                            class="btn btn-primary btn-sm"
+                            :disabled="!acknowledgeCorrect || !sendResetPassword"
+                        >
+                            Send Reset Link
+                        </button>
                     </div>
                 </form>
             </div>

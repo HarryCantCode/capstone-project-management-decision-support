@@ -29,9 +29,18 @@ class ProjectTaskController extends Controller
     {
         $this->authorize('update', $project);
 
+        $minStartDateRule = ['required', 'date'];
+        if ($project->tasks()->exists()) {
+            $latestTask = $project->tasks()->orderByDesc('end_date')->first();
+            if ($latestTask && $latestTask->end_date) {
+                $minAllowed = Carbon::parse($latestTask->end_date)->addDay()->toDateString();
+                $minStartDateRule[] = 'after_or_equal:' . $minAllowed;
+            }
+        }
+
         $validated = $request->validate([
             'task_name' => ['required', 'string', 'max:255'],
-            'start_date' => ['required', 'date'],
+            'start_date' => $minStartDateRule,
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'description' => ['nullable', 'string', 'max:1000'],
             'subtasks' => ['nullable', 'array'],
@@ -43,6 +52,7 @@ class ProjectTaskController extends Controller
             'baby_task_dates' => ['nullable', 'array'],
             'baby_task_dates.*' => ['nullable', 'date', 'after_or_equal:start_date', 'before_or_equal:end_date'],
         ], [
+            'start_date.after_or_equal' => 'The start date must be on or after the day following the previous Major Task.',
             'subtask_dates.*.after_or_equal' => 'Sub task date must be on or after the Major Task start date.',
             'subtask_dates.*.before_or_equal' => 'Sub task date must be on or before the Major Task end date.',
             'baby_task_dates.*.after_or_equal' => 'Sub task date must be on or after the Major Task start date.',

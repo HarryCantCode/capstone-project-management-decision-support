@@ -648,18 +648,15 @@
                                                 ✎ Edit Major Task
                                             </button>
                                             
-                                            <form 
-                                                method="POST" 
-                                                action="{{ route('projects.tasks.destroy', [$project, $task]) }}" 
-                                                class="inline-form"
-                                                onsubmit="return confirm('Delete this major task and all its sub tasks? This action cannot be undone.');"
+                                            <button 
+                                                type="button" 
+                                                class="btn btn-secondary btn-sm" 
+                                                style="color: var(--color-danger); border-color: #fad2cf;" 
+                                                id="btn-delete-major-task-{{ $task->id }}"
+                                                @click="openDeleteTaskModal('{{ route('projects.tasks.destroy', [$project, $task]) }}', '{{ addslashes($task->task_name) }}')"
                                             >
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;" id="btn-delete-major-task-{{ $task->id }}">
-                                                    🗑 Delete
-                                                </button>
-                                            </form>
+                                                🗑 Delete
+                                            </button>
                                         @endif
                                     @endcan
                                 </div>
@@ -1117,13 +1114,14 @@
                                 <td class="text-right">
                                     @can('update', $project)
                                         @if (!$isProjectReadOnly)
-                                            <form method="POST" action="{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Remove this cost entry?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
-                                                    Delete
-                                                </button>
-                                            </form>
+                                            <button
+                                                type="button"
+                                                class="btn btn-secondary btn-sm"
+                                                style="color: var(--color-danger); border-color: #fad2cf;"
+                                                @click="openDeleteCostModal('{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}', '{{ addslashes($cost->description) }}', '{{ number_format($cost->amount, 2) }}')"
+                                            >
+                                                Delete
+                                            </button>
                                         @endif
                                     @endcan
                                 </td>
@@ -1303,12 +1301,14 @@
                                     <td class="text-right">
                                         @can('update', $project)
                                             @if (!$isProjectReadOnly)
-                                                <form method="POST" action="{{ route('projects.unassign-personnel', ['project' => $project, 'personnel' => $person]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Are you sure you want to unassign {{ $person->full_name }} from this project?');">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
-                                                        Unassign
-                                                    </button>
-                                                </form>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-secondary btn-sm"
+                                                    style="color: var(--color-danger); border-color: #fad2cf;"
+                                                    @click="openUnassignPersonnelModal('{{ route('projects.unassign-personnel', ['project' => $project, 'personnel' => $person]) }}', '{{ addslashes($person->full_name) }}')"
+                                                >
+                                                    Unassign
+                                                </button>
                                             @endif
                                         @endcan
                                     </td>
@@ -1800,6 +1800,8 @@
                                 class="form-control"
                                 x-model="newTask.start_date"
                                 value="{{ $defaultStartDate->format('Y-m-d') }}"
+                                min="{{ $defaultStartDate->format('Y-m-d') }}"
+                                @change="if (newTask.end_date < newTask.start_date) { newTask.end_date = newTask.start_date; }"
                                 required
                             >
                         </div>
@@ -1813,12 +1815,13 @@
                                 class="form-control"
                                 x-model="newTask.end_date"
                                 value="{{ $defaultEndDate->format('Y-m-d') }}"
+                                :min="newTask.start_date || '{{ $defaultStartDate->format('Y-m-d') }}'"
                                 required
                             >
                         </div>
                     </div>
                     <p class="form-hint" style="margin-top: -8px; margin-bottom: var(--space-4);">
-                        Pre-calculated duration: 7 days (1 week). You can modify start or end date freely.
+                        Must start on or after {{ $defaultStartDate->format('M j, Y') }} (following previous Major Task / Week). Pre-calculated duration: 7 days.
                     </p>
 
                     <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
@@ -2287,11 +2290,15 @@
                                 <div style="display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0;">
                                     <a :href="f.url" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem;" title="Download">⬇</a>
                                     @can('update', $project)
-                                        <form :action="'/projects/{{ $project->id }}/files/' + f.id" method="POST" onsubmit="return confirm('Delete this attachment?');" class="inline-form">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); padding: 2px 6px; font-size: 0.75rem;">✕</button>
-                                        </form>
+                                        <button 
+                                            type="button" 
+                                            class="btn btn-secondary btn-sm" 
+                                            style="color: var(--color-danger); padding: 2px 6px; font-size: 0.75rem;"
+                                            title="Delete Attachment"
+                                            @click="openDeleteFileModal('/projects/{{ $project->id }}/files/' + f.id, f.name)"
+                                        >
+                                            ✕
+                                        </button>
                                     @endcan
                                 </div>
                             </div>
@@ -2346,6 +2353,236 @@
                         </div>
                     @endif
                 @endcan
+            </div>
+        </div>
+    </div>
+
+    {{-- Hidden form for cost deletion --}}
+    <form id="project-delete-cost-form" method="POST" style="display: none;">
+        @csrf
+        @method('DELETE')
+    </form>
+
+    {{-- Centered In-App Delete Expenditure Confirmation Modal --}}
+    <div
+        class="reassign-modal-overlay"
+        style="display: none;"
+        x-show="deleteCostModalOpen"
+        x-cloak
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-cost-modal-title"
+    >
+        <div class="reassign-modal-backdrop" @click="deleteCostModalOpen = false"></div>
+        <div
+            class="reassign-modal-content card"
+            style="max-width: 480px; width: 100%; text-align: center; padding: var(--space-6);"
+            x-show="deleteCostModalOpen"
+            x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave"
+        >
+            <div style="width: 54px; height: 54px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4); color: var(--color-danger, #ef4444);">
+                <svg style="width: 28px; height: 28px;" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+
+            <h3 id="delete-cost-modal-title" style="margin: 0 0 var(--space-2); font-size: 1.15rem; font-weight: 700; color: var(--color-ink);">
+                Delete Cost Entry
+            </h3>
+            <p style="color: var(--color-muted); font-size: 0.875rem; line-height: 1.5; margin: 0 0 var(--space-5);">
+                Are you sure you want to delete the cost entry for <strong style="color: var(--color-ink);" x-text="deleteCostTarget.description"></strong> (<span class="font-mono font-bold" x-text="'₱' + deleteCostTarget.amount"></span>)? This action cannot be undone.
+            </p>
+
+            <div style="display: flex; gap: var(--space-3); justify-content: center;">
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    style="min-width: 110px;"
+                    @click="deleteCostModalOpen = false"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-danger"
+                    style="min-width: 110px; background: var(--color-danger, #ef4444); border-color: var(--color-danger, #ef4444); color: #fff;"
+                    @click="confirmDeleteCost()"
+                >
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Hidden form for unassigning personnel --}}
+    <form id="project-unassign-personnel-form" method="POST" style="display: none;">
+        @csrf
+    </form>
+
+    {{-- Centered In-App Delete Major Task Confirmation Modal --}}
+    <form id="project-delete-task-form" method="POST" style="display: none;">
+        @csrf
+        @method('DELETE')
+    </form>
+
+    <div
+        class="reassign-modal-overlay"
+        style="display: none;"
+        x-show="deleteTaskModalOpen"
+        x-cloak
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-major-task-modal-title"
+    >
+        <div class="reassign-modal-backdrop" @click="deleteTaskModalOpen = false"></div>
+        <div
+            class="reassign-modal-content card"
+            style="max-width: 480px; width: 100%; text-align: center; padding: var(--space-6);"
+            x-show="deleteTaskModalOpen"
+            x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave"
+        >
+            <div style="width: 54px; height: 54px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4); color: var(--color-danger, #ef4444);">
+                <svg style="width: 28px; height: 28px;" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+
+            <h3 id="delete-major-task-modal-title" style="margin: 0 0 var(--space-2); font-size: 1.15rem; font-weight: 700; color: var(--color-ink);">
+                Delete Major Task
+            </h3>
+            <p style="color: var(--color-muted); font-size: 0.875rem; line-height: 1.5; margin: 0 0 var(--space-5);">
+                Are you sure you want to delete <strong style="color: var(--color-ink);" x-text="deleteTaskTarget.name"></strong> along with all its specific sub tasks? This action cannot be undone.
+            </p>
+
+            <div style="display: flex; gap: var(--space-3); justify-content: center;">
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    style="min-width: 110px;"
+                    @click="deleteTaskModalOpen = false"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-danger"
+                    style="min-width: 110px; background: var(--color-danger, #ef4444); border-color: var(--color-danger, #ef4444); color: #fff;"
+                    @click="confirmDeleteTask()"
+                >
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Centered In-App Unassign Personnel Confirmation Modal --}}
+    <div
+        class="reassign-modal-overlay"
+        style="display: none;"
+        x-show="unassignPersonnelModalOpen"
+        x-cloak
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="unassign-personnel-modal-title"
+    >
+        <div class="reassign-modal-backdrop" @click="unassignPersonnelModalOpen = false"></div>
+        <div
+            class="reassign-modal-content card"
+            style="max-width: 480px; width: 100%; text-align: center; padding: var(--space-6);"
+            x-show="unassignPersonnelModalOpen"
+            x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave"
+        >
+            <div style="width: 54px; height: 54px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4); color: var(--color-danger, #ef4444);">
+                <svg style="width: 28px; height: 28px;" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                </svg>
+            </div>
+
+            <h3 id="unassign-personnel-modal-title" style="margin: 0 0 var(--space-2); font-size: 1.15rem; font-weight: 700; color: var(--color-ink);">
+                Unassign Personnel
+            </h3>
+            <p style="color: var(--color-muted); font-size: 0.875rem; line-height: 1.5; margin: 0 0 var(--space-5);">
+                Are you sure you want to unassign <strong style="color: var(--color-ink);" x-text="unassignPersonnelTarget.name"></strong> from this project? They will be returned to the available manpower pool.
+            </p>
+
+            <div style="display: flex; gap: var(--space-3); justify-content: center;">
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    style="min-width: 110px;"
+                    @click="unassignPersonnelModalOpen = false"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-danger"
+                    style="min-width: 110px; background: var(--color-danger, #ef4444); border-color: var(--color-danger, #ef4444); color: #fff;"
+                    @click="confirmUnassignPersonnel()"
+                >
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Hidden form for file/attachment deletion --}}
+    <form id="project-delete-file-form" method="POST" style="display: none;">
+        @csrf
+        @method('DELETE')
+    </form>
+
+    {{-- Centered In-App Delete File / Attachment Confirmation Modal --}}
+    <div
+        class="reassign-modal-overlay"
+        style="display: none;"
+        x-show="deleteFileModalOpen"
+        x-cloak
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-file-modal-title"
+    >
+        <div class="reassign-modal-backdrop" @click="deleteFileModalOpen = false"></div>
+        <div
+            class="reassign-modal-content card"
+            style="max-width: 480px; width: 100%; text-align: center; padding: var(--space-6);"
+            x-show="deleteFileModalOpen"
+            x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave"
+        >
+            <div style="width: 54px; height: 54px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4); color: var(--color-danger, #ef4444);">
+                <svg style="width: 28px; height: 28px;" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+
+            <h3 id="delete-file-modal-title" style="margin: 0 0 var(--space-2); font-size: 1.15rem; font-weight: 700; color: var(--color-ink);">
+                Delete File / Attachment
+            </h3>
+            <p style="color: var(--color-muted); font-size: 0.875rem; line-height: 1.5; margin: 0 0 var(--space-5);">
+                Are you sure you want to delete <strong style="color: var(--color-ink);" x-text="deleteFileTarget.name"></strong>? This action cannot be undone.
+            </p>
+
+            <div style="display: flex; gap: var(--space-3); justify-content: center;">
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    style="min-width: 110px;"
+                    @click="deleteFileModalOpen = false"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-danger"
+                    style="min-width: 110px; background: var(--color-danger, #ef4444); border-color: var(--color-danger, #ef4444); color: #fff;"
+                    @click="confirmDeleteFile()"
+                >
+                    Confirm
+                </button>
             </div>
         </div>
     </div>
@@ -2688,6 +2925,80 @@ function projectDetail() {
         },
         timelineMode: 'minimized',
         archiveModalOpen: false,
+        deleteCostModalOpen: false,
+        deleteCostTarget: {
+            url: '',
+            description: '',
+            amount: ''
+        },
+        openDeleteCostModal(url, description, amount) {
+            this.deleteCostTarget = {
+                url: url,
+                description: description,
+                amount: amount
+            };
+            this.deleteCostModalOpen = true;
+        },
+        confirmDeleteCost() {
+            if (!this.deleteCostTarget.url) return;
+            const form = document.getElementById('project-delete-cost-form');
+            form.action = this.deleteCostTarget.url;
+            form.submit();
+        },
+        unassignPersonnelModalOpen: false,
+        unassignPersonnelTarget: {
+            url: '',
+            name: ''
+        },
+        openUnassignPersonnelModal(url, name) {
+            this.unassignPersonnelTarget = {
+                url: url,
+                name: name
+            };
+            this.unassignPersonnelModalOpen = true;
+        },
+        confirmUnassignPersonnel() {
+            if (!this.unassignPersonnelTarget.url) return;
+            const form = document.getElementById('project-unassign-personnel-form');
+            form.action = this.unassignPersonnelTarget.url;
+            form.submit();
+        },
+        deleteTaskModalOpen: false,
+        deleteTaskTarget: {
+            url: '',
+            name: ''
+        },
+        openDeleteTaskModal(url, name) {
+            this.deleteTaskTarget = {
+                url: url,
+                name: name
+            };
+            this.deleteTaskModalOpen = true;
+        },
+        confirmDeleteTask() {
+            if (!this.deleteTaskTarget.url) return;
+            const form = document.getElementById('project-delete-task-form');
+            form.action = this.deleteTaskTarget.url;
+            form.submit();
+        },
+        deleteFileModalOpen: false,
+        deleteFileTarget: {
+            url: '',
+            name: ''
+        },
+        openDeleteFileModal(url, name) {
+            this.deleteFileTarget = {
+                url: url,
+                name: name
+            };
+            this.deleteFileModalOpen = true;
+        },
+        confirmDeleteFile() {
+            if (!this.deleteFileTarget.url) return;
+            const form = document.getElementById('project-delete-file-form');
+            form.action = this.deleteFileTarget.url;
+            form.submit();
+        },
         addCostModalOpen: false,
         assignModalOpen: false,
         createMajorTaskModalOpen: false,
@@ -2870,12 +3181,8 @@ function projectDetail() {
             this.viewFileModalOpen = true;
         },
         deleteActiveFile() {
-            if (confirm(`Are you sure you want to delete "${this.activeFileData.name}"? This action cannot be undone.`)) {
-                const form = document.getElementById('activeFileDeleteForm');
-                if (form) {
-                    form.submit();
-                }
-            }
+            if (!this.activeFileData.delete_url) return;
+            this.openDeleteFileModal(this.activeFileData.delete_url, this.activeFileData.name);
         },
         openSubtaskUploadModal(taskId, subtaskId, title, files = []) {
             this.activeSubtaskData = {

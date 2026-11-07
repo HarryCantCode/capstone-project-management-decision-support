@@ -10,6 +10,13 @@
         selectedIds: [],
         addModalOpen: false,
         editModalOpen: false,
+        deleteModalOpen: false,
+        deleteTarget: {
+            title: '',
+            message: '',
+            isBulk: false,
+            url: ''
+        },
         pageIds: [{{ $resources->pluck('id')->implode(',') }}],
         editForm: {
             id: null,
@@ -79,15 +86,31 @@
 
         confirmBulkDelete() {
             if (this.selectedIds.length === 0) return;
-            if (confirm(`Are you sure you want to delete ${this.selectedIds.length} selected material(s) from the catalog? This action cannot be undone.`)) {
-                document.getElementById('bulk-delete-form').submit();
-            }
+            this.deleteTarget = {
+                title: 'Remove Selected Materials',
+                message: `Are you sure you want to remove ${this.selectedIds.length} selected material(s) from the catalog? This action cannot be undone.`,
+                isBulk: true,
+                url: ''
+            };
+            this.deleteModalOpen = true;
         },
 
         confirmSingleDelete(id, name, code, deleteUrl) {
-            if (confirm(`Are you sure you want to delete material [${code}] '${name}' from the inventory?`)) {
+            this.deleteTarget = {
+                title: 'Remove Material from Catalog',
+                message: `Are you sure you want to remove material [${code}] '${name}' from the inventory? This action cannot be undone.`,
+                isBulk: false,
+                url: deleteUrl
+            };
+            this.deleteModalOpen = true;
+        },
+
+        executeDelete() {
+            if (this.deleteTarget.isBulk) {
+                document.getElementById('bulk-delete-form').submit();
+            } else if (this.deleteTarget.url) {
                 const form = document.getElementById('single-delete-form');
-                form.action = deleteUrl;
+                form.action = this.deleteTarget.url;
                 form.submit();
             }
         }
@@ -525,5 +548,57 @@
         @csrf
         @method('DELETE')
     </form>
+
+    {{-- Centered In-App Delete Confirmation Modal --}}
+    <div
+        class="reassign-modal-overlay"
+        style="display: none;"
+        x-show="deleteModalOpen"
+        x-cloak
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-material-modal-title"
+    >
+        <div class="reassign-modal-backdrop" @click="deleteModalOpen = false"></div>
+        <div
+            class="reassign-modal-content card"
+            style="max-width: 480px; width: 100%; text-align: center; padding: var(--space-6);"
+            x-show="deleteModalOpen"
+            x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave"
+        >
+            <div style="width: 54px; height: 54px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4); color: var(--color-danger, #ef4444);">
+                <svg style="width: 28px; height: 28px;" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+
+            <h3 id="delete-material-modal-title" style="margin: 0 0 var(--space-2); font-size: 1.15rem; font-weight: 700; color: var(--color-ink);" x-text="deleteTarget.title">
+                Remove Material from Catalog
+            </h3>
+            <p style="color: var(--color-muted); font-size: 0.875rem; line-height: 1.5; margin: 0 0 var(--space-5);" x-text="deleteTarget.message">
+                Are you sure you want to remove this material from the catalog?
+            </p>
+
+            <div style="display: flex; gap: var(--space-3); justify-content: center;">
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    style="min-width: 110px;"
+                    @click="deleteModalOpen = false"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-danger"
+                    style="min-width: 110px; background: var(--color-danger, #ef4444); border-color: var(--color-danger, #ef4444); color: #fff;"
+                    @click="executeDelete()"
+                >
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 @endsection

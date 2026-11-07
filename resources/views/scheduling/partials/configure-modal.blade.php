@@ -35,7 +35,7 @@
         </div>
 
         {{-- Modal Body / Form --}}
-        <form :action="editForm.actionUrl" method="POST" style="display: flex; flex-direction: column; overflow-y: auto; flex: 1;">
+        <form :action="editForm.actionUrl" method="POST" :novalidate="editForm.archive_profile" style="display: flex; flex-direction: column; overflow-y: auto; flex: 1;">
             @csrf
             @method('PUT')
 
@@ -43,14 +43,14 @@
                 {{-- Name Fields Grid --}}
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
                     <div class="form-group-premium">
-                        <label for="modal_first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+                        <label for="modal_first_name" class="form-label">First Name <span class="text-danger" x-show="!editForm.archive_profile">*</span></label>
                         <input
                             type="text"
                             id="modal_first_name"
                             name="first_name"
                             class="form-control"
                             x-model="editForm.first_name"
-                            required
+                            :required="!editForm.archive_profile"
                             placeholder="ex. Juan"
                         >
                     </div>
@@ -68,14 +68,14 @@
                     </div>
 
                     <div class="form-group-premium">
-                        <label for="modal_last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+                        <label for="modal_last_name" class="form-label">Last Name <span class="text-danger" x-show="!editForm.archive_profile">*</span></label>
                         <input
                             type="text"
                             id="modal_last_name"
                             name="last_name"
                             class="form-control"
                             x-model="editForm.last_name"
-                            required
+                            :required="!editForm.archive_profile"
                             placeholder="ex. Dela Cruz"
                         >
                     </div>
@@ -84,7 +84,7 @@
                 {{-- DOB and Expertise Grid --}}
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
                     <div class="form-group-premium">
-                        <label for="modal_date_of_birth" class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                        <label for="modal_date_of_birth" class="form-label">Date of Birth <span class="text-danger" x-show="!editForm.archive_profile">*</span></label>
                         <input
                             type="date"
                             id="modal_date_of_birth"
@@ -92,18 +92,18 @@
                             class="form-control"
                             x-model="editForm.date_of_birth"
                             max="{{ now()->subYears(18)->format('Y-m-d') }}"
-                            required
+                            :required="!editForm.archive_profile"
                         >
                     </div>
 
                     <div class="form-group-premium">
-                        <label for="modal_expertise" class="form-label">Expertise / Role <span class="text-danger">*</span></label>
+                        <label for="modal_expertise" class="form-label">Expertise / Role <span class="text-danger" x-show="!editForm.archive_profile">*</span></label>
                         <select
                             id="modal_expertise"
                             name="expertise"
                             class="form-control"
                             x-model="editForm.expertise"
-                            required
+                            :required="!editForm.archive_profile"
                         >
                             @foreach ($expertiseOptions as $opt)
                                 <option value="{{ $opt }}">{{ $opt }}</option>
@@ -134,26 +134,26 @@
                 {{-- Address and Region Grid --}}
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
                     <div class="form-group-premium">
-                        <label for="modal_address" class="form-label">Address <span class="text-danger">*</span></label>
+                        <label for="modal_address" class="form-label">Address <span class="text-danger" x-show="!editForm.archive_profile">*</span></label>
                         <input
                             type="text"
                             id="modal_address"
                             name="address"
                             class="form-control"
                             x-model="editForm.address"
-                            required
+                            :required="!editForm.archive_profile"
                             placeholder="ex. Unit 101, High Street"
                         >
                     </div>
 
                     <div class="form-group-premium">
-                        <label for="modal_region" class="form-label">Region <span class="text-danger">*</span></label>
+                        <label for="modal_region" class="form-label">Region <span class="text-danger" x-show="!editForm.archive_profile">*</span></label>
                         <select
                             id="modal_region"
                             name="region"
                             class="form-control"
                             x-model="editForm.region"
-                            required
+                            :required="!editForm.archive_profile"
                         >
                             <option value="" disabled>Select Region...</option>
                             @foreach(\App\Support\PhilippineRegions::all() as $regName)
@@ -166,26 +166,26 @@
                 {{-- Province and City Grid --}}
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4);">
                     <div class="form-group-premium">
-                        <label for="modal_province" class="form-label">Province <span class="text-danger">*</span></label>
+                        <label for="modal_province" class="form-label">Province <span class="text-danger" x-show="!editForm.archive_profile">*</span></label>
                         <select
                             id="modal_province"
                             name="province"
                             class="form-control"
                             x-model="editForm.province"
-                            required
+                            :required="!editForm.archive_profile"
                         >
                             <option value="" disabled>Select Province...</option>
                         </select>
                     </div>
 
                     <div class="form-group-premium">
-                        <label for="modal_city" class="form-label">City <span class="text-danger">*</span></label>
+                        <label for="modal_city" class="form-label">City <span class="text-danger" x-show="!editForm.archive_profile">*</span></label>
                         <select
                             id="modal_city"
                             name="city"
                             class="form-control"
                             x-model="editForm.city"
-                            required
+                            :required="!editForm.archive_profile"
                         >
                             <option value="" disabled>Select City / Municipality...</option>
                         </select>
@@ -286,3 +286,56 @@
     @csrf
     @method('DELETE')
 </form>
+
+{{-- Centered In-App Archive Confirmation Modal --}}
+<div
+    class="reassign-modal-overlay"
+    style="display: none;"
+    x-show="archiveModalOpen"
+    x-cloak
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="archive-personnel-modal-title"
+>
+    <div class="reassign-modal-backdrop" @click="archiveModalOpen = false"></div>
+    <div
+        class="reassign-modal-content card"
+        style="max-width: 480px; width: 100%; text-align: center; padding: var(--space-6);"
+        x-show="archiveModalOpen"
+        x-transition:enter="modal-enter"
+        x-transition:leave="modal-leave"
+    >
+        <div style="width: 54px; height: 54px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4); color: var(--color-danger, #ef4444);">
+            <svg style="width: 28px; height: 28px;" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" />
+                <path fill-rule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clip-rule="evenodd" />
+            </svg>
+        </div>
+
+        <h3 id="archive-personnel-modal-title" style="margin: 0 0 var(--space-2); font-size: 1.15rem; font-weight: 700; color: var(--color-ink);">
+            Archive Personnel Profile
+        </h3>
+        <p style="color: var(--color-muted); font-size: 0.875rem; line-height: 1.5; margin: 0 0 var(--space-5);">
+            Are you sure you want to archive <strong style="color: var(--color-ink);" x-text="archivePersonnelTarget.name || 'this personnel'"></strong>? They will be unassigned from any active projects and moved to the inactive roster.
+        </p>
+
+        <div style="display: flex; gap: var(--space-3); justify-content: center;">
+            <button
+                type="button"
+                class="btn btn-secondary"
+                style="min-width: 110px;"
+                @click="archiveModalOpen = false"
+            >
+                Cancel
+            </button>
+            <button
+                type="button"
+                class="btn btn-danger"
+                style="min-width: 110px; background: var(--color-danger, #ef4444); border-color: var(--color-danger, #ef4444); color: #fff;"
+                @click="confirmArchive()"
+            >
+                Confirm
+            </button>
+        </div>
+    </div>
+</div>

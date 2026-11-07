@@ -314,14 +314,14 @@
                                 <td class="text-right">
                                     @can('update', $project)
                                         @if (!$project->trashed())
-                                            <form method="POST" action="{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}" class="inline-form" style="justify-content: flex-end;" onsubmit="return confirm('Delete this cost entry of ₱{{ number_format($cost->amount, 2) }}?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <input type="hidden" name="redirect_to" value="costing">
-                                                <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--color-danger); border-color: #fad2cf;">
-                                                    Delete
-                                                </button>
-                                            </form>
+                                            <button
+                                                type="button"
+                                                class="btn btn-secondary btn-sm"
+                                                style="color: var(--color-danger); border-color: #fad2cf;"
+                                                @click="openDeleteCostModal('{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}', '{{ addslashes($cost->description) }}', '{{ number_format($cost->amount, 2) }}')"
+                                            >
+                                                Delete
+                                            </button>
                                         @endif
                                     @endcan
                                 </td>
@@ -546,6 +546,65 @@
         </div>
     </div>
 
+    {{-- Hidden form for cost deletion --}}
+    <form id="costing-delete-cost-form" method="POST" style="display: none;">
+        @csrf
+        @method('DELETE')
+        <input type="hidden" name="redirect_to" value="costing">
+    </form>
+
+    {{-- Centered In-App Delete Expenditure Confirmation Modal --}}
+    <div
+        class="reassign-modal-overlay"
+        style="display: none;"
+        x-show="deleteCostModalOpen"
+        x-cloak
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="costing-delete-cost-modal-title"
+    >
+        <div class="reassign-modal-backdrop" @click="deleteCostModalOpen = false"></div>
+        <div
+            class="reassign-modal-content card"
+            style="max-width: 480px; width: 100%; text-align: center; padding: var(--space-6);"
+            x-show="deleteCostModalOpen"
+            x-transition:enter="modal-enter"
+            x-transition:leave="modal-leave"
+        >
+            <div style="width: 54px; height: 54px; border-radius: 50%; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4); color: var(--color-danger, #ef4444);">
+                <svg style="width: 28px; height: 28px;" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+
+            <h3 id="costing-delete-cost-modal-title" style="margin: 0 0 var(--space-2); font-size: 1.15rem; font-weight: 700; color: var(--color-ink);">
+                Delete Cost Entry
+            </h3>
+            <p style="color: var(--color-muted); font-size: 0.875rem; line-height: 1.5; margin: 0 0 var(--space-5);">
+                Are you sure you want to delete the cost entry for <strong style="color: var(--color-ink);" x-text="deleteCostTarget.description"></strong> (<span class="font-mono font-bold" x-text="'₱' + deleteCostTarget.amount"></span>)? This action cannot be undone.
+            </p>
+
+            <div style="display: flex; gap: var(--space-3); justify-content: center;">
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    style="min-width: 110px;"
+                    @click="deleteCostModalOpen = false"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-danger"
+                    style="min-width: 110px; background: var(--color-danger, #ef4444); border-color: var(--color-danger, #ef4444); color: #fff;"
+                    @click="confirmDeleteCost()"
+                >
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 
@@ -554,6 +613,26 @@
 function costingBreakdown() {
     return {
         addCostModalOpen: false,
+        deleteCostModalOpen: false,
+        deleteCostTarget: {
+            url: '',
+            description: '',
+            amount: ''
+        },
+        openDeleteCostModal(url, description, amount) {
+            this.deleteCostTarget = {
+                url: url,
+                description: description,
+                amount: amount
+            };
+            this.deleteCostModalOpen = true;
+        },
+        confirmDeleteCost() {
+            if (!this.deleteCostTarget.url) return;
+            const form = document.getElementById('costing-delete-cost-form');
+            form.action = this.deleteCostTarget.url;
+            form.submit();
+        },
         selectedMaterialId: '',
         materialSearch: '',
         materialDropdownOpen: false,

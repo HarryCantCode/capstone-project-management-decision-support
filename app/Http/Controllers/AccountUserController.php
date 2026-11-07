@@ -84,18 +84,16 @@ class AccountUserController extends Controller implements HasMiddleware
         $employeeNumber = User::generateEmployeeNumber();
         $accountNumber = User::generateAccountNumber();
 
-        // Auto-generate password with format: @ + lastname + DEX + birthyear
-        // Example: @smithDEX2000
-        $birthYear = \Carbon\Carbon::parse($validated['birthdate'])->format('Y');
-        $cleanLastName = strtolower(preg_replace('/\s+/', '', $validated['last_name']));
-        $plainPassword = '@' . $cleanLastName . 'DEX' . $birthYear;
-
         $fullNameParts = array_filter([
             $validated['first_name'],
             $validated['middle_name'] ?? null,
             $validated['last_name'],
         ]);
         $fullName = implode(' ', $fullNameParts);
+
+        // Provision user with a secure random placeholder password and must_change_password=true
+        // The user will set their actual password using the invitation link sent to their email
+        $temporarySeedPassword = \Illuminate\Support\Str::random(32);
 
         $user = User::create([
             'first_name' => $validated['first_name'],
@@ -107,7 +105,7 @@ class AccountUserController extends Controller implements HasMiddleware
             'employee_number' => $employeeNumber,
             'account_number' => $accountNumber,
             'job_title' => $jobTitle,
-            'password' => Hash::make($plainPassword),
+            'password' => Hash::make($temporarySeedPassword),
             'must_change_password' => true,
             'created_by' => auth()->id(),
             'updated_by' => auth()->id(),
@@ -115,9 +113,19 @@ class AccountUserController extends Controller implements HasMiddleware
 
         $user->assignRole($validated['role']);
 
+        // Generate password creation token and dispatch welcome email
+        $token = \Illuminate\Support\Facades\Password::broker()->createToken($user);
+        $creationUrl = route('password.create-account', ['token' => $token, 'email' => $user->email]);
+
+        try {
+            \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\NewUserPasswordCreationMail($user, $creationUrl));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to send welcome password creation email to {$user->email}: " . $e->getMessage());
+        }
+
         return redirect()->route('account.settings')->with(
             'status',
-            "User account for {$fullName} ({$employeeNumber}, Acc: {$accountNumber}) created successfully. Default password is: {$plainPassword}. The user will be required to change their password upon first login.",
+            "User account for {$fullName} ({$employeeNumber}, Acc: {$accountNumber}) created successfully. An invitation with their password creation link has been sent to {$user->email}.",
         );
     }
 
@@ -195,54 +203,28 @@ class AccountUserController extends Controller implements HasMiddleware
     }
 
     /**
-     * Admin action 1: Generate a temporary password and send it directly to the user's email.
-     * Requires Admin's current password.
+     * Admin action: Send a password reset link directly to the user's email.
+     * Requires Admin's current password and acknowledgment.
      */
-    public function sendTemporaryPassword(Request $request, User $user)
+    public function sendResetLink(Request $request, User $user)
     {
         $request->validate([
             'admin_password' => ['required', 'current_password'],
+            'acknowledge_correct' => ['accepted'],
         ], [
             'admin_password.required' => 'Please enter your administrator password to proceed.',
             'admin_password.current_password' => 'The administrator password you entered is incorrect.',
+            'acknowledge_correct.accepted' => 'You must acknowledge that the user information is reviewed and correct before sending the reset link.',
         ]);
 
         $service = app(\App\Services\PasswordResetService::class);
-        $result = $service->generateTemporaryPasswordForUser($user, sendEmail: true);
+        $result = $service->sendPasswordResetLinkForUser($user);
 
-        return back()->with('status', "A randomized temporary password was generated and sent to {$user->email}.");
-    }
-
-    /**
-     * Admin action 2: Generate a temporary password that the admin can view and copy.
-     * Requires Admin's current password.
-     */
-    public function generateTemporaryPassword(Request $request, User $user)
-    {
-        $request->validate([
-            'admin_password' => ['required', 'current_password'],
-        ], [
-            'admin_password.required' => 'Please enter your administrator password to proceed.',
-            'admin_password.current_password' => 'The administrator password you entered is incorrect.',
-        ]);
-
-        $service = app(\App\Services\PasswordResetService::class);
-        $result = $service->generateTemporaryPasswordForUser($user, sendEmail: false);
-
-        if ($request->wantsJson()) {
-            return response()->json([
-                'success' => true,
-                'temporary_password' => $result['temporary_password'],
-                'user_name' => $user->name,
-                'email' => $user->email,
-            ]);
+        if (! $result['success']) {
+            return back()->withErrors(['admin_password' => $result['message']]);
         }
 
-        return back()->with([
-            'status' => "Temporary password generated successfully.",
-            'generated_temporary_password' => $result['temporary_password'],
-            'generated_for_user' => $user->name,
-        ]);
+        return back()->with('status', "A password reset link has been dispatched to {$user->email}.");
     }
 
     /**

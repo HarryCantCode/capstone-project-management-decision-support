@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
-use App\Mail\TemporaryPasswordMail;
+use App\Mail\ResetPasswordLinkMail;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
 
 class PasswordResetService
 {
@@ -45,9 +46,9 @@ class PasswordResetService
     }
 
     /**
-     * Request a randomized new password and send it to user's email.
+     * Request a password creation reset link and dispatch it to the user's email.
      * Supports both email address and 7-digit account number.
-     * Rate limited to 3 times per calendar day for normal user requests.
+     * Rate limited to 3 times per calendar day for normal user self-requests.
      *
      * @return array{success: bool, message: string}
      */
@@ -91,25 +92,19 @@ class PasswordResetService
             ];
         }
 
-        $temporaryPassword = $this->generateRandomPassword();
-
-        // Update user record: store hashed password and enforce password change upon next login
-        $user->forceFill([
-            'password' => Hash::make($temporaryPassword),
-            'must_change_password' => true,
-            'failed_login_attempts' => 0,
-            'locked_until' => null,
-        ])->save();
+        // Generate password creation token and reset URL
+        $token = Password::broker()->createToken($user);
+        $resetUrl = route('password.create-account', ['token' => $token, 'email' => $user->email]);
 
         // Increment daily count expiring at end of day
         $secondsUntilMidnight = now()->diffInSeconds(now()->endOfDay());
         \Illuminate\Support\Facades\Cache::put($dailyKey, $dailyCount + 1, max(60, $secondsUntilMidnight));
 
         try {
-            Mail::to($user->email)->send(new TemporaryPasswordMail($user, $temporaryPassword));
+            Mail::to($user->email)->send(new ResetPasswordLinkMail($user, $resetUrl));
             app(\App\Services\NotificationService::class)->notifyCredentialReset($user, 'password');
         } catch (\Throwable $e) {
-            Log::error("Failed to send temporary password email to {$user->email}: " . $e->getMessage());
+            Log::error("Failed to send password reset link email to {$user->email}: " . $e->getMessage());
 
             return [
                 'success' => false,
@@ -119,7 +114,35 @@ class PasswordResetService
 
         return [
             'success' => true,
-            'message' => 'A new temporary password has been sent to your registered email address.',
+            'message' => 'A password reset link has been sent to your registered email address.',
+        ];
+    }
+
+    /**
+     * Admin triggers sending a password reset link to a target user's email.
+     *
+     * @return array{success: bool, message: string}
+     */
+    public function sendPasswordResetLinkForUser(User $user): array
+    {
+        $token = Password::broker()->createToken($user);
+        $resetUrl = route('password.create-account', ['token' => $token, 'email' => $user->email]);
+
+        try {
+            Mail::to($user->email)->send(new ResetPasswordLinkMail($user, $resetUrl));
+            app(\App\Services\NotificationService::class)->notifyCredentialReset($user, 'password');
+        } catch (\Throwable $e) {
+            Log::error("Failed to send password reset link email to {$user->email}: " . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Failed to dispatch password reset email. Please try again.',
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => "A password reset link has been dispatched to {$user->email}.",
         ];
     }
 

@@ -29,6 +29,25 @@ class UpdatePersonnelRequest extends FormRequest
      */
     public function rules(): array
     {
+        // When archiving the profile, do not block the request with strict field requirements
+        if ($this->boolean('archive_profile')) {
+            return [
+                'archive_profile' => ['required', 'boolean'],
+                'first_name'      => ['nullable', 'string', 'max:255'],
+                'middle_name'     => ['nullable', 'string', 'max:255'],
+                'last_name'       => ['nullable', 'string', 'max:255'],
+                'date_of_birth'   => ['nullable', 'date'],
+                'address'         => ['nullable', 'string', 'max:1000'],
+                'region'          => ['nullable', 'string', 'max:255'],
+                'province'        => ['nullable', 'string', 'max:255'],
+                'city'            => ['nullable', 'string', 'max:255'],
+                'barangay'        => ['nullable', 'string', 'max:255'],
+                'postal_code'     => ['nullable', 'string', 'max:10'],
+                'expertise'       => ['nullable', 'string'],
+                'project_id'      => ['nullable', 'exists:projects,id'],
+            ];
+        }
+
         return [
             'first_name'      => ['required', 'string', 'max:255'],
             'middle_name'     => ['nullable', 'string', 'max:255'],

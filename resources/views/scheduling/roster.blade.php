@@ -5,6 +5,11 @@
 
 @section('content')
 <div x-data="{
+    archiveModalOpen: false,
+    archivePersonnelTarget: {
+        id: null,
+        name: ''
+    },
     editModalOpen: false,
     editForm: {
         id: null,
@@ -79,11 +84,14 @@
         });
     },
     archiveDirectly(id, name) {
-        if (confirm('Archive personnel profile for ' + name + '? They will be unassigned from projects and moved to the inactive roster.')) {
-            const form = document.getElementById('standalone-archive-form');
-            form.action = '/scheduling/' + id;
-            form.submit();
-        }
+        this.archivePersonnelTarget = { id: id, name: name };
+        this.archiveModalOpen = true;
+    },
+    confirmArchive() {
+        if (!this.archivePersonnelTarget.id) return;
+        const form = document.getElementById('standalone-archive-form');
+        form.action = '/scheduling/' + this.archivePersonnelTarget.id;
+        form.submit();
     }
 }">
     {{-- Page Header --}}
@@ -337,23 +345,15 @@
 
                                         @if (!$person->trashed())
                                             {{-- Archive Action --}}
-                                            <form
-                                                method="POST"
-                                                action="{{ route('scheduling.destroy', $person) }}"
-                                                onsubmit="return confirm('Archive personnel profile for {{ addslashes($person->full_name) }}? They will be unassigned and placed in the inactive roster.');"
-                                                style="display: inline;"
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm"
+                                                style="background: transparent; color: var(--color-danger, #ef4444); border: 1px solid rgba(239, 68, 68, 0.35); font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                                                title="Archive this personnel profile"
+                                                @click="archiveDirectly({{ $person->id }}, '{{ addslashes($person->full_name) }}')"
                                             >
-                                                @csrf
-                                                @method('DELETE')
-                                                <button
-                                                    type="submit"
-                                                    class="btn btn-sm"
-                                                    style="background: transparent; color: var(--color-danger, #ef4444); border: 1px solid rgba(239, 68, 68, 0.35); font-size: 0.75rem; padding: 0.25rem 0.5rem;"
-                                                    title="Archive this personnel profile"
-                                                >
-                                                    Archive
-                                                </button>
-                                            </form>
+                                                Archive
+                                            </button>
                                         @else
                                             {{-- Restore / Activate Action --}}
                                             <form

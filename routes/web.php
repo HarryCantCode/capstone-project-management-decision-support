@@ -38,6 +38,10 @@ Route::middleware('guest')->group(function () {
     Route::post('/forgot-password', [\App\Http\Controllers\Auth\ForgotPasswordController::class, 'store'])->name('password.forgot.store');
 });
 
+// ─── Password Creation / Reset Link (Accessible even if previously logged in; logs out existing session) ───
+Route::get('/create-password/{token}', [\App\Http\Controllers\Auth\NewAccountPasswordController::class, 'create'])->name('password.create-account');
+Route::post('/create-password', [\App\Http\Controllers\Auth\NewAccountPasswordController::class, 'store'])->name('password.create-account.store');
+
 // ─── 2FA challenge & First-login password change (must be logged in) ──────────
 
 Route::middleware(['auth'])->group(function () {
@@ -83,8 +87,7 @@ Route::middleware(['auth', 'two-factor', 'must-change-password'])->group(functio
         // User Management & Account Archiving (Admin only)
         Route::post('users/{id}/restore', [\App\Http\Controllers\AccountUserController::class, 'restore'])->name('users.restore');
         Route::post('users/{user}/unlock', [\App\Http\Controllers\AccountUserController::class, 'unlock'])->name('users.unlock');
-        Route::post('users/{user}/send-temporary-password', [\App\Http\Controllers\AccountUserController::class, 'sendTemporaryPassword'])->name('users.send-temporary-password');
-        Route::post('users/{user}/generate-temporary-password', [\App\Http\Controllers\AccountUserController::class, 'generateTemporaryPassword'])->name('users.generate-temporary-password');
+        Route::post('users/{user}/send-reset-link', [\App\Http\Controllers\AccountUserController::class, 'sendResetLink'])->name('users.send-reset-link');
         Route::resource('users', \App\Http\Controllers\AccountUserController::class)->except(['index', 'show']);
     });
 
