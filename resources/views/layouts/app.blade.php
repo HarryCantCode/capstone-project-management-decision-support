@@ -697,27 +697,26 @@
                         <template x-teleport="body">
                             <div
                                 class="staff-action-review-overlay"
-                                x-show="reviewModalOpen"
+                                x-show="reviewModalOpen && activeReviewItem !== null"
                                 x-cloak
-                                style="position: fixed; inset: 0; z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 1.5rem; overflow-y: auto;"
+                                @keydown.escape.window="if (reviewModalOpen) closeReviewModal()"
+                                style="display: none;"
                             >
                                 <div
                                     class="staff-action-review-backdrop"
-                                    style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 999998;"
                                     @click="closeReviewModal()"
                                 ></div>
                                 <div
                                     class="card staff-action-review-content"
-                                    x-show="reviewModalOpen"
+                                    x-show="reviewModalOpen && activeReviewItem !== null"
                                     x-transition:enter="transition ease-out duration-200"
                                     x-transition:enter-start="opacity-0 transform scale-95"
                                     x-transition:enter-end="opacity-100 transform scale-100"
                                     x-transition:leave="transition ease-in duration-150"
                                     x-transition:leave-start="opacity-100 transform scale-100"
                                     x-transition:leave-end="opacity-0 transform scale-95"
-                                    style="position: relative; z-index: 999999; max-width: 580px; width: 100%; max-height: calc(100vh - 3rem); display: flex; flex-direction: column; margin: auto; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45); border-radius: var(--radius-lg); border: 1px solid var(--color-border); background: var(--color-surface);"
                                 >
-                                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); flex-shrink: 0;">
+                                    <div class="card-header" style="position: relative; display: flex; justify-content: space-between; align-items: center; padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); flex-shrink: 0;">
                                         <div style="display: flex; align-items: center; gap: var(--space-2);">
                                             <svg style="width: 20px; height: 20px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
@@ -726,7 +725,7 @@
                                             </svg>
                                             <span style="font-weight: 700; font-size: 1.05rem;">Review Staff Action</span>
                                         </div>
-                                        <button type="button" class="flash-close" @click="closeReviewModal()" aria-label="Close modal">&times;</button>
+                                        <button type="button" class="staff-action-review-close" @click="closeReviewModal()" aria-label="Close modal">&times;</button>
                                     </div>
 
                                     <div class="card-body" style="padding: var(--space-5); overflow-y: auto; flex: 1 1 auto;">
