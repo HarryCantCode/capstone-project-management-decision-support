@@ -8,7 +8,7 @@ class ExportRevenueReportRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAnyRole(['Admin', 'Manager']) ?? false;
+        return $this->user()?->hasAnyRole(['Admin', 'Manager', 'Staff']) ?? false;
     }
 
     /**

@@ -78,7 +78,7 @@ class ReportService
                 COUNT(*) as total_materials,
                 SUM(CASE WHEN demand_status = 'fast-moving' THEN 1 ELSE 0 END) as fast_moving_count,
                 SUM(CASE WHEN demand_status = 'slow-moving' THEN 1 ELSE 0 END) as slow_moving_count,
-                SUM(CASE WHEN quantity_available < 5 THEN 1 ELSE 0 END) as low_stock_count,
+                SUM(CASE WHEN quantity_available <= 8 THEN 1 ELSE 0 END) as low_stock_count,
                 COALESCE(SUM(quantity_available), 0) as total_units,
                 COALESCE(SUM(quantity_available * price), 0) as total_retail_value,
                 COALESCE(SUM(quantity_available * unit_cost), 0) as total_cost_value
@@ -460,7 +460,7 @@ class ReportService
             }
 
             if ($stockFilter === 'low_stock') {
-                $query->where('quantity_available', '>', 0)->where('quantity_available', '<', 5);
+                $query->where('quantity_available', '>', 0)->where('quantity_available', '<=', 8);
             } elseif ($stockFilter === 'out_of_stock') {
                 $query->where('quantity_available', '<=', 0);
             } elseif ($stockFilter === 'in_stock') {
@@ -486,7 +486,7 @@ class ReportService
         $totalUnits = (int) $materials->sum('quantity_available');
         $fastMovingCount = $materials->where('demand_status', 'fast-moving')->count();
         $slowMovingCount = $materials->where('demand_status', 'slow-moving')->count();
-        $lowStockCount = $materials->where('quantity_available', '<', 5)->count();
+        $lowStockCount = $materials->where('quantity_available', '<=', 8)->where('quantity_available', '>', 0)->count();
         $totalRetailValue = (float) $materials->sum(fn (Resource $r) => (int) $r->quantity_available * (float) $r->price);
         $totalCostValue = (float) $materials->sum(fn (Resource $r) => (int) $r->quantity_available * (float) $r->unit_cost);
 

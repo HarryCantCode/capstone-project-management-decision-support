@@ -34,8 +34,8 @@
     </div>
     @endrole
 
-    {{-- Project Management — Admin and Manager --}}
-    @role('Admin|Manager')
+    {{-- Project Management — Admin, Manager, and Staff --}}
+    @role('Admin|Manager|Staff')
     <div class="nav-section">
         <span class="nav-section-label">Projects</span>
         <ul class="nav-list" role="list">
@@ -102,8 +102,8 @@
     </div>
     @endrole
 
-    {{-- Reports — Admin and Manager --}}
-    @role('Admin|Manager')
+    {{-- Reports & Decision Support — Admin, Manager, and Staff --}}
+    @role('Admin|Manager|Staff')
     <div class="nav-section">
         <span class="nav-section-label">Insights</span>
         <ul class="nav-list" role="list">

@@ -309,76 +309,188 @@ class ScenarioSimulatorService
     }
 
     /**
-     * Simulate Budget / Price Adjustment ("What if material prices or other costs change?").
+     * Simulate Supplier Procurement & Lead-Time Trade-off ("Compare suppliers for best cost & delivery schedule").
+     * Pure in-memory multi-criteria decision analysis (MCDA).
      *
-     * @param Project $project
-     * @param float $materialPriceDeltaPct Percentage change applied to material costs (-50 to +200)
-     * @param float $otherCostDeltaPct Percentage change applied to non-material costs (-50 to +200)
-     * @param float $additionalContingency Fixed additional PHP contingency amount
+     * @param Project|null $project
+     * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function simulateBudgetAdjustment(
-        Project $project,
-        float $materialPriceDeltaPct = 0.0,
-        float $otherCostDeltaPct = 0.0,
-        float $additionalContingency = 0.0,
-    ): array {
-        $project->loadMissing('costs');
+    public function simulateSupplierComparison(?Project $project, array $input): array
+    {
+        $materialName = trim((string) ($input['material_name'] ?? 'Elevator Component'));
+        $requiredQty = max(1, (int) ($input['required_quantity'] ?? 1));
+        $orderDate = ! empty($input['order_date'])
+            ? Carbon::parse($input['order_date'])->startOfDay()
+            : Carbon::today();
+        $targetArrivalDate = ! empty($input['required_by_date'])
+            ? Carbon::parse($input['required_by_date'])->startOfDay()
+            : ($project && $project->target_completion_date
+                ? Carbon::parse($project->target_completion_date)->startOfDay()->subDays(14)
+                : $orderDate->copy()->addDays(21));
+        $windowDays = (int) $orderDate->diffInDays($targetArrivalDate, false);
 
-        $contractPrice = max(0.0, (float) $project->contract_price);
-        $currentActualSpend = max(0.0, (float) $project->actual_spend);
+        $costWeight = max(0.0, (float) ($input['cost_weight'] ?? 0.55));
+        $leadTimeWeight = max(0.0, (float) ($input['lead_time_weight'] ?? 0.45));
+        $totalWeight = $costWeight + $leadTimeWeight;
+        if ($totalWeight <= 0) {
+            $costWeight = 0.55;
+            $leadTimeWeight = 0.45;
+            $totalWeight = 1.0;
+        }
+        $wCost = $costWeight / $totalWeight;
+        $wLead = $leadTimeWeight / $totalWeight;
 
-        $materialSpend = (float) $project->costs->where('cost_type', 'materials')->sum('amount');
-        $otherSpend = max(0.0, $currentActualSpend - $materialSpend);
-
-        $simulatedMaterialSpend = round($materialSpend * (1 + ($materialPriceDeltaPct / 100.0)), 2);
-        $simulatedOtherSpend = round($otherSpend * (1 + ($otherCostDeltaPct / 100.0)), 2);
-        $simulatedTotalSpend = max(0.0, round($simulatedMaterialSpend + $simulatedOtherSpend + $additionalContingency, 2));
-
-        $spendDelta = round($simulatedTotalSpend - $currentActualSpend, 2);
-        $originalMargin = round($contractPrice - $currentActualSpend, 2);
-        $simulatedMargin = round($contractPrice - $simulatedTotalSpend, 2);
-
-        $originalUtilPct = $contractPrice > 0 ? round(($currentActualSpend / $contractPrice) * 100, 1) : 0.0;
-        $simulatedUtilPct = $contractPrice > 0 ? round(($simulatedTotalSpend / $contractPrice) * 100, 1) : 0.0;
-
-        $status = 'ok';
-        $healthLabel = 'On Track';
-        if ($simulatedUtilPct > 100.0) {
-            $status = 'critical';
-            $healthLabel = 'Over Budget';
-        } elseif ($simulatedUtilPct >= 85.0) {
-            $status = 'warning';
-            $healthLabel = 'At Risk';
+        /** @var array<int, array<string, mixed>> $rawSuppliers */
+        $rawSuppliers = $input['suppliers'] ?? [];
+        if (empty($rawSuppliers)) {
+            $rawSuppliers = [
+                [
+                    'name' => 'Fuji Elevator Components Corp.',
+                    'unit_price' => 185000,
+                    'shipping_fee' => 6500,
+                    'lead_time_days' => 10,
+                    'payment_terms' => '30 Days Net',
+                ],
+                [
+                    'name' => 'Orient Hoist & Industrial Direct',
+                    'unit_price' => 142000,
+                    'shipping_fee' => 28000,
+                    'lead_time_days' => 35,
+                    'payment_terms' => '50% DP / 50% Delivery',
+                ],
+            ];
         }
 
+        $minTotalCost = null;
+        $maxTotalCost = null;
+        $minLeadDays = null;
+        $maxLeadDays = null;
+
+        $parsed = [];
+        foreach ($rawSuppliers as $idx => $s) {
+            $name = trim((string) ($s['name'] ?? 'Supplier ' . chr(65 + $idx)));
+            $unitPrice = max(0.0, (float) ($s['unit_price'] ?? 0));
+            $shippingFee = max(0.0, (float) ($s['shipping_fee'] ?? 0));
+            $leadDays = max(1, (int) ($s['lead_time_days'] ?? 1));
+            $terms = trim((string) ($s['payment_terms'] ?? 'Standard'));
+
+            $totalCost = ($unitPrice * $requiredQty) + $shippingFee;
+            $arrivalDate = $orderDate->copy()->addDays($leadDays);
+            $latestOrderDate = $targetArrivalDate->copy()->subDays($leadDays);
+            $daysDiffToNeed = (int) $arrivalDate->diffInDays($targetArrivalDate, false);
+            $isLate = $arrivalDate->gt($targetArrivalDate);
+            $delayDays = $isLate ? (int) $targetArrivalDate->diffInDays($arrivalDate) : 0;
+
+            if ($minTotalCost === null || $totalCost < $minTotalCost) {
+                $minTotalCost = $totalCost;
+            }
+            if ($maxTotalCost === null || $totalCost > $maxTotalCost) {
+                $maxTotalCost = $totalCost;
+            }
+            if ($minLeadDays === null || $leadDays < $minLeadDays) {
+                $minLeadDays = $leadDays;
+            }
+            if ($maxLeadDays === null || $leadDays > $maxLeadDays) {
+                $maxLeadDays = $leadDays;
+            }
+
+            $parsed[] = [
+                'id' => $idx + 1,
+                'name' => $name,
+                'unit_price' => $unitPrice,
+                'shipping_fee' => $shippingFee,
+                'total_cost' => round($totalCost, 2),
+                'lead_time_days' => $leadDays,
+                'order_date' => $orderDate->format('M j, Y'),
+                'arrival_date' => $arrivalDate->format('M j, Y'),
+                'latest_order_date' => $latestOrderDate->format('M j, Y'),
+                'payment_terms' => $terms,
+                'is_late' => $isLate,
+                'delay_days' => $delayDays,
+                'days_buffer' => $daysDiffToNeed,
+            ];
+        }
+
+        $minTotalCost = $minTotalCost ?? 1.0;
+        $maxTotalCost = $maxTotalCost ?? 1.0;
+        $minLeadDays = $minLeadDays ?? 1;
+        $maxLeadDays = $maxLeadDays ?? 1;
+
+        $costRange = max(1.0, $maxTotalCost - $minTotalCost);
+        $leadRange = max(1, $maxLeadDays - $minLeadDays);
+        $hasAnyOnTime = collect($parsed)->contains(fn (array $p) => ! $p['is_late']);
+
+        $evaluated = [];
+        $bestScore = -1.0;
+        $bestId = null;
+
+        foreach ($parsed as $item) {
+            $costScore = $costRange > 0
+                ? round(100 - ((($item['total_cost'] - $minTotalCost) / $costRange) * 100), 1)
+                : 100.0;
+
+            $speedScore = $leadRange > 0
+                ? round(100 - ((($item['lead_time_days'] - $minLeadDays) / $leadRange) * 100), 1)
+                : 100.0;
+
+            if (! $item['is_late']) {
+                $effWindow = max(1, $windowDays);
+                $fitScore = min(100.0, 70.0 + round(($item['days_buffer'] / $effWindow) * 30.0, 1));
+                $leadScore = min(100.0, round(($speedScore * 0.45) + ($fitScore * 0.55), 1));
+            } else {
+                $leadScore = max(0.0, round(($speedScore * 0.3) - ($item['delay_days'] * 6), 1));
+            }
+
+            $rawComposite = ($costScore * $wCost) + ($leadScore * $wLead);
+            $compositeScore = $item['is_late']
+                ? max(5.0, round($rawComposite - 35.0 - ($item['delay_days'] * 1.5), 1))
+                : round($rawComposite, 1);
+
+            $badges = [];
+            if ($item['total_cost'] == $minTotalCost) {
+                $badges[] = 'Lowest Price';
+            }
+            if ($item['lead_time_days'] == $minLeadDays) {
+                $badges[] = 'Fastest Delivery';
+            }
+
+            $status = $item['is_late'] ? 'critical' : ($item['days_buffer'] <= 3 ? 'warning' : 'ok');
+
+            $evaluated[] = array_merge($item, [
+                'cost_score' => $costScore,
+                'lead_score' => $leadScore,
+                'composite_score' => $compositeScore,
+                'badges' => $badges,
+                'status' => $status,
+            ]);
+
+            $isEligibleForBest = $hasAnyOnTime ? ! $item['is_late'] : true;
+            if ($isEligibleForBest && $compositeScore > $bestScore) {
+                $bestScore = $compositeScore;
+                $bestId = $item['id'];
+            }
+        }
+
+        foreach ($evaluated as &$ev) {
+            $ev['is_best_overall'] = ($ev['id'] === $bestId);
+        }
+        unset($ev);
+
         return [
-            'project_code' => $project->project_code,
-            'project_name' => $project->name,
-            'contract_price' => $contractPrice,
-            'original_material_spend' => $materialSpend,
-            'original_other_spend' => $otherSpend,
-            'original_total_spend' => $currentActualSpend,
-            'original_remaining_budget' => $originalMargin,
-            'original_utilization_pct' => $originalUtilPct,
-            'simulated_material_spend' => $simulatedMaterialSpend,
-            'simulated_other_spend' => $simulatedOtherSpend,
-            'additional_contingency' => $additionalContingency,
-            'simulated_total_spend' => $simulatedTotalSpend,
-            'simulated_remaining_budget' => $simulatedMargin,
-            'simulated_utilization_pct' => $simulatedUtilPct,
-            'spend_delta' => $spendDelta,
-            'status' => $status,
-            'health_label' => $healthLabel,
-            'formula' => sprintf(
-                'Simulated Spend = (Materials ₱%s × %s%%) + (Other ₱%s × %s%%) + ₱%s = ₱%s',
-                number_format($materialSpend, 2),
-                number_format(100 + $materialPriceDeltaPct, 1),
-                number_format($otherSpend, 2),
-                number_format(100 + $otherCostDeltaPct, 1),
-                number_format($additionalContingency, 2),
-                number_format($simulatedTotalSpend, 2),
-            ),
+            'material_name' => $materialName,
+            'required_quantity' => $requiredQty,
+            'order_date' => $orderDate->format('M j, Y'),
+            'required_by_date' => $targetArrivalDate->format('M j, Y'),
+            'procurement_window_days' => $windowDays,
+            'suppliers' => $evaluated,
+            'summary' => [
+                'total_compared' => count($evaluated),
+                'best_supplier' => ! empty($evaluated[0]) ? $evaluated[0]['name'] : null,
+                'best_score' => ! empty($evaluated[0]) ? $evaluated[0]['composite_score'] : null,
+                'price_difference' => ($maxTotalCost - $minTotalCost),
+                'days_difference' => ($maxLeadDays - $minLeadDays),
+            ],
         ];
     }
 }

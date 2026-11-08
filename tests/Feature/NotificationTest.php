@@ -312,3 +312,48 @@ test('user cannot mark or archive another users notification', function () {
     expect($notification->fresh()->isRead())->toBeFalse();
     expect($notification->fresh()->isArchived())->toBeFalse();
 });
+
+test('admin and manager receive notifications when project status changes to in-progress, completed, or archived', function () {
+    $admin = User::factory()->create();
+    $admin->assignRole('Admin');
+
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $project = Project::factory()->create([
+        'name' => 'Apex Tower Elevator',
+        'status' => 'pending',
+        'created_by' => $admin->id,
+    ]);
+
+    Notification::query()->delete();
+
+    // 1. Transition to ongoing (In-Progress)
+    $this->actingAs($manager)
+        ->patch(route('projects.transition', $project), ['status' => 'ongoing'])
+        ->assertRedirect();
+
+    expect(Notification::where('user_id', $admin->id)->where('type', 'project_status_changed')->exists())->toBeTrue();
+    expect(Notification::where('user_id', $manager->id)->where('type', 'project_status_changed')->exists())->toBeTrue();
+
+    Notification::query()->delete();
+
+    // 2. Transition to completed
+    $this->actingAs($manager)
+        ->patch(route('projects.transition', $project->fresh()), ['status' => 'completed'])
+        ->assertRedirect();
+
+    $completedNotif = Notification::where('user_id', $admin->id)->where('type', 'project_status_changed')->first();
+    expect($completedNotif)->not->toBeNull();
+    expect($completedNotif->title)->toBe('Project Status: Completed');
+
+    Notification::query()->delete();
+
+    // 3. Archive project
+    $this->actingAs($manager)
+        ->post(route('projects.archive', $project->fresh()))
+        ->assertRedirect();
+
+    expect(Notification::where('user_id', $admin->id)->where('type', 'project_archived')->exists())->toBeTrue();
+    expect(Notification::where('user_id', $manager->id)->where('type', 'project_archived')->exists())->toBeTrue();
+});

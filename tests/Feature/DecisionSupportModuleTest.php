@@ -179,18 +179,34 @@ it('runs in-memory what-if simulations without modifying database records', func
         ->assertJsonPath('scenario_type', 'delay')
         ->assertJsonPath('simulation.slip_days', 14);
 
-    // 3. Budget Adjustment Simulation
+    // 3. Supplier Procurement Trade-Off Simulation (Replaced Budget Adjustment)
     $this->actingAs($admin)
         ->withSession(['two_factor_verified' => true])
         ->postJson(route('decision-support.simulate'), [
-            'scenario_type' => 'budget',
+            'scenario_type' => 'supplier',
             'project_id' => $project->id,
-            'material_price_delta_pct' => 20,
-            'other_cost_delta_pct' => 10,
-            'additional_contingency' => 50000,
+            'material_name' => 'Traction Machine Drive',
+            'required_quantity' => 2,
+            'suppliers' => [
+                [
+                    'name' => 'Supplier Alpha',
+                    'unit_price' => 50000,
+                    'shipping_fee' => 5000,
+                    'lead_time_days' => 5,
+                    'payment_terms' => 'Net 30',
+                ],
+                [
+                    'name' => 'Supplier Beta',
+                    'unit_price' => 40000,
+                    'shipping_fee' => 15000,
+                    'lead_time_days' => 25,
+                    'payment_terms' => 'COD',
+                ],
+            ],
         ])
         ->assertOk()
-        ->assertJsonPath('scenario_type', 'budget');
+        ->assertJsonPath('scenario_type', 'supplier')
+        ->assertJsonPath('simulation.summary.total_compared', 2);
 
     // Verify zero database mutations occurred
     expect((float) $project->fresh()->actual_spend)->toBe(1200000.00)

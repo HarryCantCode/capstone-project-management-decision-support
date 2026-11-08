@@ -118,7 +118,7 @@
 
                     <div class="form-group-premium">
                         <label for="email" class="form-label">Email Address <span class="required" aria-hidden="true">*</span></label>
-                        <input type="email" id="email" name="email" x-model="email" class="form-control @error('email') is-invalid @enderror" value="{{ old('email') }}" required placeholder="user@dex-pms.local">
+                        <input type="email" id="email" name="email" x-model="email" class="form-control @error('email') is-invalid @enderror" value="{{ old('email') }}" required placeholder="user@example.com">
                         @error('email')<div class="form-error">{{ $message }}</div>@enderror
                     </div>
                 </div>

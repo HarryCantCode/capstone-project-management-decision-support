@@ -36,17 +36,17 @@
             
             @if ($project->trashed())
                 @can('restore', $project)
-                    <form method="POST" action="{{ route('projects.restore', $project->id) }}" class="inline-form" onsubmit="return confirm('Restore archived project {{ addslashes($project->name) }} back to active completed projects?');">
+                    <form method="POST" action="{{ route('projects.restore', $project->id) }}" class="inline-form" onsubmit="return confirm('Restore archived project {{ addslashes($project->name) }} back to active projects?');">
                         @csrf
                         <button type="submit" class="btn btn-primary btn-sm" title="Restore project from archive">Restore</button>
                     </form>
                 @endcan
-            @elseif ($project->status === 'completed')
+            @else
                 @can('archive', $project)
                     <button
                         type="button"
                         class="btn btn-danger btn-sm"
-                        title="Archive completed project"
+                        title="Archive project"
                         @click="openArchiveModal('{{ route('projects.archive', $project) }}', '{{ addslashes($project->name) }}')"
                     >
                         Archive

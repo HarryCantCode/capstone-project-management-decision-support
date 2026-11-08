@@ -33,7 +33,7 @@ class DecisionSupportController extends Controller implements HasMiddleware
         return [
             'auth',
             'two-factor',
-            'role:Admin|Manager',
+            'role:Admin|Manager|Staff',
         ];
     }
 
@@ -203,6 +203,8 @@ class DecisionSupportController extends Controller implements HasMiddleware
      */
     public function allocate(Request $request, DecisionSupportService $service): RedirectResponse|JsonResponse
     {
+        abort_if(Auth::user()->hasRole('Staff'), 403, 'Staff users cannot allocate resources.');
+
         $validated = $request->validate([
             'project_id' => ['required', 'integer', 'exists:projects,id'],
             'template_name' => ['nullable', 'string', 'max:120'],

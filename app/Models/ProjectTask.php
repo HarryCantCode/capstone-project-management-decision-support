@@ -46,6 +46,14 @@ class ProjectTask extends Model
         'sort_order' => 'integer',
     ];
 
+    protected static function booted(): void
+    {
+        $flush = fn () => cache()->forget('dashboard.stats.global');
+
+        static::saved($flush);
+        static::deleted($flush);
+    }
+
     /**
      * Parent project for this mother task.
      */

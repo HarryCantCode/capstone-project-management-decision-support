@@ -97,26 +97,15 @@ class DecisionSupportService
     }
 
     /**
-     * Run the in-memory Budget / Price Adjustment simulator.
+     * Run the in-memory Supplier Procurement & Lead-Time Trade-off simulator.
      *
-     * @param Project $project
-     * @param float $materialPriceDeltaPct
-     * @param float $otherCostDeltaPct
-     * @param float $additionalContingency
+     * @param Project|null $project
+     * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function simulateBudgetAdjustment(
-        Project $project,
-        float $materialPriceDeltaPct = 0.0,
-        float $otherCostDeltaPct = 0.0,
-        float $additionalContingency = 0.0,
-    ): array {
-        return $this->scenarioSimulator->simulateBudgetAdjustment(
-            $project,
-            $materialPriceDeltaPct,
-            $otherCostDeltaPct,
-            $additionalContingency,
-        );
+    public function simulateSupplierComparison(?Project $project, array $input): array
+    {
+        return $this->scenarioSimulator->simulateSupplierComparison($project, $input);
     }
 
     /**

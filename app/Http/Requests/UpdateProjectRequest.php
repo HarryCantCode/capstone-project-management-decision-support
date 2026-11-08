@@ -12,6 +12,15 @@ class UpdateProjectRequest extends FormRequest
         return Auth::check();
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('contract_price') && is_string($this->input('contract_price'))) {
+            $this->merge([
+                'contract_price' => str_replace(',', '', $this->input('contract_price')),
+            ]);
+        }
+    }
+
     /**
      * Same rules as store — status transitions use the separate
      * ProjectController::transition() route and its own inline validation.

@@ -155,7 +155,7 @@
             const q = this.materialSearch.trim().toLowerCase();
             return this.materials.filter(m => {
                 if (this.materialDemandStatus && m.demand_status !== this.materialDemandStatus) return false;
-                if (this.materialStockFilter === 'low_stock' && (m.quantity_available <= 0 || m.quantity_available >= 5)) return false;
+                if (this.materialStockFilter === 'low_stock' && (m.quantity_available <= 0 || m.quantity_available > 8)) return false;
                 if (this.materialStockFilter === 'out_of_stock' && m.quantity_available > 0) return false;
                 if (this.materialStockFilter === 'in_stock' && m.quantity_available <= 0) return false;
                 if (q) {
@@ -1641,7 +1641,7 @@
                         <select id="report-material-stock" x-model="materialStockFilter" class="form-control form-control--compact filter-select reports-select">
                             <option value="all">All Stock Levels</option>
                             <option value="in_stock">In Stock (&gt; 0)</option>
-                            <option value="low_stock">Low Stock (&lt; 5)</option>
+                            <option value="low_stock">Low Stock (≤ 8)</option>
                             <option value="out_of_stock">Out of Stock (0)</option>
                         </select>
 
@@ -1743,7 +1743,7 @@
                                     </template>
                                 </td>
                                 <td class="font-mono" style="font-size: 0.8125rem;" x-text="mat.model"></td>
-                                <td class="text-right font-mono font-bold" :class="mat.quantity_available < 5 ? 'text-danger' : ''" x-text="mat.quantity_available"></td>
+                                <td class="text-right font-mono font-bold" :class="mat.quantity_available <= 8 ? 'text-danger' : ''" x-text="mat.quantity_available"></td>
                                 <td class="text-right font-mono text-success" x-text="formatCurrency(mat.price)"></td>
                                 <td class="text-right font-mono text-muted" x-text="formatCurrency(mat.unit_cost)"></td>
                                 <td class="text-center">

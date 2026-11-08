@@ -22,6 +22,15 @@ class StoreProjectRequest extends FormRequest
         return Auth::check();
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('contract_price') && is_string($this->input('contract_price'))) {
+            $this->merge([
+                'contract_price' => str_replace(',', '', $this->input('contract_price')),
+            ]);
+        }
+    }
+
     /**
      * @return array<string, list<string|\Illuminate\Contracts\Validation\Rule>>
      */

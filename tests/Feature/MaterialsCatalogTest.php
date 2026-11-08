@@ -129,3 +129,46 @@ test('manager can bulk delete selected materials from catalog', function () {
     $this->assertSoftDeleted('resources', ['id' => $mat2->id]);
     $this->assertNotSoftDeleted('resources', ['id' => $mat3->id]);
 });
+
+test('material demand status automatically syncs to fast-moving or slow-moving based on 3-month project usage frequency', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $material = Resource::factory()->create([
+        'name' => 'Guide Rail Bracket Kit',
+        'resource_code' => 'DEX-MAT020',
+        'quantity_available' => 20,
+        'price' => 15000.00,
+        'unit_cost' => 12000.00,
+        'demand_status' => 'slow-moving',
+    ]);
+
+    $projectA = \App\Models\Project::factory()->create(['status' => 'ongoing']);
+    $projectB = \App\Models\Project::factory()->create(['status' => 'ongoing']);
+
+    // First single unit usage in 1 project -> still slow-moving
+    $this->actingAs($manager)->post(route('projects.costs.store', $projectA), [
+        'resource_id' => $material->id,
+        'description' => 'Guide Rail Bracket Kit [DEX-MAT020]',
+        'cost_type' => 'other', // should also be forced to 'materials'
+        'amount' => '15,000.00',
+        'quantity' => 1,
+        'incurred_date' => now()->subDays(10)->toDateString(),
+    ])->assertRedirect();
+
+    $costEntry = \App\Models\ProjectCost::where('project_id', $projectA->id)->first();
+    expect($costEntry->cost_type)->toBe('materials');
+    expect($material->fresh()->demand_status)->toBe('slow-moving');
+
+    // Second usage within the 3-month window -> transitions to fast-moving
+    $this->actingAs($manager)->post(route('projects.costs.store', $projectB), [
+        'resource_id' => $material->id,
+        'description' => 'Guide Rail Bracket Kit [DEX-MAT020]',
+        'cost_type' => 'materials',
+        'amount' => '15,000.00',
+        'quantity' => 1,
+        'incurred_date' => now()->subDays(5)->toDateString(),
+    ])->assertRedirect();
+
+    expect($material->fresh()->demand_status)->toBe('fast-moving');
+});

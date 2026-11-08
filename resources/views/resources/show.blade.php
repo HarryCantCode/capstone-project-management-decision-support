@@ -26,10 +26,30 @@
         <div class="card-header"><h2 id="resource-overview-heading">Material Details & Specifications</h2></div>
         <dl class="card-body detail-list">
             <div><dt>Model / Specifications</dt><dd>{{ $resource->model ?: 'Standard' }}</dd></div>
-            <div><dt>Available quantity</dt><dd class="font-mono" style="font-weight: 600;">{{ number_format($resource->quantity_available) }}</dd></div>
+            <div>
+                <dt>Available quantity</dt>
+                <dd class="font-mono" style="font-weight: 600;">
+                    <span class="{{ $resource->quantity_available <= 8 ? 'text-danger' : '' }}">{{ number_format($resource->quantity_available) }}</span>
+                    @if ($resource->quantity_available <= 8)
+                        <span class="badge" style="margin-left: 6px; font-size: 0.6875rem; font-weight: 700; background: rgba(239, 68, 68, 0.12); color: var(--color-danger); border: 1px solid rgba(239, 68, 68, 0.25);">
+                            {{ $resource->quantity_available <= 0 ? 'Out of Stock' : 'Low Stock (≤ 8)' }}
+                        </span>
+                    @endif
+                </dd>
+            </div>
             <div><dt>Catalog Price</dt><dd class="font-mono">₱{{ number_format((float) $resource->price, 2) }}</dd></div>
             <div><dt>Unit Cost</dt><dd class="font-mono">₱{{ number_format((float) $resource->unit_cost, 2) }}</dd></div>
-            <div><dt>Demand Status</dt><dd>{{ ucfirst($resource->demand_status ?? 'fast-moving') }}</dd></div>
+            <div>
+                <dt>Demand Status (3-Month Usage)</dt>
+                <dd>
+                    {{ ucfirst($resource->demand_status ?? 'fast-moving') }}
+                    @if(isset($usageStats))
+                        <span class="font-mono text-muted" style="font-size: 0.75rem; margin-left: 4px;">
+                            ({{ $usageStats['usage_count'] }}x used · {{ $usageStats['total_quantity'] }} unit(s) across {{ $usageStats['projects_count'] }} project(s) in last 3 months)
+                        </span>
+                    @endif
+                </dd>
+            </div>
             <div><dt>Last updated</dt><dd>{{ $resource->updated_at->format('M j, Y · g:i A') }}</dd></div>
             <div style="grid-column: 1 / -1;"><dt>Description & Application</dt><dd>{{ $resource->description ?: 'No additional notes provided.' }}</dd></div>
         </dl>

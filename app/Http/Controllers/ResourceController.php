@@ -29,6 +29,8 @@ class ResourceController extends Controller
     {
         $this->authorize('viewAny', Resource::class);
 
+        $usageStatsByResource = $this->catalogService->syncAllCatalogDemandStatusesIfActiveUsage();
+
         $demandStatus = $request->query('demand_status');
         $search = $request->query('search');
 
@@ -48,7 +50,7 @@ class ResourceController extends Controller
 
         $nextItemCode = $this->catalogService->generateNextItemCode();
 
-        return view('resources.index', compact('resources', 'demandStatus', 'search', 'nextItemCode'));
+        return view('resources.index', compact('resources', 'demandStatus', 'search', 'nextItemCode', 'usageStatsByResource'));
     }
 
     /**
@@ -72,7 +74,15 @@ class ResourceController extends Controller
             'allocations' => fn ($q) => $q->with(['project', 'creator'])->orderByDesc('created_at'),
         ]);
 
-        return view('resources.show', compact('resource'));
+        $usageStatsMap = $this->catalogService->getThreeMonthUsageStats($resource->id);
+        $usageStats = $usageStatsMap[$resource->id] ?? [
+            'usage_count' => 0,
+            'projects_count' => 0,
+            'total_quantity' => 0,
+            'computed_status' => $resource->demand_status ?? 'slow-moving',
+        ];
+
+        return view('resources.show', compact('resource', 'usageStats'));
     }
 
     /**

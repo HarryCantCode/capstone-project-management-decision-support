@@ -30,15 +30,15 @@ return [
     ],
 
     'inventory' => [
-        // Stock quantity below which a catalog material is flagged as low stock.
-        // Matches ResourceAllocationService low-stock notification threshold (< 5).
-        'low_stock_threshold' => 5,
+        // Stock quantity at or below which a catalog material is flagged as low stock (<= 8).
+        // Matches catalog low-stock notification threshold.
+        'low_stock_threshold' => 8,
 
         // Target baseline reserve for fast-moving materials when computing reorder deficits.
-        'fast_moving_target_stock' => 10,
+        'fast_moving_target_stock' => 12,
 
         // Target baseline reserve for slow-moving materials when computing reorder deficits.
-        'slow_moving_target_stock' => 5,
+        'slow_moving_target_stock' => 8,
 
         // Safety buffer ratio added to a stock deficit when calculating reorder quantity (10%).
         'safety_buffer_ratio' => 0.10,

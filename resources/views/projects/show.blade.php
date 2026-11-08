@@ -251,7 +251,7 @@
                         <h2 id="project-files-heading" style="margin: 0; font-size: 0.9375rem; font-weight: 700;">Project Files & Documents</h2>
                         <span class="badge font-mono" style="background: var(--color-surface-alt); font-size: 0.75rem; font-weight: 600;">{{ $project->files->count() }}</span>
                     </div>
-                    @can('update', $project)
+                    @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
                         @if ($isProjectReadOnly)
                             <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap; font-size: 0.75rem; padding: 4px 10px;" title="{{ $project->trashed() ? 'Cannot upload files to an archived project' : 'Cannot upload files to a completed project unless reactivated' }}">
                                 + Upload File
@@ -261,7 +261,7 @@
                                 + Upload File
                             </button>
                         @endif
-                    @endcan
+                    @endif
                 </div>
                 <div class="card-body" style="padding: var(--space-3) var(--space-4);">
                     @if ($project->files->isEmpty())
@@ -726,11 +726,12 @@
                                                         }"
                                                         id="subtask-check-{{ $subtask->id }}"
                                                         {{ $subtask->is_completed ? 'checked' : '' }}
-                                                        {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'disabled' : '' }}
-                                                        :disabled="{{ $isProjectReadOnly ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
+                                                        {{ ($isProjectReadOnly || $isSubtaskLocked || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'disabled' : '' }}
+                                                        :disabled="{{ ($isProjectReadOnly || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
                                                         @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
-                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
-                                                        :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
+                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'not-allowed' : 'pointer' }};"
+                                                        :style="subtaskLocks[{{ $subtask->id }}] || ({{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'true' : 'false' }}) ? 'cursor: not-allowed !important;' : ''"
+                                                        title="{{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'Staff users cannot uncheck completed tasks' : '' }}"
                                                     >
                                                     <span 
                                                         class="subtask-title-{{ $subtask->id }}"
@@ -973,11 +974,12 @@
                                                                     }"
                                                                     id="expanded-subtask-check-{{ $subtask->id }}"
                                                                     {{ $subtask->is_completed ? 'checked' : '' }}
-                                                                    {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'disabled' : '' }}
-                                                                    :disabled="{{ $isProjectReadOnly ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
+                                                                    {{ ($isProjectReadOnly || $isSubtaskLocked || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'disabled' : '' }}
+                                                                    :disabled="{{ ($isProjectReadOnly || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
                                                                     @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
-                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
-                                                                    :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
+                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'not-allowed' : 'pointer' }};"
+                                                                    :style="subtaskLocks[{{ $subtask->id }}] || ({{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'true' : 'false' }}) ? 'cursor: not-allowed !important;' : ''"
+                                                                    title="{{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'Staff users cannot uncheck completed tasks' : '' }}"
                                                                 >
                                                                 <span 
                                                                     class="subtask-title-{{ $subtask->id }}"
@@ -1034,7 +1036,7 @@
                 <a href="{{ route('costing.show', $project) }}" class="btn btn-secondary btn-sm" style="white-space: nowrap;">
                     Full Breakdown ↗
                 </a>
-                @can('update', $project)
+                @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
                     @if ($isProjectReadOnly)
                         <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}">
                             + Log New Expense / Cost
@@ -1044,7 +1046,7 @@
                             + Log New Expense / Cost
                         </button>
                     @endif
-                @endcan
+                @endif
             </div>
         </div>
 
@@ -1058,7 +1060,7 @@
                     <p class="empty-state__description">
                         Manually type down what each cost is for (materials, labor, equipment rental, permits) to keep an accurate spend ledger.
                     </p>
-                    @can('update', $project)
+                    @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
                         @if ($isProjectReadOnly)
                             <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}">
                                 + Log First Cost Entry
@@ -1068,7 +1070,7 @@
                                 + Log First Cost Entry
                             </button>
                         @endif
-                    @endcan
+                    @endif
                 </div>
             </div>
         @else
@@ -1522,13 +1524,23 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-4);">
                         <div class="form-group form-group-premium" style="margin-bottom: 0;">
                             <label for="cost_type" class="form-label">Category <span class="required">*</span></label>
-                            <select id="cost_type" name="cost_type" class="form-control" x-model="costForm.cost_type" required>
+                            <select
+                                id="cost_type"
+                                name="cost_type"
+                                class="form-control"
+                                x-model="costForm.cost_type"
+                                :disabled="Boolean(selectedMaterialId)"
+                                :style="selectedMaterialId ? 'background: var(--color-surface-alt); cursor: not-allowed; opacity: 0.85;' : ''"
+                                required
+                            >
                                 <option value="materials">Materials</option>
                                 <option value="equipment">Equipment Rental</option>
                                 <option value="labor">Labor / Overtime</option>
                                 <option value="subcontractor">Subcontractor</option>
                                 <option value="other">Other / Miscellaneous</option>
                             </select>
+                            <input type="hidden" name="cost_type" value="materials" :disabled="!selectedMaterialId">
+                            <p class="form-hint" x-show="selectedMaterialId" style="margin-top: 4px;">Locked to Materials for catalog items.</p>
                         </div>
 
                         <div class="form-group form-group-premium" style="margin-bottom: 0;">
@@ -1546,18 +1558,18 @@
                     <div class="form-group form-group-premium">
                         <label for="cost_amount" class="form-label">Amount (PHP ₱) <span class="required">*</span></label>
                         <div style="position: relative;">
-                            <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 600; color: var(--color-muted); font-family: var(--font-mono);">₱</span>
+                            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-weight: 600; color: var(--color-muted); font-family: var(--font-mono); pointer-events: none; z-index: 2;">₱&nbsp;</span>
                             <input
                                 id="cost_amount"
                                 name="amount"
-                                type="number"
-                                step="0.01"
-                                min="100"
+                                type="text"
+                                inputmode="decimal"
+                                data-amount-input
                                 class="form-control font-mono"
-                                style="padding-left: 32px;"
+                                style="padding-left: 38px !important;"
                                 x-model="costForm.amount"
                                 :readonly="Boolean(selectedMaterialId)"
-                                :style="selectedMaterialId ? 'background: var(--color-surface-alt); cursor: not-allowed;' : ''"
+                                :style="selectedMaterialId ? 'padding-left: 38px !important; background: var(--color-surface-alt); cursor: not-allowed;' : 'padding-left: 38px !important;'"
                                 placeholder="100.00"
                                 required
                             >
@@ -2307,7 +2319,7 @@
                 </div>
 
                 {{-- Upload New Attachment Form --}}
-                @can('update', $project)
+                @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
                     @if ($isProjectReadOnly)
                         <div style="border-top: 1px solid var(--color-border); padding-top: var(--space-3);">
                             <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-2);">
@@ -2352,7 +2364,7 @@
                             </form>
                         </div>
                     @endif
-                @endcan
+                @endif
             </div>
         </div>
     </div>
@@ -3043,12 +3055,15 @@ function projectDetail() {
             return qty > this.selectedMaterialStock;
         },
         validateCostSubmission(e) {
-            const amt = parseFloat(this.costForm.amount);
+            const amt = window.parseAmountValue ? window.parseAmountValue(this.costForm.amount) : parseFloat(String(this.costForm.amount).replace(/,/g, ''));
             if (isNaN(amt) || amt < 100) {
                 window.dispatchEvent(new CustomEvent('show-toast', {
                     detail: { type: 'error', title: 'Minimum Amount Required', message: 'Expenditure amount cannot be less than ₱100.00.', duration: 5000 }
                 }));
                 return false;
+            }
+            if (this.selectedMaterialId) {
+                this.costForm.cost_type = 'materials';
             }
 
             if (this.selectedMaterialId && this.isQuantityExcessive) {
@@ -3100,7 +3115,7 @@ function projectDetail() {
                 const qty = Math.max(1, parseInt(this.materialQuantity, 10) || 1);
                 this.materialQuantity = qty;
                 const total = (qty * this.materialUnitPrice).toFixed(2);
-                this.costForm.amount = total;
+                this.costForm.amount = window.formatAmountWithCommas ? window.formatAmountWithCommas(total) : total;
 
                 if (this.isQuantityExcessive) {
                     const stock = this.selectedMaterialStock;
@@ -3241,6 +3256,21 @@ function projectDetail() {
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
+                    if (data.pending_approval) {
+                        if (checkboxEl) {
+                            checkboxEl.checked = false;
+                        }
+                        window.dispatchEvent(new CustomEvent('show-toast', {
+                            detail: {
+                                type: 'warning',
+                                title: 'Action Submitted for Review',
+                                message: data.message || 'This task completion has been submitted for review by an Admin or Manager before taking effect.',
+                                duration: 6000
+                            }
+                        }));
+                        return;
+                    }
+
                     // Keep all checkboxes for this subtask in sync (card checklist & expanded view)
                     const checkboxes = document.querySelectorAll(`.subtask-check-${subtaskId}`);
                     checkboxes.forEach(cb => { cb.checked = data.is_completed; });

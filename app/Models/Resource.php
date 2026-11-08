@@ -18,6 +18,11 @@ class Resource extends \Illuminate\Database\Eloquent\Model
     use HasFactory;
     use SoftDeletes;
 
+    /**
+     * Quantity threshold at or below which an inventory material is considered low stock.
+     */
+    public const LOW_STOCK_THRESHOLD = 8;
+
     /** @var list<string> */
     protected $fillable = [
         'name',
@@ -76,5 +81,13 @@ class Resource extends \Illuminate\Database\Eloquent\Model
     public function allocations(): HasMany
     {
         return $this->hasMany(ResourceAllocation::class);
+    }
+
+    /**
+     * Check if this material is currently at or below the low stock threshold (<= 8).
+     */
+    public function isLowStock(): bool
+    {
+        return (int) $this->quantity_available <= self::LOW_STOCK_THRESHOLD;
     }
 }

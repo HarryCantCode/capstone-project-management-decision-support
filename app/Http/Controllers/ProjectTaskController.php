@@ -314,8 +314,21 @@ class ProjectTaskController extends Controller
      */
     public function toggleSubtask(Request $request, Project $project, ProjectTask $task, ProjectSubtask $subtask): RedirectResponse|JsonResponse
     {
-        $this->authorize('update', $project);
+        abort_unless(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']), 403);
         abort_if($task->project_id !== $project->id || $subtask->project_task_id !== $task->id, 404);
+
+        // Staff cannot uncheck already checked subtasks
+        if (Auth::user()->hasRole('Staff') && $subtask->is_completed) {
+            $msg = 'Staff users cannot uncheck completed tasks.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $msg,
+                ], 403);
+            }
+
+            return back()->withErrors(['subtask' => $msg]);
+        }
 
         $newCompleted = ! $subtask->is_completed;
 
@@ -396,6 +409,53 @@ class ProjectTaskController extends Controller
                     return back()->withErrors(['subtask' => $msg]);
                 }
             }
+        }
+
+        // Staff action: requires review from Admin or Manager before reflecting
+        if (Auth::user()->hasRole('Staff')) {
+            $existingPending = \App\Models\StaffPendingAction::where('project_id', $project->id)
+                ->where('action_type', 'complete_subtask')
+                ->where('status', 'pending')
+                ->whereJsonContains('payload->subtask_id', $subtask->id)
+                ->first();
+
+            if ($existingPending) {
+                $msg = "This task completion has already been submitted for review.";
+                if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $msg,
+                    ], 422);
+                }
+
+                return back()->withErrors(['subtask' => $msg]);
+            }
+
+            $pendingAction = \App\Models\StaffPendingAction::create([
+                'user_id' => Auth::id(),
+                'project_id' => $project->id,
+                'action_type' => 'complete_subtask',
+                'payload' => [
+                    'task_id' => $task->id,
+                    'task_name' => $task->task_name,
+                    'subtask_id' => $subtask->id,
+                    'subtask_title' => $subtask->title,
+                ],
+                'status' => 'pending',
+            ]);
+
+            app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
+
+            $msg = "Task '{$subtask->title}' completion submitted for Admin/Manager review.";
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'pending_approval' => true,
+                    'message' => $msg,
+                ]);
+            }
+
+            return back()->with('warning', $msg);
         }
 
         $subtask->update([

@@ -1160,7 +1160,7 @@ test('manager can search projects by project name, project code, client name, an
         ->assertSee('Clear Search & Filters');
 });
 
-test('completed project can be archived and restored, and tabs display active vs archived projects', function () {
+test('any project regardless of status can be archived and restored, and tabs display active vs archived projects', function () {
     $manager = User::factory()->create();
     $manager->assignRole('Manager');
 
@@ -1176,10 +1176,18 @@ test('completed project can be archived and restored, and tabs display active vs
         ->assertSee('Active Work (2)')
         ->assertSee('Archived Projects (0)');
 
-    // 2. Cannot archive a project that is not completed
+    // 2. Can archive an ongoing (non-completed) project
     $this->actingAs($manager)
         ->post(route('projects.archive', $activeProject))
-        ->assertSessionHas('error');
+        ->assertRedirect(route('projects.index', ['tab' => 'archived']))
+        ->assertSessionHas('status', "Project {$activeProject->name} has been archived.");
+
+    expect($activeProject->fresh()->trashed())->toBeTrue();
+
+    // Restore the ongoing project so we can also test archiving the completed project
+    $this->actingAs($manager)
+        ->post(route('projects.restore', $activeProject->id))
+        ->assertRedirect(route('projects.index'));
 
     expect($activeProject->fresh()->trashed())->toBeFalse();
 

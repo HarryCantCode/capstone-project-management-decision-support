@@ -31,11 +31,13 @@ class NotificationController extends Controller
         $query = Notification::where('user_id', $user->id);
 
         if ($filter === 'unread') {
-            $query->unread();
+            $query->active()->unread();
         } elseif ($filter === 'read') {
-            $query->whereNotNull('read_at');
+            $query->active()->whereNotNull('read_at');
         } elseif ($filter === 'archived') {
             $query->archived();
+        } else {
+            $query->active();
         }
 
         $notifications = $query->orderByDesc('created_at')
@@ -44,6 +46,7 @@ class NotificationController extends Controller
             ->map(fn (Notification $n) => $this->formatNotification($n));
 
         $unreadCount = Notification::where('user_id', $user->id)
+            ->active()
             ->unread()
             ->count();
 
@@ -62,6 +65,7 @@ class NotificationController extends Controller
         $user = Auth::user();
 
         $count = Notification::where('user_id', $user->id)
+            ->active()
             ->unread()
             ->count();
 
@@ -155,6 +159,7 @@ class NotificationController extends Controller
             'title' => $notification->title,
             'message' => $notification->message,
             'url' => $notification->url,
+            'data' => $notification->data,
             'is_read' => $notification->isRead(),
             'time_ago' => $notification->created_at->diffForHumans(),
             'created_at' => $notification->created_at->toIso8601String(),

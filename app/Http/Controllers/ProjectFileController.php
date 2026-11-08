@@ -26,7 +26,7 @@ class ProjectFileController extends Controller
      */
     public function store(Request $request, Project $project): RedirectResponse|JsonResponse
     {
-        $this->authorize('update', $project);
+        abort_unless(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']), 403);
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:pdf,docx,jpg,jpeg,png,webp', 'max:20480'],
@@ -37,6 +37,43 @@ class ProjectFileController extends Controller
             'file.mimes' => 'Only PDF, DOCX, and Image (JPG, JPEG, PNG, WEBP) files are allowed.',
             'file.max' => 'The file size cannot exceed 20MB.',
         ]);
+
+        if (Auth::user()->hasRole('Staff')) {
+            $uploadedFile = $validated['file'];
+            $storedPath = $uploadedFile->store('project-files/' . $project->id, 'public');
+
+            $pendingAction = \App\Models\StaffPendingAction::create([
+                'user_id' => Auth::id(),
+                'project_id' => $project->id,
+                'action_type' => 'add_file',
+                'payload' => [
+                    'file_name' => $uploadedFile->getClientOriginalName(),
+                    'file_path' => $storedPath,
+                    'file_size' => $uploadedFile->getSize(),
+                    'mime_type' => $uploadedFile->getClientMimeType() ?: $uploadedFile->getMimeType(),
+                    'file_type' => $validated['file_type'] ?? 'general',
+                    'description' => $validated['description'] ?? null,
+                    'subtask_id' => null,
+                    'subtask_title' => null,
+                ],
+                'status' => 'pending',
+            ]);
+
+            app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
+
+            $msg = "File '{$uploadedFile->getClientOriginalName()}' submitted for Admin/Manager review.";
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'pending_approval' => true,
+                    'message' => $msg,
+                ]);
+            }
+
+            return redirect()
+                ->route('projects.show', $project)
+                ->with('warning', $msg);
+        }
 
         $projectFile = $this->projectService->storeProjectFile(
             $project,
@@ -68,7 +105,7 @@ class ProjectFileController extends Controller
         ProjectTask $task,
         ProjectSubtask $subtask,
     ): RedirectResponse|JsonResponse {
-        $this->authorize('update', $project);
+        abort_unless(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']), 403);
         abort_if($task->project_id !== $project->id || $subtask->project_task_id !== $task->id, 404);
 
         $validated = $request->validate([
@@ -79,6 +116,44 @@ class ProjectFileController extends Controller
             'file.mimes' => 'Only PDF, DOCX, and Image (JPG, JPEG, PNG, WEBP) files are allowed.',
             'file.max' => 'The file size cannot exceed 20MB.',
         ]);
+
+        if (Auth::user()->hasRole('Staff')) {
+            $uploadedFile = $validated['file'];
+            $storedPath = $uploadedFile->store('project-files/' . $project->id, 'public');
+
+            $pendingAction = \App\Models\StaffPendingAction::create([
+                'user_id' => Auth::id(),
+                'project_id' => $project->id,
+                'action_type' => 'add_file',
+                'payload' => [
+                    'file_name' => $uploadedFile->getClientOriginalName(),
+                    'file_path' => $storedPath,
+                    'file_size' => $uploadedFile->getSize(),
+                    'mime_type' => $uploadedFile->getClientMimeType() ?: $uploadedFile->getMimeType(),
+                    'file_type' => 'task_attachment',
+                    'description' => $validated['description'] ?? "Attachment for subtask: {$subtask->title}",
+                    'subtask_id' => $subtask->id,
+                    'subtask_title' => $subtask->title,
+                    'task_id' => $task->id,
+                ],
+                'status' => 'pending',
+            ]);
+
+            app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
+
+            $msg = "Attachment for task '{$subtask->title}' submitted for Admin/Manager review.";
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'pending_approval' => true,
+                    'message' => $msg,
+                ]);
+            }
+
+            return redirect()
+                ->route('projects.show', $project)
+                ->with('warning', $msg);
+        }
 
         $projectFile = $this->projectService->storeProjectFile(
             $project,
@@ -151,6 +226,7 @@ class ProjectFileController extends Controller
      */
     public function destroy(Request $request, Project $project, ProjectFile $file): RedirectResponse|JsonResponse
     {
+        abort_if(Auth::user()->hasRole('Staff'), 403, 'Staff cannot delete files.');
         $this->authorize('update', $project);
         abort_if($file->project_id !== $project->id, 404);
 

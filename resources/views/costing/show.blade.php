@@ -20,7 +20,7 @@
             </p>
         </div>
         <div class="page-actions">
-            @can('update', $project)
+            @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
                 @if ($project->trashed())
                     <button type="button" class="btn btn-secondary" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot log expenses on an archived project">
                         + Log New Expense / Cost
@@ -30,7 +30,7 @@
                         + Log New Expense / Cost
                     </button>
                 @endif
-            @endcan
+            @endif
             <a href="{{ route('projects.show', $project) }}" class="btn btn-secondary">Project Details</a>
         </div>
     </div>
@@ -187,10 +187,11 @@
                         <label for="filter-min-amount" class="form-label" style="font-size: 0.75rem; text-transform: uppercase;">Min Amount (₱)</label>
                         <input
                             id="filter-min-amount"
-                            type="number"
-                            step="0.01"
+                            type="text"
+                            inputmode="decimal"
+                            data-amount-input
                             name="min_amount"
-                            value="{{ $minAmount ?? '' }}"
+                            value="{{ $minAmount !== null && $minAmount !== '' ? number_format((float) str_replace(',', '', (string) $minAmount), 0, '.', ',') : '' }}"
                             placeholder="0.00"
                             class="form-control form-control--compact font-mono"
                         >
@@ -201,11 +202,12 @@
                         <label for="filter-max-amount" class="form-label" style="font-size: 0.75rem; text-transform: uppercase;">Max Amount (₱)</label>
                         <input
                             id="filter-max-amount"
-                            type="number"
-                            step="0.01"
+                            type="text"
+                            inputmode="decimal"
+                            data-amount-input
                             name="max_amount"
-                            value="{{ $maxAmount ?? '' }}"
-                            placeholder="9999999.00"
+                            value="{{ $maxAmount !== null && $maxAmount !== '' ? number_format((float) str_replace(',', '', (string) $maxAmount), 0, '.', ',') : '' }}"
+                            placeholder="9,999,999.00"
                             class="form-control form-control--compact font-mono"
                         >
                     </div>
@@ -492,13 +494,22 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-4);">
                         <div class="form-group form-group-premium" style="margin-bottom: 0;">
                             <label for="cost_type" class="form-label">Category <span class="required">*</span></label>
-                            <select id="cost_type" name="cost_type" class="form-control" x-model="costForm.cost_type" required>
+                            <select
+                                id="cost_type"
+                                name="cost_type"
+                                class="form-control"
+                                x-model="costForm.cost_type"
+                                :disabled="Boolean(selectedMaterialId)"
+                                :style="selectedMaterialId ? 'background: var(--color-surface-alt); cursor: not-allowed;' : ''"
+                                required
+                            >
                                 <option value="materials">Materials</option>
-                                <option value="equipment">Equipment Rental</option>
-                                <option value="labor">Labor / Overtime</option>
-                                <option value="subcontractor">Subcontractor</option>
-                                <option value="other">Other / Miscellaneous</option>
+                                <option value="equipment" x-bind:disabled="Boolean(selectedMaterialId)">Equipment Rental</option>
+                                <option value="labor" x-bind:disabled="Boolean(selectedMaterialId)">Labor / Overtime</option>
+                                <option value="subcontractor" x-bind:disabled="Boolean(selectedMaterialId)">Subcontractor</option>
+                                <option value="other" x-bind:disabled="Boolean(selectedMaterialId)">Other / Miscellaneous</option>
                             </select>
+                            <input type="hidden" name="cost_type" value="materials" :disabled="!selectedMaterialId">
                         </div>
 
                         <div class="form-group form-group-premium" style="margin-bottom: 0;">
@@ -516,18 +527,19 @@
                     <div class="form-group form-group-premium">
                         <label for="cost_amount" class="form-label">Amount (PHP ₱) <span class="required">*</span></label>
                         <div style="position: relative;">
-                            <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 600; color: var(--color-muted); font-family: var(--font-mono);">₱</span>
+                            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-weight: 600; color: var(--color-muted); font-family: var(--font-mono); pointer-events: none; z-index: 2;">₱&nbsp;</span>
                             <input
                                 id="cost_amount"
                                 name="amount"
-                                type="number"
-                                step="0.01"
-                                min="100"
+                                type="text"
+                                inputmode="decimal"
+                                data-amount-input
                                 class="form-control font-mono"
-                                style="padding-left: 32px;"
+                                style="padding-left: 38px !important;"
                                 x-model="costForm.amount"
+                                @input="if (!selectedMaterialId) { costForm.amount = window.formatAmountWithCommas ? window.formatAmountWithCommas($event.target.value) : $event.target.value; }"
                                 :readonly="Boolean(selectedMaterialId)"
-                                :style="selectedMaterialId ? 'background: var(--color-surface-alt); cursor: not-allowed;' : ''"
+                                :style="selectedMaterialId ? 'padding-left: 38px !important; background: var(--color-surface-alt); cursor: not-allowed;' : 'padding-left: 38px !important;'"
                                 placeholder="100.00"
                                 required
                             >
@@ -668,7 +680,7 @@ function costingBreakdown() {
             return qty > this.selectedMaterialStock;
         },
         validateCostSubmission(e) {
-            const amt = parseFloat(this.costForm.amount);
+            const amt = window.parseAmountValue ? window.parseAmountValue(this.costForm.amount) : parseFloat(String(this.costForm.amount).replace(/,/g, ''));
             if (isNaN(amt) || amt < 100) {
                 window.dispatchEvent(new CustomEvent('show-toast', {
                     detail: { type: 'error', title: 'Minimum Amount Required', message: 'Expenditure amount cannot be less than ₱100.00.', duration: 5000 }
@@ -725,7 +737,7 @@ function costingBreakdown() {
                 const qty = Math.max(1, parseInt(this.materialQuantity, 10) || 1);
                 this.materialQuantity = qty;
                 const total = (qty * this.materialUnitPrice).toFixed(2);
-                this.costForm.amount = total;
+                this.costForm.amount = window.formatAmountWithCommas ? window.formatAmountWithCommas(total) : total;
 
                 if (this.isQuantityExcessive) {
                     const stock = this.selectedMaterialStock;

@@ -116,4 +116,7 @@ Route::middleware(['auth', 'two-factor', 'must-change-password'])->group(functio
 
     // Notifications (bell dropdown API)
     require __DIR__ . '/modules/notifications.php';
+
+    // Staff Pending Actions (Admin/Manager review & approval)
+    require __DIR__ . '/modules/pending-actions.php';
 });

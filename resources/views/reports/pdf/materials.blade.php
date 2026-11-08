@@ -353,7 +353,7 @@
                                 <span class="pill-slow">Slow-Moving</span>
                             @endif
                         </td>
-                        <td class="text-right mono {{ $material->quantity_available < 5 ? 'text-danger' : '' }}">
+                        <td class="text-right mono {{ $material->quantity_available <= 8 ? 'text-danger' : '' }}">
                             <strong>{{ number_format($material->quantity_available) }}</strong>
                         </td>
                         <td class="text-right mono">&#8369;{{ number_format((float) $material->price, 2) }}</td>

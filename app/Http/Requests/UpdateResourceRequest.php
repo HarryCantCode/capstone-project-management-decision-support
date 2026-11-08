@@ -13,6 +13,23 @@ class UpdateResourceRequest extends FormRequest
         return $this->user() && $resource && $this->user()->can('update', $resource);
     }
 
+    protected function prepareForValidation(): void
+    {
+        $merges = [];
+
+        if ($this->has('price') && is_string($this->input('price'))) {
+            $merges['price'] = str_replace(',', '', $this->input('price'));
+        }
+
+        if ($this->has('unit_cost') && is_string($this->input('unit_cost'))) {
+            $merges['unit_cost'] = str_replace(',', '', $this->input('unit_cost'));
+        }
+
+        if (!empty($merges)) {
+            $this->merge($merges);
+        }
+    }
+
     /**
      * @return array<string, list<string|\Illuminate\Contracts\Validation\Rule>>
      */

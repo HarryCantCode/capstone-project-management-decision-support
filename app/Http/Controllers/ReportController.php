@@ -39,7 +39,7 @@ class ReportController extends Controller implements HasMiddleware
         return [
             'auth',
             'two-factor',
-            'role:Admin|Manager',
+            'role:Admin|Manager|Staff',
         ];
     }
 

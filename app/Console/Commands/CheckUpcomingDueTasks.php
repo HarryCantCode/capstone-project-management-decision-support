@@ -73,9 +73,9 @@ class CheckUpcomingDueTasks extends Command
             }
         }
 
-        // 3. Check materials running low (< 5 quantity available)
+        // 3. Check materials running low (<= 8 quantity available)
         $lowStockMaterials = \App\Models\Resource::query()
-            ->where('quantity_available', '<', 5)
+            ->where('quantity_available', '<=', \App\Models\Resource::LOW_STOCK_THRESHOLD)
             ->get();
 
         foreach ($lowStockMaterials as $mat) {

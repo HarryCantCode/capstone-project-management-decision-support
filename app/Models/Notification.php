@@ -158,6 +158,8 @@ class Notification extends Model
             'manpower_assigned' => 'users',
             'new_material' => 'package',
             'low_stock' => 'alert-triangle',
+            'staff_action_review' => 'clipboard-check',
+            'staff_action_decision' => 'bell',
             default => 'bell',
         };
     }

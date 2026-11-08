@@ -54,7 +54,12 @@
         openEditModal(id) {
             const item = this.materialsMap[id];
             if (!item) return;
-            this.editForm = Object.assign({}, item);
+            const copy = Object.assign({}, item);
+            if (window.formatAmountWithCommas) {
+                copy.price = window.formatAmountWithCommas(Number(copy.price || 0).toFixed(2));
+                copy.unit_cost = window.formatAmountWithCommas(Number(copy.unit_cost || 0).toFixed(2));
+            }
+            this.editForm = copy;
             this.editModalOpen = true;
         },
 
@@ -280,7 +285,14 @@
                                     </div>
                                 </td>
                                 <td class="cell-numeric" style="font-weight: 600;">
-                                    {{ number_format($resource->quantity_available) }}
+                                    <div style="display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);">
+                                        <span class="{{ $resource->quantity_available <= 8 ? 'text-danger' : '' }}">{{ number_format($resource->quantity_available) }}</span>
+                                        @if ($resource->quantity_available <= 8)
+                                            <span class="badge" style="font-size: 0.6875rem; font-weight: 700; background: rgba(239, 68, 68, 0.12); color: var(--color-danger); border: 1px solid rgba(239, 68, 68, 0.25);" title="Stock level is 8 or below">
+                                                {{ $resource->quantity_available <= 0 ? 'Out of Stock' : 'Low Stock' }}
+                                            </span>
+                                        @endif
+                                    </div>
                                 </td>
                                 <td class="cell-numeric font-mono" style="color: var(--color-ink);">
                                     ₱{{ number_format((float) $resource->price, 2) }}
@@ -289,15 +301,23 @@
                                     ₱{{ number_format((float) $resource->unit_cost, 2) }}
                                 </td>
                                 <td class="text-center">
-                                    @if ($resource->demand_status === 'fast-moving')
-                                        <span class="badge badge-success" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em;">
-                                            Fast-moving
+                                    @php
+                                        $resUsage3m = $usageStatsByResource[$resource->id] ?? ['usage_count' => 0, 'projects_count' => 0, 'total_quantity' => 0];
+                                    @endphp
+                                    <div style="display: inline-flex; flex-direction: column; align-items: center; gap: 3px;" title="Based on project usage frequency over the last 3 months ({{ $resUsage3m['usage_count'] }} usage(s), {{ $resUsage3m['total_quantity'] }} unit(s) across {{ $resUsage3m['projects_count'] }} project(s))">
+                                        @if ($resource->demand_status === 'fast-moving')
+                                            <span class="badge badge-success" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em;">
+                                                Fast-moving
+                                            </span>
+                                        @else
+                                            <span class="badge badge-warning" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em; background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.3);">
+                                                Slow-moving
+                                            </span>
+                                        @endif
+                                        <span class="font-mono" style="font-size: 0.6875rem; color: var(--color-muted); white-space: nowrap;">
+                                            {{ $resUsage3m['usage_count'] }}x used · {{ $resUsage3m['projects_count'] }} {{ $resUsage3m['projects_count'] === 1 ? 'proj' : 'projs' }} (3m)
                                         </span>
-                                    @else
-                                        <span class="badge badge-warning" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em; background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.3);">
-                                            Slow-moving
-                                        </span>
-                                    @endif
+                                    </div>
                                 </td>
                                 <td class="text-right">
                                     <div style="display: inline-flex; align-items: center; gap: 0.4rem; justify-content: flex-end;">
@@ -396,12 +416,12 @@
 
                         <div class="form-group-premium">
                             <label for="add_price" class="form-label" style="font-weight: 600; font-size: 0.8125rem;">Price (PHP) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="add_price" name="price" class="form-control font-mono" min="100" placeholder="100.00" required>
+                            <input type="text" inputmode="decimal" data-amount-input id="add_price" name="price" class="form-control font-mono" placeholder="100.00" required>
                         </div>
 
                         <div class="form-group-premium">
                             <label for="add_unit_cost" class="form-label" style="font-weight: 600; font-size: 0.8125rem;">Unit Cost (PHP) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="add_unit_cost" name="unit_cost" class="form-control font-mono" min="100" placeholder="100.00" required>
+                            <input type="text" inputmode="decimal" data-amount-input id="add_unit_cost" name="unit_cost" class="form-control font-mono" placeholder="100.00" required>
                         </div>
                     </div>
 
@@ -409,9 +429,10 @@
                     <div class="form-group-premium">
                         <label for="add_demand_status" class="form-label" style="font-weight: 600; font-size: 0.8125rem;">Demand Status <span class="text-danger">*</span></label>
                         <select id="add_demand_status" name="demand_status" class="form-control" required>
-                            <option value="fast-moving">Fast-moving (Regularly installed across elevator assemblies)</option>
-                            <option value="slow-moving">Slow-moving (Custom, specialized, or infrequent order)</option>
+                            <option value="slow-moving">Slow-moving (Default — auto-switches to Fast-moving when frequently used in projects over 3 months)</option>
+                            <option value="fast-moving">Fast-moving (Frequently used across projects within a 3-month window)</option>
                         </select>
+                        <p class="form-hint" style="margin-top: 4px;">Automatically recalculated based on how frequently this material is used in projects over a 3-month rolling window.</p>
                     </div>
 
                     {{-- Row 5: Description & Purpose --}}
@@ -495,12 +516,12 @@
 
                         <div class="form-group-premium">
                             <label for="edit_price" class="form-label" style="font-weight: 600; font-size: 0.8125rem;">Price (PHP) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="edit_price" name="price" class="form-control font-mono" min="100" x-model="editForm.price" required>
+                            <input type="text" inputmode="decimal" data-amount-input id="edit_price" name="price" class="form-control font-mono" x-model="editForm.price" required>
                         </div>
 
                         <div class="form-group-premium">
                             <label for="edit_unit_cost" class="form-label" style="font-weight: 600; font-size: 0.8125rem;">Unit Cost (PHP) <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" id="edit_unit_cost" name="unit_cost" class="form-control font-mono" min="100" x-model="editForm.unit_cost" required>
+                            <input type="text" inputmode="decimal" data-amount-input id="edit_unit_cost" name="unit_cost" class="form-control font-mono" x-model="editForm.unit_cost" required>
                         </div>
                     </div>
 
@@ -508,9 +529,10 @@
                     <div class="form-group-premium">
                         <label for="edit_demand_status" class="form-label" style="font-weight: 600; font-size: 0.8125rem;">Demand Status <span class="text-danger">*</span></label>
                         <select id="edit_demand_status" name="demand_status" class="form-control" x-model="editForm.demand_status" required>
-                            <option value="fast-moving">Fast-moving (Regularly installed across elevator assemblies)</option>
-                            <option value="slow-moving">Slow-moving (Custom, specialized, or infrequent order)</option>
+                            <option value="fast-moving">Fast-moving (Frequently used across projects within a 3-month window)</option>
+                            <option value="slow-moving">Slow-moving (Infrequently used in projects over a 3-month window)</option>
                         </select>
+                        <p class="form-hint" style="margin-top: 4px;">Automatically synced based on project usage frequency over the last 3 months.</p>
                     </div>
 
                     {{-- Row 5: Description --}}

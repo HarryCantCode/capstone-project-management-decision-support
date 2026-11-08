@@ -9,11 +9,11 @@ use Illuminate\Console\Command;
 /**
  * CheckWarrantyExpiry — daily scheduled command.
  *
- * Finds projects whose warranty_end_date is tomorrow and creates
- * warranty_expiry notifications for all Admin and Manager users.
+ * Finds projects whose warranty_end_date is in 7 days, 3 days, or 1 day and creates
+ * warranty_expiry notifications for all users (Admin, Manager, and Staff).
  *
  * Idempotent: NotificationService checks for existing notifications
- * on the same day for the same project, so running this command
+ * on the same day for the same project and days_remaining, so running this command
  * multiple times on the same day will not create duplicates.
  */
 class CheckWarrantyExpiry extends Command
@@ -30,31 +30,37 @@ class CheckWarrantyExpiry extends Command
      *
      * @var string
      */
-    protected $description = 'Notify Admin and Manager users about projects with warranty expiring tomorrow';
+    protected $description = 'Notify all users about projects with warranty expiring in 7, 3, or 1 day(s)';
 
     /**
      * Execute the console command.
      */
     public function handle(NotificationService $notificationService): int
     {
-        $tomorrow = now()->addDay()->toDateString();
+        $thresholds = [7, 3, 1];
+        $totalNotified = 0;
 
-        $projects = Project::whereDate('warranty_end_date', $tomorrow)->get();
+        foreach ($thresholds as $days) {
+            $targetDate = now()->addDays($days)->toDateString();
+            $projects = Project::whereDate('warranty_end_date', $targetDate)->get();
 
-        if ($projects->isEmpty()) {
-            $this->info('No projects with warranty expiring tomorrow.');
+            if ($projects->isNotEmpty()) {
+                $this->info("Found {$projects->count()} project(s) with warranty expiring in {$days} day(s) ({$targetDate}).");
+                foreach ($projects as $project) {
+                    $notificationService->notifyWarrantyExpiry($project, $days);
+                    $this->line("  → Notified for: {$project->name} ({$project->project_code}) - {$days} day(s) remaining");
+                    $totalNotified++;
+                }
+            }
+        }
+
+        if ($totalNotified === 0) {
+            $this->info('No projects with warranty expiring in 7, 3, or 1 days.');
 
             return self::SUCCESS;
         }
 
-        $this->info("Found {$projects->count()} project(s) with warranty expiring on {$tomorrow}.");
-
-        foreach ($projects as $project) {
-            $notificationService->notifyWarrantyExpiry($project);
-            $this->line("  → Notified for: {$project->name} ({$project->project_code})");
-        }
-
-        $this->info('Warranty expiry notifications dispatched.');
+        $this->info("Warranty expiry notifications dispatched ({$totalNotified} total).");
 
         return self::SUCCESS;
     }

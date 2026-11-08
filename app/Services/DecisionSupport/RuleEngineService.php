@@ -609,7 +609,7 @@ class RuleEngineService
      */
     public function evaluateInventoryRule(Project $project, Collection $allResources): array
     {
-        $lowStockThreshold = (int) config('decision_support.inventory.low_stock_threshold', 5);
+        $lowStockThreshold = (int) config('decision_support.inventory.low_stock_threshold', 8);
         $safetyBufferRatio = (float) config('decision_support.inventory.safety_buffer_ratio', 0.10);
         $materialShareWarningPct = (float) config('decision_support.budget.material_share_warning_percent', 70.0);
 
@@ -719,20 +719,20 @@ class RuleEngineService
      */
     public function getCatalogInventoryAlerts(Collection $allResources): array
     {
-        $lowStockThreshold = (int) config('decision_support.inventory.low_stock_threshold', 5);
+        $lowStockThreshold = (int) config('decision_support.inventory.low_stock_threshold', 8);
         $safetyBufferRatio = (float) config('decision_support.inventory.safety_buffer_ratio', 0.10);
 
         $alerts = [];
 
         foreach ($allResources as $res) {
             $avail = (int) $res->quantity_available;
-            if ($avail >= $lowStockThreshold) {
+            if ($avail > $lowStockThreshold) {
                 continue;
             }
 
             $targetReserve = ($res->demand_status === 'fast-moving')
-                ? (int) config('decision_support.inventory.fast_moving_target_stock', 10)
-                : (int) config('decision_support.inventory.slow_moving_target_stock', 5);
+                ? (int) config('decision_support.inventory.fast_moving_target_stock', 12)
+                : (int) config('decision_support.inventory.slow_moving_target_stock', 8);
 
             $deficit = max(1, $targetReserve - $avail);
             $reorderQty = (int) ceil($deficit * (1 + $safetyBufferRatio));

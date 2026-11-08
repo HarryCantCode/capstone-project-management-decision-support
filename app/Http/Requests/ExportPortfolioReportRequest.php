@@ -14,7 +14,7 @@ class ExportPortfolioReportRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return Auth::check() && Auth::user()->hasAnyRole(['Admin', 'Manager']);
+        return Auth::check() && Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']);
     }
 
     /**

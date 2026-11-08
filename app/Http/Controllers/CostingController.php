@@ -23,7 +23,7 @@ class CostingController extends Controller implements HasMiddleware
         return [
             'auth',
             'two-factor',
-            'role:Admin|Manager',
+            'role:Admin|Manager|Staff',
         ];
     }
 
@@ -75,8 +75,10 @@ class CostingController extends Controller implements HasMiddleware
         $category = $request->query('category');
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
-        $minAmount = $request->query('min_amount');
-        $maxAmount = $request->query('max_amount');
+        $minAmountRaw = $request->query('min_amount');
+        $maxAmountRaw = $request->query('max_amount');
+        $minAmount = ($minAmountRaw !== null && $minAmountRaw !== '') ? str_replace(',', '', (string) $minAmountRaw) : null;
+        $maxAmount = ($maxAmountRaw !== null && $maxAmountRaw !== '') ? str_replace(',', '', (string) $maxAmountRaw) : null;
 
         $costsQuery = \App\Models\ProjectCost::query()
             ->where('project_id', $project->id)
@@ -98,11 +100,11 @@ class CostingController extends Controller implements HasMiddleware
             $costsQuery->whereDate('incurred_date', '<=', $endDate);
         }
 
-        if ($minAmount !== null && $minAmount !== '') {
+        if ($minAmount !== null && $minAmount !== '' && is_numeric($minAmount)) {
             $costsQuery->where('amount', '>=', (float) $minAmount);
         }
 
-        if ($maxAmount !== null && $maxAmount !== '') {
+        if ($maxAmount !== null && $maxAmount !== '' && is_numeric($maxAmount)) {
             $costsQuery->where('amount', '<=', (float) $maxAmount);
         }
 

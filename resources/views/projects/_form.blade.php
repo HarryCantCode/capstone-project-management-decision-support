@@ -610,17 +610,23 @@
         <div class="card-body">
             <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
                 <label for="contract_price" class="form-label">Contract Price (PHP ₱) <span class="text-danger">*</span></label>
+                @php
+                    $rawContractPrice = old('contract_price', isset($project) && $project->contract_price !== null ? $project->contract_price : '');
+                    $formattedContractPrice = $rawContractPrice !== '' && is_numeric(str_replace(',', '', (string) $rawContractPrice))
+                        ? number_format((float) str_replace(',', '', (string) $rawContractPrice), 2, '.', ',')
+                        : $rawContractPrice;
+                @endphp
                 <div style="position: relative;">
-                    <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 600; color: var(--color-muted); font-family: var(--font-mono);">₱</span>
+                    <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-weight: 600; color: var(--color-muted); font-family: var(--font-mono); pointer-events: none; z-index: 2;">₱&nbsp;</span>
                     <input
                         id="contract_price"
                         name="contract_price"
-                        type="number"
-                        step="0.01"
-                        min="100000"
+                        type="text"
+                        inputmode="decimal"
+                        data-amount-input
                         class="form-control @error('contract_price') is-invalid @enderror font-mono"
-                        style="padding-left: 32px;"
-                        value="{{ old('contract_price', isset($project) ? $project->contract_price : '') }}"
+                        style="padding-left: 38px !important;"
+                        value="{{ $formattedContractPrice }}"
                         required
                         placeholder="100,000.00"
                     >

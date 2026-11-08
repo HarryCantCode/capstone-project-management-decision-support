@@ -280,6 +280,12 @@ class ProjectController extends Controller
     {
         $this->authorize('update', $project);
 
+        if ($request->has('actual_spend') && is_string($request->input('actual_spend'))) {
+            $request->merge([
+                'actual_spend' => str_replace(',', '', $request->input('actual_spend')),
+            ]);
+        }
+
         $validated = $request->validate([
             'actual_spend' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
         ]);
@@ -430,10 +436,23 @@ class ProjectController extends Controller
 
     /**
      * Add an itemized cost / expenditure entry to the project.
+     * Admin/Manager adds directly; Staff submissions require review.
      */
     public function addCost(Request $request, Project $project): RedirectResponse
     {
-        $this->authorize('update', $project);
+        abort_unless(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']), 403);
+
+        if ($request->has('amount') && is_string($request->input('amount'))) {
+            $request->merge([
+                'amount' => str_replace(',', '', $request->input('amount')),
+            ]);
+        }
+
+        if ($request->filled('resource_id')) {
+            $request->merge([
+                'cost_type' => 'materials',
+            ]);
+        }
 
         $validated = $request->validate([
             'resource_id' => ['nullable', 'exists:resources,id'],
@@ -447,6 +466,7 @@ class ProjectController extends Controller
         ]);
 
         if (!empty($validated['resource_id'])) {
+            $validated['cost_type'] = 'materials';
             $resource = \App\Models\Resource::find($validated['resource_id']);
             $requestedQty = !empty($validated['quantity']) && (int) $validated['quantity'] > 0 ? (int) $validated['quantity'] : 1;
             if ($resource && $requestedQty > $resource->quantity_available) {
@@ -455,17 +475,44 @@ class ProjectController extends Controller
             }
         }
 
+        // Staff submissions must be reviewed and accepted by Admin or Manager before reflecting
+        if (Auth::user()->hasRole('Staff')) {
+            $pendingAction = \App\Models\StaffPendingAction::create([
+                'user_id' => Auth::id(),
+                'project_id' => $project->id,
+                'action_type' => 'add_expense',
+                'payload' => [
+                    'description' => $validated['description'],
+                    'cost_type' => $validated['cost_type'],
+                    'amount' => (float) $validated['amount'],
+                    'quantity' => $validated['quantity'] ?? null,
+                    'resource_id' => $validated['resource_id'] ?? null,
+                    'resource_name' => !empty($validated['resource_id']) ? \App\Models\Resource::find($validated['resource_id'])?->name : null,
+                    'incurred_date' => $validated['incurred_date'] ?? now()->toDateString(),
+                    'redirect_to' => $request->input('redirect_to'),
+                ],
+                'status' => 'pending',
+            ]);
+
+            app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
+
+            return redirect($this->getCostRedirectUrl($request, $project))
+                ->with('warning', "Expense entry '{$validated['description']}' has been submitted for review by an Admin or Manager before reflecting.");
+        }
+
         $this->projectService->addCost($project, $validated);
 
         return redirect($this->getCostRedirectUrl($request, $project))
-            ->with('status', "Cost entry '{$validated['description']}' of ₱" . number_format($validated['amount'], 2) . " logged successfully.");
+            ->with('status', "Cost entry '{$validated['description']}' of ₱" . number_format((float) $validated['amount'], 2) . " logged successfully.");
     }
 
     /**
      * Remove an itemized cost / expenditure entry from the project.
+     * Staff role cannot remove costs.
      */
     public function deleteCost(Request $request, Project $project, \App\Models\ProjectCost $cost): RedirectResponse
     {
+        abort_if(Auth::user()->hasRole('Staff'), 403, 'Staff users cannot remove expenses.');
         $this->authorize('update', $project);
 
         $redirectUrl = $this->getCostRedirectUrl($request, $project);

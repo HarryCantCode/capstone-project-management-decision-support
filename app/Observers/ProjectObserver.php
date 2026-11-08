@@ -35,6 +35,14 @@ class ProjectObserver
 
         if ($project->isDirty('status')) {
             $changes[] = "Status transitioned from " . ucfirst($fromStatus) . " to " . ucfirst($toStatus);
+
+            if (in_array(strtolower((string) $toStatus), ['ongoing', 'in_progress', 'in-progress', 'completed'], true)) {
+                app(\App\Services\NotificationService::class)->notifyProjectStatusChanged(
+                    $project,
+                    (string) $fromStatus,
+                    (string) $toStatus,
+                );
+            }
         }
 
         if ($project->isDirty('name')) {

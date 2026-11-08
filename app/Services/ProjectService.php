@@ -255,15 +255,16 @@ class ProjectService
         return DB::transaction(function () use ($project, $data, $user) {
             $qty = !empty($data['quantity']) && (int)$data['quantity'] > 0 ? (int)$data['quantity'] : 1;
             $resourceId = !empty($data['resource_id']) ? (int)$data['resource_id'] : null;
+            $rawAmount = is_string($data['amount'] ?? null) ? str_replace(',', '', $data['amount']) : ($data['amount'] ?? 0);
 
             $cost = $project->costs()->create([
                 'resource_id' => $resourceId,
                 'description' => $data['description'],
-                'cost_type' => $data['cost_type'] ?? 'materials',
-                'amount' => $data['amount'],
+                'cost_type' => $resourceId ? 'materials' : ($data['cost_type'] ?? 'materials'),
+                'amount' => $rawAmount,
                 'quantity' => $qty,
                 'incurred_date' => $data['incurred_date'] ?? now()->toDateString(),
-                'created_by' => $user->id,
+                'created_by' => $data['created_by'] ?? $user->id,
                 'updated_by' => $user->id,
             ]);
 
@@ -283,7 +284,7 @@ class ProjectService
                         'updated_by' => $user->id,
                     ]);
 
-                    if ($newQty < 5) {
+                    if ($newQty <= \App\Models\Resource::LOW_STOCK_THRESHOLD) {
                         $this->notificationService->notifyLowStockMaterial($resource);
                     }
 
@@ -296,6 +297,8 @@ class ProjectService
                         'updated_by' => $user->id,
                         'created_at' => !empty($data['incurred_date']) ? \Carbon\Carbon::parse($data['incurred_date']) : now(),
                     ]);
+
+                    app(ResourceCatalogService::class)->syncDemandStatusForResource($resource);
                 }
             }
 
@@ -322,9 +325,11 @@ class ProjectService
         $user = Auth::user();
 
         DB::transaction(function () use ($project, $cost, $user) {
+            $resourceId = $cost->resource_id ? (int) $cost->resource_id : null;
+
             // If it was linked to a resource, restore quantity
-            if ($cost->resource_id) {
-                $resource = \App\Models\Resource::query()->lockForUpdate()->find($cost->resource_id);
+            if ($resourceId) {
+                $resource = \App\Models\Resource::query()->lockForUpdate()->find($resourceId);
                 if ($resource) {
                     $resource->increment('quantity_available', $cost->quantity ?? 1, [
                         'updated_by' => $user->id,
@@ -333,6 +338,10 @@ class ProjectService
             }
 
             $cost->delete();
+
+            if ($resourceId) {
+                app(ResourceCatalogService::class)->syncDemandStatusForResource($resourceId);
+            }
 
             $totalSpend = (float) $project->costs()->sum('amount');
             $project->update([
@@ -461,20 +470,15 @@ class ProjectService
     }
 
     /**
-     * Archive a completed project.
+     * Archive a project regardless of its current status.
      */
     public function archive(Project $project): void
     {
-        if ($project->status !== 'completed') {
-            throw ValidationException::withMessages([
-                'project' => 'Only completed projects can be archived.',
-            ]);
-        }
-
         DB::transaction(function () use ($project) {
             $user = Auth::user();
             $userId = $user ? $user->id : $project->updated_by;
             $now = now()->toDateString();
+            $currentStatus = $project->status ?: 'pending';
 
             // Release any remaining assigned personnel just in case
             $assignedPersonnel = $project->personnel()->get();
@@ -497,8 +501,8 @@ class ProjectService
 
             \App\Models\ProjectStatusHistory::create([
                 'project_id'  => $project->id,
-                'from_status' => 'completed',
-                'to_status'   => 'completed',
+                'from_status' => $currentStatus,
+                'to_status'   => $currentStatus,
                 'notes'       => "Project archived to records repository",
                 'changed_by'  => $userId,
                 'changed_at'  => now(),
@@ -507,26 +511,29 @@ class ProjectService
             $projectId = $project->id;
             $project->delete(); // Soft delete as archive
 
+            $this->notificationService->notifyProjectArchived($project);
+
             $stats = Project::getDashboardStats();
             \App\Events\ProjectDeleted::dispatch($projectId, $stats);
         });
     }
 
     /**
-     * Restore an archived project back to active completed state.
+     * Restore an archived project back to active state.
      */
     public function restore(Project $project): void
     {
         DB::transaction(function () use ($project) {
             $user = Auth::user();
             $userId = $user ? $user->id : $project->updated_by;
+            $currentStatus = $project->status ?: 'completed';
 
             $project->restore();
 
             \App\Models\ProjectStatusHistory::create([
                 'project_id'  => $project->id,
-                'from_status' => 'completed',
-                'to_status'   => 'completed',
+                'from_status' => $currentStatus,
+                'to_status'   => $currentStatus,
                 'notes'       => "Project restored from archive",
                 'changed_by'  => $userId,
                 'changed_at'  => now(),

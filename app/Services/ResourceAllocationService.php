@@ -56,9 +56,11 @@ class ResourceAllocationService
             ]);
 
             $remaining = (int) $lockedResource->fresh()->quantity_available;
-            if ($remaining < 5) {
+            if ($remaining <= \App\Models\Resource::LOW_STOCK_THRESHOLD) {
                 app(\App\Services\NotificationService::class)->notifyLowStockMaterial($lockedResource->fresh());
             }
+
+            app(ResourceCatalogService::class)->syncDemandStatusForResource($lockedResource);
 
             return $allocation;
         });

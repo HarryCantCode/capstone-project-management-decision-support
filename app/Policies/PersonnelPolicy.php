@@ -18,7 +18,7 @@ class PersonnelPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['Admin', 'Manager']);
+        return $user->hasAnyRole(['Admin', 'Manager', 'Staff']);
     }
 
     /**

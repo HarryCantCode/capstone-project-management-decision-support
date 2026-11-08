@@ -23,12 +23,12 @@ class ProjectPolicy
 
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['Admin', 'Manager']);
+        return $user->hasAnyRole(['Admin', 'Manager', 'Staff']);
     }
 
     public function view(User $user, Project $project): bool
     {
-        return $user->hasAnyRole(['Admin', 'Manager']);
+        return $user->hasAnyRole(['Admin', 'Manager', 'Staff']);
     }
 
     public function create(User $user): bool
