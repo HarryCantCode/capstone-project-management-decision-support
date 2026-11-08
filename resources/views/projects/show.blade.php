@@ -1042,7 +1042,7 @@
                             + Log New Expense / Cost
                         </button>
                     @else
-                        <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true" style="white-space: nowrap;">
+                        <button type="button" class="btn btn-primary btn-sm" @click="openAddCostModal()" style="white-space: nowrap;">
                             + Log New Expense / Cost
                         </button>
                     @endif
@@ -1066,7 +1066,7 @@
                                 + Log First Cost Entry
                             </button>
                         @else
-                            <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
+                            <button type="button" class="btn btn-primary btn-sm" @click="openAddCostModal()">
                                 + Log First Cost Entry
                             </button>
                         @endif
@@ -1388,9 +1388,16 @@
 
                     {{-- Option to choose from Materials Catalog with Search & Clear --}}
                     <div class="form-group form-group-premium" style="background: var(--color-surface-alt); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); margin-bottom: var(--space-4);" @click.outside="materialDropdownOpen = false">
-                        <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; flex-wrap: wrap;">
                             <span style="font-weight: 600;">Choose from Materials Catalog (Optional)</span>
-                            <span class="text-muted" style="font-size: 0.75rem; font-weight: normal;">Search by name, code or model</span>
+                            <template x-if="selectedMaterialId">
+                                <button type="button" @click="clearMaterialSelection()" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; color: var(--color-accent);">
+                                    ✕ Clear &amp; Switch to Custom Fill-Up
+                                </button>
+                            </template>
+                            <template x-if="!selectedMaterialId">
+                                <span class="text-muted" style="font-size: 0.75rem; font-weight: normal;">Leave empty below to manually fill up a custom expense</span>
+                            </template>
                         </label>
 
                         {{-- Searchable Dropdown Container --}}
@@ -1467,7 +1474,8 @@
                                     type="number"
                                     id="material_qty_input"
                                     min="1"
-                                    :max="selectedMaterialStock"
+                                    :max="selectedMaterialId ? selectedMaterialStock : null"
+                                    :disabled="!selectedMaterialId"
                                     step="1"
                                     class="form-control font-mono"
                                     :style="isQuantityExcessive ? 'border-color: var(--color-danger); background: var(--color-danger-light);' : ''"
@@ -1514,12 +1522,13 @@
                             step="1"
                             class="form-control font-mono"
                             x-model.number="materialQuantity"
+                            :disabled="Boolean(selectedMaterialId)"
+                            :required="!selectedMaterialId"
                             placeholder="1"
-                            required
                         >
                         <p class="form-hint">Default is 1, minimum is 1 (cannot be 0).</p>
                     </div>
-                    <input type="hidden" name="quantity" :value="materialQuantity" x-show="selectedMaterialId">
+                    <input type="hidden" name="quantity" :value="materialQuantity || 1" :disabled="!selectedMaterialId">
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-4);">
                         <div class="form-group form-group-premium" style="margin-bottom: 0;">
@@ -1568,6 +1577,7 @@
                                 class="form-control font-mono"
                                 style="padding-left: 38px !important;"
                                 x-model="costForm.amount"
+                                @input="if (!selectedMaterialId) { costForm.amount = window.formatAmountWithCommas ? window.formatAmountWithCommas($event.target.value) : $event.target.value; }"
                                 :readonly="Boolean(selectedMaterialId)"
                                 :style="selectedMaterialId ? 'padding-left: 38px !important; background: var(--color-surface-alt); cursor: not-allowed;' : 'padding-left: 38px !important;'"
                                 placeholder="100.00"
@@ -3012,6 +3022,11 @@ function projectDetail() {
             form.submit();
         },
         addCostModalOpen: false,
+        openAddCostModal() {
+            this.clearMaterialSelection();
+            this.costForm.cost_type = 'materials';
+            this.addCostModalOpen = true;
+        },
         assignModalOpen: false,
         createMajorTaskModalOpen: false,
         editMajorTaskModalOpen: false,
@@ -3055,12 +3070,16 @@ function projectDetail() {
             return qty > this.selectedMaterialStock;
         },
         validateCostSubmission(e) {
-            const amt = window.parseAmountValue ? window.parseAmountValue(this.costForm.amount) : parseFloat(String(this.costForm.amount).replace(/,/g, ''));
+            const rawVal = this.costForm.amount || (e && e.target && e.target.elements && e.target.elements['amount'] ? e.target.elements['amount'].value : '');
+            const amt = window.parseAmountValue ? window.parseAmountValue(rawVal) : parseFloat(String(rawVal).replace(/,/g, ''));
             if (isNaN(amt) || amt < 100) {
                 window.dispatchEvent(new CustomEvent('show-toast', {
                     detail: { type: 'error', title: 'Minimum Amount Required', message: 'Expenditure amount cannot be less than ₱100.00.', duration: 5000 }
                 }));
                 return false;
+            }
+            if (!this.materialQuantity || this.materialQuantity < 1) {
+                this.materialQuantity = 1;
             }
             if (this.selectedMaterialId) {
                 this.costForm.cost_type = 'materials';
@@ -3257,15 +3276,17 @@ function projectDetail() {
             .then(data => {
                 if (data.success) {
                     if (data.pending_approval) {
+                        const checkboxes = document.querySelectorAll(`.subtask-check-${subtaskId}`);
+                        checkboxes.forEach(cb => { cb.checked = false; });
                         if (checkboxEl) {
                             checkboxEl.checked = false;
                         }
                         window.dispatchEvent(new CustomEvent('show-toast', {
                             detail: {
-                                type: 'warning',
-                                title: 'Action Submitted for Review',
-                                message: data.message || 'This task completion has been submitted for review by an Admin or Manager before taking effect.',
-                                duration: 6000
+                                type: 'success',
+                                title: 'Action Submitted',
+                                message: data.message || 'Your action has been submitted successfully and will be reviewed by your manager or admin to take effect.',
+                                duration: 6500
                             }
                         }));
                         return;
@@ -3432,12 +3453,12 @@ function projectDetail() {
                     }
                 } else if (data.message) {
                     if (checkboxEl) {
-                        checkboxEl.checked = !checkboxEl.checked;
+                        checkboxEl.checked = data.already_pending ? false : !checkboxEl.checked;
                     }
                     window.dispatchEvent(new CustomEvent('show-toast', {
                         detail: {
                             type: 'warning',
-                            title: 'Sequential Task Progression',
+                            title: data.already_pending ? 'Already Pending Review' : 'Sequential Task Progression',
                             message: data.message,
                             duration: 5000
                         }

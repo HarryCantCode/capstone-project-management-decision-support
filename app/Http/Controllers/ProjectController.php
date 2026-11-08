@@ -442,6 +442,11 @@ class ProjectController extends Controller
     {
         abort_unless(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']), 403);
 
+        if ($project->trashed() || $project->status === 'completed') {
+            return redirect($this->getCostRedirectUrl($request, $project))
+                ->with('error', 'Cannot log expenses on a completed or archived project.');
+        }
+
         if ($request->has('amount') && is_string($request->input('amount'))) {
             $request->merge([
                 'amount' => str_replace(',', '', $request->input('amount')),
@@ -497,7 +502,7 @@ class ProjectController extends Controller
             app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
 
             return redirect($this->getCostRedirectUrl($request, $project))
-                ->with('warning', "Expense entry '{$validated['description']}' has been submitted for review by an Admin or Manager before reflecting.");
+                ->with('staff_submitted', 'Your action has been submitted successfully and will be reviewed by your manager or admin to take effect.');
         }
 
         $this->projectService->addCost($project, $validated);
@@ -516,6 +521,11 @@ class ProjectController extends Controller
         $this->authorize('update', $project);
 
         $redirectUrl = $this->getCostRedirectUrl($request, $project);
+
+        if ($project->trashed() || $project->status === 'completed') {
+            return redirect($redirectUrl)
+                ->with('error', 'Cannot remove expenses from a completed or archived project.');
+        }
 
         if ($cost->project_id === $project->id) {
             $this->projectService->deleteCost($project, $cost);

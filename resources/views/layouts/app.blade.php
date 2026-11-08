@@ -638,9 +638,9 @@
                                                 </div>
 
                                                 <a
-                                                    :href="notification.url || 'javascript:void(0)'"
+                                                    :href="notification.type === 'staff_action_review' ? '#' : (notification.url || '#')"
                                                     class="notification-card-link-block"
-                                                    @click="onNotificationClick(notification)"
+                                                    @click.prevent.stop="onNotificationClick(notification, $event)"
                                                 >
                                                     <div class="notification-card-title" x-text="notification.title"></div>
                                                     <div class="notification-card-msg" x-text="notification.message"></div>
@@ -985,6 +985,36 @@
                 role="region"
                 aria-label="Notification alerts"
             >
+                @if (session('staff_submitted'))
+                    <div
+                        x-data="{ show: true }"
+                        x-show="show"
+                        x-init="setTimeout(() => show = false, 6500)"
+                        x-transition.duration.300ms
+                        style="pointer-events: auto; width: 100%; max-width: 460px;"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #064e3b; color: #ecfdf5; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #059669;">
+                            <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #10b981; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
+                                &#10003;
+                            </span>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Action Submitted</div>
+                                <div style="font-size: 0.85rem; color: #d1fae5; line-height: 1.4;">{{ session('staff_submitted') }}</div>
+                            </div>
+                            <button
+                                type="button"
+                                @click="show = false"
+                                style="background: transparent; border: none; color: #a7f3d0; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
+                                aria-label="Close notification"
+                            >
+                                &times;
+                            </button>
+                        </div>
+                    </div>
+                @endif
+
                 @if (session('status') || session('success'))
                     <div
                         x-data="{ show: true }"
@@ -1421,7 +1451,11 @@
                     }
                 },
 
-                onNotificationClick(notification) {
+                onNotificationClick(notification, event) {
+                    if (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
                     if (!notification.is_read) {
                         this.markRead(notification);
                     }
@@ -1493,8 +1527,6 @@
                     if (!this.activeReviewItem || !this.activeReviewItem.data) return;
                     const actionId = this.activeReviewItem.data.pending_action_id;
                     if (!actionId) return;
-
-                    if (!confirm('Are you sure you want to reject this staff action?')) return;
 
                     this.reviewLoading = true;
                     this.reviewError = null;

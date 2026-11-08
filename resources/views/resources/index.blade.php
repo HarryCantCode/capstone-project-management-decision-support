@@ -284,14 +284,29 @@
                                         {{ $resource->model ?: '—' }}
                                     </div>
                                 </td>
-                                <td class="cell-numeric" style="font-weight: 600;">
-                                    <div style="display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);">
-                                        <span class="{{ $resource->quantity_available <= 8 ? 'text-danger' : '' }}">{{ number_format($resource->quantity_available) }}</span>
+                                <td class="cell-numeric font-mono" style="font-weight: 600; white-space: nowrap;">
+                                    <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px;">
                                         @if ($resource->quantity_available <= 8)
-                                            <span class="badge" style="font-size: 0.6875rem; font-weight: 700; background: rgba(239, 68, 68, 0.12); color: var(--color-danger); border: 1px solid rgba(239, 68, 68, 0.25);" title="Stock level is 8 or below">
-                                                {{ $resource->quantity_available <= 0 ? 'Out of Stock' : 'Low Stock' }}
+                                            @php
+                                                $isOutOfStock = $resource->quantity_available <= 0;
+                                                $stockTooltip = $isOutOfStock
+                                                    ? 'Out of Stock — 0 units remaining'
+                                                    : 'Low Stock — ' . number_format($resource->quantity_available) . ' unit(s) remaining (threshold: 8)';
+                                            @endphp
+                                            <span
+                                                style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0; cursor: help; {{ $isOutOfStock ? 'background: rgba(239, 68, 68, 0.14); color: var(--color-danger); border: 1px solid rgba(239, 68, 68, 0.3);' : 'background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.35);' }}"
+                                                title="{{ $stockTooltip }}"
+                                                aria-label="{{ $stockTooltip }}"
+                                            >
+                                                <svg style="width: 12px; height: 12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                                    <line x1="12" y1="9" x2="12" y2="13"/>
+                                                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                                </svg>
+                                                <span class="visually-hidden">{{ $isOutOfStock ? 'Out of Stock' : 'Low Stock' }}</span>
                                             </span>
                                         @endif
+                                        <span class="{{ $resource->quantity_available <= 8 ? 'text-danger' : '' }}" style="display: inline-block; min-width: 2ch; text-align: right;">{{ number_format($resource->quantity_available) }}</span>
                                     </div>
                                 </td>
                                 <td class="cell-numeric font-mono" style="color: var(--color-ink);">
@@ -304,7 +319,7 @@
                                     @php
                                         $resUsage3m = $usageStatsByResource[$resource->id] ?? ['usage_count' => 0, 'projects_count' => 0, 'total_quantity' => 0];
                                     @endphp
-                                    <div style="display: inline-flex; flex-direction: column; align-items: center; gap: 3px;" title="Based on project usage frequency over the last 3 months ({{ $resUsage3m['usage_count'] }} usage(s), {{ $resUsage3m['total_quantity'] }} unit(s) across {{ $resUsage3m['projects_count'] }} project(s))">
+                                    <div style="display: inline-flex; align-items: center; justify-content: center;" title="Based on project usage frequency over the last 3 months ({{ $resUsage3m['usage_count'] }} usage(s), {{ $resUsage3m['total_quantity'] }} unit(s) across {{ $resUsage3m['projects_count'] }} project(s))">
                                         @if ($resource->demand_status === 'fast-moving')
                                             <span class="badge badge-success" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em;">
                                                 Fast-moving
@@ -314,9 +329,6 @@
                                                 Slow-moving
                                             </span>
                                         @endif
-                                        <span class="font-mono" style="font-size: 0.6875rem; color: var(--color-muted); white-space: nowrap;">
-                                            {{ $resUsage3m['usage_count'] }}x used · {{ $resUsage3m['projects_count'] }} {{ $resUsage3m['projects_count'] === 1 ? 'proj' : 'projs' }} (3m)
-                                        </span>
                                     </div>
                                 </td>
                                 <td class="text-right">

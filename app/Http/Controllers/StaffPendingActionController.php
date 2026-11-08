@@ -64,6 +64,13 @@ class StaffPendingActionController extends Controller implements HasMiddleware
             }
 
             $project = $lockedAction->project;
+            if (!$project || $project->trashed() || $project->status === 'completed') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot approve this action because the project is already completed or archived.',
+                ], 422);
+            }
+
             $payload = $lockedAction->payload ?? [];
 
             match ($lockedAction->action_type) {

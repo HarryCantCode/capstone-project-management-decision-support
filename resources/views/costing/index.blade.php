@@ -10,7 +10,9 @@
             <p class="page-header__description">Monitor real-time budgets, actual expenditures, and remaining funds across all projects.</p>
         </div>
         <div class="page-actions">
-            <a href="{{ route('projects.create') }}" class="btn btn-primary">+ Create New Project</a>
+            @can('create', \App\Models\Project::class)
+                <a href="{{ route('projects.create') }}" class="btn btn-primary">+ Create New Project</a>
+            @endcan
         </div>
     </div>
 
@@ -234,7 +236,9 @@
                     @if (!empty($search) || !empty($status))
                         <a href="{{ route('costing.index') }}" class="btn btn-secondary btn-sm">Clear Search &amp; Filters</a>
                     @elseif (empty($search) && empty($status))
-                        <a href="{{ route('projects.create') }}" class="btn btn-primary">+ Create First Project</a>
+                        @can('create', \App\Models\Project::class)
+                            <a href="{{ route('projects.create') }}" class="btn btn-primary">+ Create First Project</a>
+                        @endcan
                     @endif
                 </div>
             </div>

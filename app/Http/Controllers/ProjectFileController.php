@@ -61,7 +61,7 @@ class ProjectFileController extends Controller
 
             app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
 
-            $msg = "File '{$uploadedFile->getClientOriginalName()}' submitted for Admin/Manager review.";
+            $msg = 'Your action has been submitted successfully and will be reviewed by your manager or admin to take effect.';
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => true,
@@ -72,7 +72,7 @@ class ProjectFileController extends Controller
 
             return redirect()
                 ->route('projects.show', $project)
-                ->with('warning', $msg);
+                ->with('staff_submitted', $msg);
         }
 
         $projectFile = $this->projectService->storeProjectFile(
@@ -141,7 +141,7 @@ class ProjectFileController extends Controller
 
             app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
 
-            $msg = "Attachment for task '{$subtask->title}' submitted for Admin/Manager review.";
+            $msg = 'Your action has been submitted successfully and will be reviewed by your manager or admin to take effect.';
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => true,
@@ -152,7 +152,7 @@ class ProjectFileController extends Controller
 
             return redirect()
                 ->route('projects.show', $project)
-                ->with('warning', $msg);
+                ->with('staff_submitted', $msg);
         }
 
         $projectFile = $this->projectService->storeProjectFile(

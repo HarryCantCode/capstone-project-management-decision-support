@@ -420,10 +420,11 @@ class ProjectTaskController extends Controller
                 ->first();
 
             if ($existingPending) {
-                $msg = "This task completion has already been submitted for review.";
+                $msg = 'This task completion has already been submitted and is awaiting review by your manager or admin.';
                 if ($request->wantsJson() || $request->ajax()) {
                     return response()->json([
                         'success' => false,
+                        'already_pending' => true,
                         'message' => $msg,
                     ], 422);
                 }
@@ -446,7 +447,7 @@ class ProjectTaskController extends Controller
 
             app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
 
-            $msg = "Task '{$subtask->title}' completion submitted for Admin/Manager review.";
+            $msg = 'Your action has been submitted successfully and will be reviewed by your manager or admin to take effect.';
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => true,
@@ -455,7 +456,7 @@ class ProjectTaskController extends Controller
                 ]);
             }
 
-            return back()->with('warning', $msg);
+            return back()->with('staff_submitted', $msg);
         }
 
         $subtask->update([

@@ -4,6 +4,9 @@
 @section('meta-description', 'Detailed project expense ledger, search, multi-criteria filtering, and budget tracking.')
 
 @section('content')
+@php
+    $isProjectReadOnly = $project->trashed() || $project->status === 'completed';
+@endphp
 <div x-data="costingBreakdown()">
 
     {{-- Page Header --}}
@@ -21,12 +24,12 @@
         </div>
         <div class="page-actions">
             @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
-                @if ($project->trashed())
-                    <button type="button" class="btn btn-secondary" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot log expenses on an archived project">
+                @if ($isProjectReadOnly)
+                    <button type="button" class="btn btn-secondary" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}">
                         + Log New Expense / Cost
                     </button>
                 @else
-                    <button type="button" class="btn btn-primary" @click="addCostModalOpen = true">
+                    <button type="button" class="btn btn-primary" @click="openAddCostModal()">
                         + Log New Expense / Cost
                     </button>
                 @endif
@@ -231,17 +234,17 @@
                     Showing {{ $costs->total() }} {{ Str::plural('entry', $costs->total()) }}
                 </span>
             </div>
-            @can('update', $project)
-                @if ($project->trashed())
-                    <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot log expenses on an archived project">
+            @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
+                @if ($isProjectReadOnly)
+                    <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}">
                         + Log New Expense / Cost
                     </button>
                 @else
-                    <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
+                    <button type="button" class="btn btn-primary btn-sm" @click="openAddCostModal()">
                         + Log New Expense / Cost
                     </button>
                 @endif
-            @endcan
+            @endif
         </div>
 
         @if ($costs->isEmpty())
@@ -261,17 +264,17 @@
                     @if (!empty($search) || !empty($category) || !empty($startDate) || !empty($endDate) || !empty($minAmount) || !empty($maxAmount))
                         <a href="{{ route('costing.show', $project) }}" class="btn btn-secondary btn-sm">Clear Active Filters</a>
                     @else
-                        @can('update', $project)
-                            @if ($project->trashed())
-                                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot log expenses on an archived project">
+                        @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
+                            @if ($isProjectReadOnly)
+                                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}">
                                     + Log First Expense Item
                                 </button>
                             @else
-                                <button type="button" class="btn btn-primary btn-sm" @click="addCostModalOpen = true">
+                                <button type="button" class="btn btn-primary btn-sm" @click="openAddCostModal()">
                                     + Log First Expense Item
                                 </button>
                             @endif
-                        @endcan
+                        @endif
                     @endif
                 </div>
             </div>
@@ -315,7 +318,7 @@
                                 </td>
                                 <td class="text-right">
                                     @can('update', $project)
-                                        @if (!$project->trashed())
+                                        @if (!$isProjectReadOnly)
                                             <button
                                                 type="button"
                                                 class="btn btn-secondary btn-sm"
@@ -358,9 +361,16 @@
 
                     {{-- Option to choose from Materials Catalog with Search & Clear --}}
                     <div class="form-group form-group-premium" style="background: var(--color-surface-alt); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); margin-bottom: var(--space-4);" @click.outside="materialDropdownOpen = false">
-                        <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; flex-wrap: wrap;">
                             <span style="font-weight: 600;">Choose from Materials Catalog (Optional)</span>
-                            <span class="text-muted" style="font-size: 0.75rem; font-weight: normal;">Search by name, code or model</span>
+                            <template x-if="selectedMaterialId">
+                                <button type="button" @click="clearMaterialSelection()" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; color: var(--color-accent);">
+                                    ✕ Clear &amp; Switch to Custom Fill-Up
+                                </button>
+                            </template>
+                            <template x-if="!selectedMaterialId">
+                                <span class="text-muted" style="font-size: 0.75rem; font-weight: normal;">Leave empty below to manually fill up a custom expense</span>
+                            </template>
                         </label>
 
                         {{-- Searchable Dropdown Container --}}
@@ -437,7 +447,8 @@
                                     type="number"
                                     id="costing_material_qty_input"
                                     min="1"
-                                    :max="selectedMaterialStock"
+                                    :max="selectedMaterialId ? selectedMaterialStock : null"
+                                    :disabled="!selectedMaterialId"
                                     step="1"
                                     class="form-control font-mono"
                                     :style="isQuantityExcessive ? 'border-color: var(--color-danger); background: var(--color-danger-light);' : ''"
@@ -484,12 +495,13 @@
                             step="1"
                             class="form-control font-mono"
                             x-model.number="materialQuantity"
+                            :disabled="Boolean(selectedMaterialId)"
+                            :required="!selectedMaterialId"
                             placeholder="1"
-                            required
                         >
                         <p class="form-hint">Default is 1, minimum is 1 (cannot be 0).</p>
                     </div>
-                    <input type="hidden" name="quantity" :value="materialQuantity" x-show="selectedMaterialId">
+                    <input type="hidden" name="quantity" :value="materialQuantity || 1" :disabled="!selectedMaterialId">
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-4);">
                         <div class="form-group form-group-premium" style="margin-bottom: 0;">
@@ -625,6 +637,11 @@
 function costingBreakdown() {
     return {
         addCostModalOpen: false,
+        openAddCostModal() {
+            this.clearMaterialSelection();
+            this.costForm.cost_type = 'materials';
+            this.addCostModalOpen = true;
+        },
         deleteCostModalOpen: false,
         deleteCostTarget: {
             url: '',
@@ -680,12 +697,16 @@ function costingBreakdown() {
             return qty > this.selectedMaterialStock;
         },
         validateCostSubmission(e) {
-            const amt = window.parseAmountValue ? window.parseAmountValue(this.costForm.amount) : parseFloat(String(this.costForm.amount).replace(/,/g, ''));
+            const rawVal = this.costForm.amount || (e && e.target && e.target.elements && e.target.elements['amount'] ? e.target.elements['amount'].value : '');
+            const amt = window.parseAmountValue ? window.parseAmountValue(rawVal) : parseFloat(String(rawVal).replace(/,/g, ''));
             if (isNaN(amt) || amt < 100) {
                 window.dispatchEvent(new CustomEvent('show-toast', {
                     detail: { type: 'error', title: 'Minimum Amount Required', message: 'Expenditure amount cannot be less than ₱100.00.', duration: 5000 }
                 }));
                 return false;
+            }
+            if (!this.materialQuantity || this.materialQuantity < 1) {
+                this.materialQuantity = 1;
             }
 
             if (this.selectedMaterialId && this.isQuantityExcessive) {
