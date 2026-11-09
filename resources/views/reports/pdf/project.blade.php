@@ -5,10 +5,11 @@
     <title>Project Report — {{ $project->project_code }} — {{ $project->name }}</title>
     <style>
         @page {
-            margin: 32px 36px 52px 36px;
+            size: A4 portrait;
+            margin: 15mm;
         }
 
-        * {
+        body, div, p, h1, h2, h3, h4, h5, h6, table, thead, tbody, tfoot, tr, th, td, ul, ol, li, span, img {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
@@ -16,10 +17,11 @@
 
         body {
             font-family: 'DejaVu Sans', Helvetica, Arial, sans-serif;
-            font-size: 9.5pt;
-            line-height: 1.45;
+            font-size: 9pt;
+            line-height: 1.4;
             color: #1B1E23;
             background-color: #FFFFFF;
+            padding-bottom: 24px;
         }
 
         .mono {
@@ -29,55 +31,58 @@
         /* ── Running Page Footer ── */
         .page-footer {
             position: fixed;
-            bottom: -34px;
+            bottom: 0;
             left: 0;
             right: 0;
-            height: 26px;
+            height: 20px;
             border-top: 1px solid #DDE1E7;
-            padding-top: 6px;
-            font-size: 7.5pt;
+            padding-top: 4px;
+            font-size: 7pt;
             color: #6B7280;
+            background-color: #FFFFFF;
         }
 
         .footer-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
         }
 
         /* ── Top Corporate Header with DEX Logo ── */
         .report-header {
             border-bottom: 2.5px solid #2C5F7C;
-            padding-bottom: 12px;
-            margin-bottom: 14px;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .header-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
         }
 
         .logo-box {
-            width: 54px;
+            width: 52px;
             vertical-align: middle;
         }
 
         .logo-img {
-            width: 46px;
-            height: 46px;
+            width: 44px;
+            height: 44px;
             border-radius: 8px;
             display: block;
         }
 
         .logo-fallback {
-            width: 46px;
-            height: 46px;
+            width: 44px;
+            height: 44px;
             border-radius: 8px;
             background-color: #2C5F7C;
             color: #FFFFFF;
             font-weight: bold;
-            font-size: 13pt;
+            font-size: 12pt;
             text-align: center;
-            line-height: 46px;
+            line-height: 44px;
         }
 
         .brand-cell {
@@ -86,7 +91,7 @@
         }
 
         .company-name {
-            font-size: 14pt;
+            font-size: 13pt;
             font-weight: bold;
             color: #1B1E23;
             letter-spacing: 0.4px;
@@ -94,24 +99,25 @@
         }
 
         .company-sub {
-            font-size: 8pt;
+            font-size: 7.5pt;
             color: #2C5F7C;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.5px;
             margin-top: 2px;
         }
 
         .company-tagline {
-            font-size: 7.5pt;
+            font-size: 7pt;
             color: #6B7280;
             margin-top: 1px;
         }
 
         .meta-cell {
+            width: 205px;
             text-align: right;
             vertical-align: middle;
-            font-size: 8pt;
+            font-size: 7.5pt;
             color: #5E6370;
         }
 
@@ -119,11 +125,11 @@
             display: inline-block;
             background-color: #2C5F7C;
             color: #FFFFFF;
-            font-size: 8pt;
+            font-size: 7.5pt;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
-            padding: 3px 10px;
+            letter-spacing: 0.6px;
+            padding: 3px 9px;
             border-radius: 3px;
             margin-bottom: 4px;
         }
@@ -134,33 +140,38 @@
             border: 1px solid #DDE1E7;
             border-left: 4px solid #2C5F7C;
             border-radius: 4px;
-            padding: 10px 14px;
-            margin-bottom: 14px;
+            padding: 9px 12px;
+            margin-bottom: 12px;
         }
 
         .title-banner-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
         }
 
         .project-title {
-            font-size: 13pt;
+            font-size: 12pt;
             font-weight: bold;
             color: #1B1E23;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .project-subtitle {
-            font-size: 8.5pt;
+            font-size: 8pt;
             color: #5E6370;
             margin-top: 2px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         /* ── Status Pills ── */
         .status-pill {
             display: inline-block;
-            padding: 2px 9px;
+            padding: 2px 8px;
             border-radius: 12px;
-            font-size: 7.5pt;
+            font-size: 7pt;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.4px;
@@ -192,24 +203,25 @@
 
         /* ── Section Containers ── */
         .report-section {
-            margin-bottom: 14px;
+            margin-bottom: 12px;
             page-break-inside: avoid;
         }
 
         .report-section-flow {
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .section-header {
             background-color: #EBF3F8;
             border: 1px solid #C8DCE8;
             border-left: 4px solid #2C5F7C;
-            padding: 6px 10px;
-            margin-bottom: 8px;
+            padding: 5px 10px;
+            margin-bottom: 7px;
         }
 
         .section-header-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
         }
 
@@ -217,7 +229,7 @@
             display: inline-block;
             background-color: #2C5F7C;
             color: #FFFFFF;
-            font-size: 7.5pt;
+            font-size: 7pt;
             font-weight: bold;
             padding: 1px 6px;
             border-radius: 3px;
@@ -225,16 +237,16 @@
         }
 
         .section-title {
-            font-size: 9.5pt;
+            font-size: 9pt;
             font-weight: bold;
             color: #1B1E23;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
         }
 
         .section-meta {
             text-align: right;
-            font-size: 7.5pt;
+            font-size: 7pt;
             color: #2C5F7C;
             font-weight: bold;
         }
@@ -242,34 +254,37 @@
         /* ── Key-Value Grid Tables ── */
         .kv-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
             border: 1px solid #DDE1E7;
         }
 
         .kv-table td {
-            padding: 6px 10px;
+            padding: 5.5px 8px;
             border: 1px solid #DDE1E7;
             vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .kv-label {
-            font-size: 7pt;
+            font-size: 6.75pt;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
             color: #6B7280;
             display: block;
             margin-bottom: 2px;
         }
 
         .kv-value {
-            font-size: 9pt;
+            font-size: 8.5pt;
             color: #1B1E23;
             font-weight: bold;
         }
 
         .kv-value-normal {
-            font-size: 8.5pt;
+            font-size: 8pt;
             color: #1B1E23;
             font-weight: normal;
         }
@@ -277,6 +292,7 @@
         /* ── Financial KPI Strip ── */
         .fin-kpi-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
             margin-bottom: 8px;
         }
@@ -285,21 +301,23 @@
             width: 25%;
             background-color: #F7F8FA;
             border: 1px solid #DDE1E7;
-            padding: 8px 10px;
+            padding: 7px 8px;
             vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .fin-kpi-label {
-            font-size: 7pt;
+            font-size: 6.5pt;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
             color: #6B7280;
-            margin-bottom: 3px;
+            margin-bottom: 2px;
         }
 
         .fin-kpi-val {
-            font-size: 11pt;
+            font-size: 9.5pt;
             font-weight: bold;
             color: #1B1E23;
         }
@@ -315,6 +333,7 @@
         /* ── Standard Data Tables ── */
         .data-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
             border: 1px solid #DDE1E7;
         }
@@ -322,21 +341,25 @@
         .data-table th {
             background-color: #F0F2F5;
             color: #1B1E23;
-            font-size: 7.5pt;
+            font-size: 7pt;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.4px;
-            padding: 6px 8px;
+            letter-spacing: 0.3px;
+            padding: 5.5px 6px;
             border: 1px solid #DDE1E7;
             text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .data-table td {
-            padding: 5.5px 8px;
+            padding: 5px 6px;
             border: 1px solid #DDE1E7;
-            font-size: 8.25pt;
+            font-size: 7.75pt;
             color: #1B1E23;
             vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .data-table tr:nth-child(even) td {
@@ -346,7 +369,7 @@
         .data-table tfoot td {
             background-color: #EBF3F8;
             font-weight: bold;
-            font-size: 8.5pt;
+            font-size: 8pt;
             border-top: 1.5px solid #2C5F7C;
         }
 
@@ -355,18 +378,18 @@
             background-color: #F0F2F5;
             border: 1px solid #DDE1E7;
             color: #1B1E23;
-            font-size: 7pt;
+            font-size: 6.75pt;
             font-weight: bold;
-            padding: 1px 6px;
+            padding: 1px 5px;
             border-radius: 3px;
         }
 
         .empty-box {
             border: 1px dashed #DDE1E7;
             background-color: #F7F8FA;
-            padding: 10px 14px;
+            padding: 9px 12px;
             text-align: center;
-            font-size: 8.5pt;
+            font-size: 8pt;
             color: #6B7280;
             font-style: italic;
         }
@@ -374,45 +397,46 @@
         /* ── Progress Bar ── */
         .progress-track {
             width: 100%;
-            height: 7px;
+            height: 6px;
             background-color: #E5E7EB;
-            border-radius: 4px;
+            border-radius: 3px;
             overflow: hidden;
             margin-top: 4px;
         }
 
         .progress-fill {
-            height: 7px;
+            height: 6px;
             background-color: #2C5F7C;
         }
 
         /* ── Signature Block ── */
         .signature-section {
-            margin-top: 22px;
+            margin-top: 18px;
             page-break-inside: avoid;
         }
 
         .sig-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
         }
 
         .sig-cell {
             width: 48%;
             vertical-align: bottom;
-            padding-top: 24px;
+            padding-top: 22px;
         }
 
         .sig-line {
             border-top: 1px solid #1B1E23;
             padding-top: 4px;
-            font-size: 8.5pt;
+            font-size: 8pt;
             font-weight: bold;
             color: #1B1E23;
         }
 
         .sig-role {
-            font-size: 7.5pt;
+            font-size: 7pt;
             color: #6B7280;
         }
     </style>

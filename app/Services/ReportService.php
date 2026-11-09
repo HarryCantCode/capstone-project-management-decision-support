@@ -544,7 +544,7 @@ class ReportService
         $data = $this->buildMaterialsReportData($filters);
 
         $pdf = Pdf::loadView('reports.pdf.materials', $data)
-            ->setPaper('a4', 'landscape');
+            ->setPaper('a4', 'portrait');
 
         $suffix = ! empty($filters['demand_status']) ? '-' . $filters['demand_status'] : '';
         $filename = sprintf('DEX-Materials-Report%s-%s.pdf', $suffix, now()->format('Ymd'));
@@ -749,10 +749,8 @@ class ReportService
     {
         $data = $this->buildManpowerReportData($filters);
 
-        $orientation = $data['includeRecentProjects'] ? 'landscape' : 'portrait';
-
         $pdf = Pdf::loadView('reports.pdf.manpower', $data)
-            ->setPaper('a4', $orientation);
+            ->setPaper('a4', 'portrait');
 
         $filename = sprintf('DEX-Manpower-Report-%s.pdf', now()->format('Ymd'));
 
@@ -987,7 +985,7 @@ class ReportService
         $data = $this->buildRevenueReportData($filters);
 
         $pdf = Pdf::loadView('reports.pdf.revenue', $data)
-            ->setPaper('a4', 'landscape');
+            ->setPaper('a4', 'portrait');
 
         $modeSuffix = $data['comparisonMode'] === 'yearly' ? 'Yearly' : ('Monthly-' . $data['yearFilter']);
         $filename = sprintf('DEX-Revenue-Report-Without-Taxes-%s-%s.pdf', $modeSuffix, now()->format('Ymd'));
@@ -1163,7 +1161,7 @@ class ReportService
         $data = $this->buildPortfolioReportData($filters);
 
         $pdf = Pdf::loadView('reports.pdf.portfolio', $data)
-            ->setPaper('a4', 'landscape');
+            ->setPaper('a4', 'portrait');
 
         $filename = sprintf('DEX-Portfolio-Summary-%s.pdf', now()->format('Ymd'));
 

@@ -5,10 +5,11 @@
     <title>Revenue &amp; Financial Performance Report (Without Taxes) — Dex International Co.</title>
     <style>
         @page {
-            margin: 30px 34px 48px 34px;
+            size: A4 portrait;
+            margin: 15mm;
         }
 
-        * {
+        body, div, p, h1, h2, h3, h4, h5, h6, table, thead, tbody, tfoot, tr, th, td, ul, ol, li, span, img {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
@@ -16,10 +17,11 @@
 
         body {
             font-family: 'DejaVu Sans', Helvetica, Arial, sans-serif;
-            font-size: 9pt;
-            line-height: 1.4;
+            font-size: 8.5pt;
+            line-height: 1.38;
             color: #1B1E23;
             background-color: #FFFFFF;
+            padding-bottom: 24px;
         }
 
         .mono {
@@ -28,18 +30,20 @@
 
         .page-footer {
             position: fixed;
-            bottom: -32px;
+            bottom: 0;
             left: 0;
             right: 0;
-            height: 24px;
+            height: 20px;
             border-top: 1px solid #DDE1E7;
-            padding-top: 5px;
-            font-size: 7.5pt;
+            padding-top: 4px;
+            font-size: 7pt;
             color: #6B7280;
+            background-color: #FFFFFF;
         }
 
         .footer-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
         }
 
@@ -51,31 +55,32 @@
 
         .header-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
         }
 
         .logo-box {
-            width: 52px;
+            width: 50px;
             vertical-align: middle;
         }
 
         .logo-img {
-            width: 44px;
-            height: 44px;
+            width: 42px;
+            height: 42px;
             border-radius: 8px;
             display: block;
         }
 
         .logo-fallback {
-            width: 44px;
-            height: 44px;
+            width: 42px;
+            height: 42px;
             border-radius: 8px;
             background-color: #2C5F7C;
             color: #FFFFFF;
             font-weight: bold;
-            font-size: 12pt;
+            font-size: 11.5pt;
             text-align: center;
-            line-height: 44px;
+            line-height: 42px;
         }
 
         .brand-cell {
@@ -84,7 +89,7 @@
         }
 
         .company-name {
-            font-size: 13.5pt;
+            font-size: 13pt;
             font-weight: bold;
             color: #1B1E23;
             letter-spacing: 0.4px;
@@ -92,23 +97,24 @@
         }
 
         .company-sub {
-            font-size: 8pt;
+            font-size: 7.5pt;
             color: #2C5F7C;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.5px;
             margin-top: 1px;
         }
 
         .company-tagline {
-            font-size: 7.5pt;
+            font-size: 7pt;
             color: #6B7280;
         }
 
         .meta-cell {
+            width: 205px;
             text-align: right;
             vertical-align: middle;
-            font-size: 7.5pt;
+            font-size: 7.25pt;
             color: #5E6370;
         }
 
@@ -116,11 +122,11 @@
             display: inline-block;
             background-color: #2C5F7C;
             color: #FFFFFF;
-            font-size: 7.5pt;
+            font-size: 7.25pt;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
-            padding: 3px 9px;
+            letter-spacing: 0.6px;
+            padding: 3px 8px;
             border-radius: 3px;
             margin-bottom: 4px;
         }
@@ -129,37 +135,42 @@
             background-color: #EBF3F8;
             border: 1px solid #C8DCE8;
             border-left: 4px solid #2C5F7C;
-            padding: 7px 12px;
-            margin-bottom: 12px;
-            font-size: 8pt;
+            padding: 6px 10px;
+            margin-bottom: 10px;
+            font-size: 7.5pt;
             color: #1B1E23;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .kpi-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .kpi-card {
             width: 25%;
             background-color: #F7F8FA;
             border: 1px solid #DDE1E7;
-            padding: 8px 10px;
+            padding: 7px 8px;
             vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .kpi-label {
-            font-size: 6.75pt;
+            font-size: 6.5pt;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
             color: #6B7280;
             margin-bottom: 2px;
         }
 
         .kpi-val {
-            font-size: 11pt;
+            font-size: 9.5pt;
             font-weight: bold;
             color: #1B1E23;
         }
@@ -169,8 +180,8 @@
             border: 1px solid #C8DCE8;
             border-left: 4px solid #2C5F7C;
             padding: 5px 10px;
-            margin-bottom: 8px;
-            margin-top: 10px;
+            margin-bottom: 7px;
+            margin-top: 8px;
         }
 
         .section-number {
@@ -185,38 +196,43 @@
         }
 
         .section-title {
-            font-size: 9pt;
+            font-size: 8.5pt;
             font-weight: bold;
             color: #1B1E23;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
         }
 
         .data-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
             border: 1px solid #DDE1E7;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .data-table th {
             background-color: #F0F2F5;
             color: #1B1E23;
-            font-size: 7.25pt;
+            font-size: 6.75pt;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.4px;
-            padding: 6px 8px;
+            letter-spacing: 0.3px;
+            padding: 5px 5.5px;
             border: 1px solid #DDE1E7;
             text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .data-table td {
-            padding: 5.5px 8px;
+            padding: 4.5px 5.5px;
             border: 1px solid #DDE1E7;
-            font-size: 8pt;
+            font-size: 7.5pt;
             color: #1B1E23;
             vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .data-table tr:nth-child(even) td {
@@ -226,13 +242,13 @@
         .data-table tfoot td {
             background-color: #EBF3F8;
             font-weight: bold;
-            font-size: 8.25pt;
+            font-size: 7.75pt;
             border-top: 1.5px solid #2C5F7C;
         }
 
         .bar-track {
             width: 100%;
-            height: 7px;
+            height: 6px;
             background-color: #E5E7EB;
             border-radius: 3px;
             overflow: hidden;
@@ -240,12 +256,12 @@
         }
 
         .bar-fill-revenue {
-            height: 7px;
+            height: 6px;
             background-color: #2C5F7C;
         }
 
         .bar-fill-spend {
-            height: 7px;
+            height: 6px;
             background-color: #D97706;
         }
 
@@ -254,9 +270,9 @@
             background-color: #EBF5F0;
             color: #2E7D53;
             border: 1px solid #B7DFC7;
-            padding: 1.5px 7px;
-            border-radius: 10px;
-            font-size: 7pt;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-size: 6.5pt;
             font-weight: bold;
             text-transform: uppercase;
         }
@@ -266,9 +282,9 @@
             background-color: #FDF3E0;
             color: #8A5A00;
             border: 1px solid #F5D491;
-            padding: 1.5px 7px;
-            border-radius: 10px;
-            font-size: 7pt;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-size: 6.5pt;
             font-weight: bold;
             text-transform: uppercase;
         }
@@ -278,9 +294,9 @@
             background-color: #F0F1F3;
             color: #5E6370;
             border: 1px solid #D1D5DB;
-            padding: 1.5px 7px;
-            border-radius: 10px;
-            font-size: 7pt;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-size: 6.5pt;
             font-weight: bold;
             text-transform: uppercase;
         }
@@ -290,9 +306,9 @@
             background-color: #FDECEA;
             color: #C0392B;
             border: 1px solid #F5B7B1;
-            padding: 1.5px 7px;
-            border-radius: 10px;
-            font-size: 7pt;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-size: 6.5pt;
             font-weight: bold;
             text-transform: uppercase;
         }
@@ -308,7 +324,7 @@
         .empty-box {
             border: 1px dashed #DDE1E7;
             background-color: #F7F8FA;
-            padding: 14px;
+            padding: 12px;
             text-align: center;
             color: #6B7280;
             font-style: italic;
@@ -392,11 +408,11 @@
     @php
         $chartMax = $maxPeriodValue > 0 ? (float) $maxPeriodValue : 100000.0;
         $bucketCount = max(1, count($periodRows));
-        $plotLeft = 64.0;
-        $plotRight = 686.0;
+        $plotLeft = 58.0;
+        $plotRight = 498.0;
         $plotWidth = $plotRight - $plotLeft;
-        $plotTop = 18.0;
-        $plotBottom = 162.0;
+        $plotTop = 16.0;
+        $plotBottom = 152.0;
         $plotHeight = $plotBottom - $plotTop;
 
         $formatShortPhp = function (float $val): string {
@@ -460,8 +476,8 @@
         $remPolyline = implode(' ', $remPoints);
 
         $svgLines = [];
-        $svgLines[] = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 190" width="700" height="190">';
-        $svgLines[] = '<rect x="0" y="0" width="700" height="190" fill="#FAFBFD" rx="4" />';
+        $svgLines[] = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 510 175" width="510" height="175">';
+        $svgLines[] = '<rect x="0" y="0" width="510" height="175" fill="#FAFBFD" rx="4" />';
 
         // Grid lines & Y-axis labels
         $gridSteps = [
@@ -476,12 +492,12 @@
             $dashAttr = $gIdx === 4 ? '' : ' stroke-dasharray="3,3"';
             $lbl = htmlspecialchars($formatShortPhp((float) $g['val']), ENT_QUOTES, 'UTF-8');
             $svgLines[] = '<line x1="' . $plotLeft . '" y1="' . $g['y'] . '" x2="' . $plotRight . '" y2="' . $g['y'] . '" stroke="' . $strokeColor . '" stroke-width="1"' . $dashAttr . ' />';
-            $svgLines[] = '<text x="' . ($plotLeft - 6) . '" y="' . ($g['y'] + 3) . '" text-anchor="end" font-family="DejaVu Sans Mono, monospace" font-size="7.5" fill="#6B7280">' . $lbl . '</text>';
+            $svgLines[] = '<text x="' . ($plotLeft - 5) . '" y="' . ($g['y'] + 3) . '" text-anchor="end" font-family="DejaVu Sans Mono, monospace" font-size="6.8" fill="#6B7280">' . $lbl . '</text>';
         }
 
         // 3-Bar Grouped Graph + X-axis labels
-        $barWidth = $bucketCount <= 4 ? 14.0 : 8.5;
-        $barGap = $bucketCount <= 4 ? 3.0 : 2.0;
+        $barWidth = $bucketCount <= 4 ? 11.0 : 6.2;
+        $barGap = $bucketCount <= 4 ? 2.5 : 1.4;
         $groupHalfWidth = (($barWidth * 3) + ($barGap * 2)) / 2.0;
 
         foreach ($chartItems as $item) {
@@ -493,30 +509,30 @@
             $b3Y = round($plotBottom - $item['remBarH'], 1);
             $remColor = $item['remPositive'] ? '#2563EB' : '#DC2626';
 
-            $svgLines[] = '<rect x="' . $b1X . '" y="' . $b1Y . '" width="' . $barWidth . '" height="' . $item['revBarH'] . '" fill="#10B981" rx="1.5" />';
-            $svgLines[] = '<rect x="' . $b2X . '" y="' . $b2Y . '" width="' . $barWidth . '" height="' . $item['spendBarH'] . '" fill="#D97706" rx="1.5" />';
-            $svgLines[] = '<rect x="' . $b3X . '" y="' . $b3Y . '" width="' . $barWidth . '" height="' . $item['remBarH'] . '" fill="' . $remColor . '" rx="1.5" />';
-            $svgLines[] = '<text x="' . $item['cx'] . '" y="178" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="8" font-weight="bold" fill="#4B5563">' . $item['shortLabel'] . '</text>';
+            $svgLines[] = '<rect x="' . $b1X . '" y="' . $b1Y . '" width="' . $barWidth . '" height="' . $item['revBarH'] . '" fill="#10B981" rx="1.2" />';
+            $svgLines[] = '<rect x="' . $b2X . '" y="' . $b2Y . '" width="' . $barWidth . '" height="' . $item['spendBarH'] . '" fill="#D97706" rx="1.2" />';
+            $svgLines[] = '<rect x="' . $b3X . '" y="' . $b3Y . '" width="' . $barWidth . '" height="' . $item['remBarH'] . '" fill="' . $remColor . '" rx="1.2" />';
+            $svgLines[] = '<text x="' . $item['cx'] . '" y="166" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="7.2" font-weight="bold" fill="#4B5563">' . $item['shortLabel'] . '</text>';
         }
 
         $svgLines[] = '</svg>';
         $svgChartBase64 = 'data:image/svg+xml;base64,' . base64_encode(implode('', $svgLines));
     @endphp
 
-    <div style="border: 1px solid #DDE1E7; background-color: #FAFBFD; padding: 8px 10px; margin-bottom: 10px;">
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px;">
+    <div style="border: 1px solid #DDE1E7; background-color: #FAFBFD; padding: 7px 8px; margin-bottom: 10px;">
+        <table style="width: 100%; table-layout: fixed; border-collapse: collapse; margin-bottom: 4px;">
             <tr>
-                <td style="font-size: 7.5pt; font-weight: bold; color: #1B1E23;">
+                <td style="width: 42%; font-size: 7.25pt; font-weight: bold; color: #1B1E23;">
                     3-Bar Graphical Comparison (Without Taxes)
                 </td>
-                <td class="text-right" style="font-size: 7pt; color: #4B5563;">
-                    <span style="display: inline-block; width: 9px; height: 9px; border-radius: 2px; background-color: #10B981; margin-right: 3px;"></span>
+                <td class="text-right" style="width: 58%; font-size: 6.75pt; color: #4B5563;">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background-color: #10B981; margin-right: 2px;"></span>
                     <strong>Total contract value</strong>
                     &nbsp;&nbsp;
-                    <span style="display: inline-block; width: 9px; height: 9px; border-radius: 2px; background-color: #D97706; margin-right: 3px;"></span>
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background-color: #D97706; margin-right: 2px;"></span>
                     <strong>Actual spends</strong>
                     &nbsp;&nbsp;
-                    <span style="display: inline-block; width: 9px; height: 9px; border-radius: 2px; background-color: #2563EB; margin-right: 3px;"></span>
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background-color: #2563EB; margin-right: 2px;"></span>
                     <strong>Total revenue</strong>
                 </td>
             </tr>
@@ -527,13 +543,13 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th style="width: 16%;">Period</th>
+                <th style="width: 15%;">Period</th>
                 <th style="width: 8%;" class="text-center">Projects</th>
-                <th style="width: 18%;" class="text-right">Total Contract Value (PHP)</th>
-                <th style="width: 17%;" class="text-right">Actual Spends (PHP)</th>
-                <th style="width: 18%;" class="text-right">Total revenue / remaining budget (without tax)</th>
+                <th style="width: 19%;" class="text-right">Total Contract Value (PHP)</th>
+                <th style="width: 18%;" class="text-right">Actual Spends (PHP)</th>
+                <th style="width: 19%;" class="text-right">Total revenue / remaining budget (without tax)</th>
                 <th style="width: 9%;" class="text-right">Util. %</th>
-                <th style="width: 14%;">Graphical Proportion</th>
+                <th style="width: 12%;">Graphical Proportion</th>
             </tr>
         </thead>
         <tbody>

@@ -1,0 +1,42 @@
+	SYSTEN CHANGES NOTES
+
+After mock defense and consultation
+Manual Task tracking (Main and sub tasks)
+Pending state update (the project will still be pending if the required tasks are not yet ticked or completed
+Project fields
+
+10/19/2026
+Login page UI change
+Password change required for new users
+Global search bar
+
+10/21/26
+Updated fields for project or elevator technical specification
+
+10/25/26
+Updated dashboard showing statistics
+Updated manpower expertise list
+Updated date configuration when updating or creating a project. Before you can choose the end date for a project right after the start date, making the duration of project only last for 1 day
+Project completion algorithm, the project can be updated as completed when the project reach the target date or the task are already completed.
+
+10//30/26
+Added a notification feature when a there is an newly added project, a warranty period was expired, and if there are newly tasks created.
+
+11/02/26
+Added file attachment for project.
+
+11/04/26
+Added an option for costing / expenditures to add an expense from materials catalog
+Pushed the new changes to production: DEX PMS beta 0.2
+Added additional security feature to do OTP when changing credentials and logging in from suspicious devices, browsers, location.
+Added an option to request a temporary password.
+Added new notifications (adding expenses, low stock quantity for materials, credentials reset, major task completed, upcoming due for specific task, file uploads, manpower assignment, and new material added)
+11/05/26
+Changed the User management UI
+Pushed the changes to production: DEX PMS: beta 0.4
+Bugs fixes (Archived accounts, manpower assignment, project naming convention)
+Added reports module
+Pushed the changes to production: DEX PMS: beta 0.5
+11/06/26
+Implement DSS module
+Bugs fixes
