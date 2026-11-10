@@ -486,6 +486,48 @@ class NotificationService
     }
 
     /**
+     * Notify Admin and Manager users that a Staff member sent a reminder/ping for their pending request.
+     */
+    public function notifyStaffActionPing(StaffPendingAction $pendingAction): void
+    {
+        $recipients = $this->getAdminAndManagerUsers();
+        $pendingAction->loadMissing(['user', 'project']);
+
+        $staffName = $pendingAction->user->name ?? 'Staff';
+        $project = $pendingAction->project;
+        $projectName = $project->name ?? 'Project';
+        $projectCode = $project->project_code ?? 'N/A';
+        $payload = $pendingAction->payload ?? [];
+
+        $actionName = match ($pendingAction->action_type) {
+            'add_expense' => 'expense entry ("' . ($payload['description'] ?? 'Expense') . '", ₱' . number_format((float) ($payload['amount'] ?? 0), 2) . ')',
+            'complete_subtask' => 'task completion ("' . ($payload['subtask_title'] ?? 'Task') . '")',
+            'add_file' => 'file upload ("' . ($payload['file_name'] ?? 'File') . '")',
+            default => 'request',
+        };
+
+        $title = 'Staff Request Reminder (Ping)';
+        $message = "Staff member {$staffName} sent a reminder to review their pending {$actionName} on project \"{$projectName}\" ({$projectCode}).";
+
+        $data = [
+            'pending_action_id' => $pendingAction->id,
+            'action_type' => $pendingAction->action_type,
+            'project_id' => $project->id,
+            'project_name' => $projectName,
+            'project_code' => $projectCode,
+            'staff_name' => $staffName,
+            'staff_email' => $pendingAction->user->email ?? '',
+            'payload' => $payload,
+            'status' => 'pending',
+            'is_reminder' => true,
+            'pinged_at' => now()->format('M j, Y · g:i A'),
+            'url' => route('projects.show', $project->id),
+        ];
+
+        $this->createForRecipients($recipients, 'staff_action_review', $title, $message, $data);
+    }
+
+    /**
      * Notify a Staff user about the review outcome of their submitted action.
      */
     public function notifyStaffActionReviewed(StaffPendingAction $pendingAction, string $decision = 'approved'): void

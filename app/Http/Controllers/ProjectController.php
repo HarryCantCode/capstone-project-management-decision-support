@@ -167,7 +167,18 @@ class ProjectController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'resource_code', 'model', 'price', 'unit_cost', 'quantity_available']);
 
-        return view('projects.show', compact('project', 'availablePersonnel', 'catalogMaterials'));
+        $pendingSubtaskIds = \App\Models\StaffPendingAction::query()
+            ->where('project_id', $project->id)
+            ->where('action_type', 'complete_subtask')
+            ->where('status', 'pending')
+            ->get(['payload'])
+            ->map(fn ($action) => (int) ($action->payload['subtask_id'] ?? 0))
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        return view('projects.show', compact('project', 'availablePersonnel', 'catalogMaterials', 'pendingSubtaskIds'));
     }
 
     /** Show the edit project form. */

@@ -60,6 +60,51 @@
                     Costing
                 </a>
             </li>
+            @role('Admin|Manager')
+            @php
+                $unexaminedSidebarCount = \Illuminate\Support\Facades\Schema::hasTable('staff_pending_actions')
+                    ? \App\Models\StaffPendingAction::where('status', 'pending')->count()
+                    : 0;
+            @endphp
+            <li>
+                <a href="{{ \Illuminate\Support\Facades\Route::has('pending-actions.index') ? route('pending-actions.index') : url('/pending-actions') }}"
+                   class="nav-link {{ request()->routeIs('pending-actions.*') || request()->is('pending-actions*') ? 'nav-link--active' : '' }}"
+                   aria-current="{{ request()->routeIs('pending-actions.*') || request()->is('pending-actions*') ? 'page' : 'false' }}">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path d="M9 2a1 1 0 0 0 0 2h2a1 1 0 1 0 0-2H9z"/>
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 0 1 2-2 3 3 0 0 0 3 3h2a3 3 0 0 0 3-3 2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5zm9.707 5.707a1 1 0 0 0-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 0 0-1.414 1.414l2 2a1 1 0 0 0 1.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>Staff Requests</span>
+                    @if($unexaminedSidebarCount > 0)
+                        <span class="nav-badge font-mono" style="background: var(--status-ongoing-bg); color: var(--status-ongoing-text);">
+                            {{ $unexaminedSidebarCount > 99 ? '99+' : $unexaminedSidebarCount }}
+                        </span>
+                    @endif
+                </a>
+            </li>
+            @endrole
+            @role('Staff')
+            @php
+                $staffPendingRequestsCount = \Illuminate\Support\Facades\Schema::hasTable('staff_pending_actions') && \Illuminate\Support\Facades\Auth::check()
+                    ? \App\Models\StaffPendingAction::where('user_id', \Illuminate\Support\Facades\Auth::id())->where('status', 'pending')->count()
+                    : 0;
+            @endphp
+            <li>
+                <a href="{{ \Illuminate\Support\Facades\Route::has('approval-list.index') ? route('approval-list.index') : url('/approval-list') }}"
+                   class="nav-link {{ request()->routeIs('approval-list.*') || request()->is('approval-list*') ? 'nav-link--active' : '' }}"
+                   aria-current="{{ request()->routeIs('approval-list.*') || request()->is('approval-list*') ? 'page' : 'false' }}">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M10 2a1 1 0 0 1 1 1v1.07A7.002 7.002 0 0 1 17 11v3.586l1.707 1.707A1 1 0 0 1 18 18H2a1 1 0 0 1-.707-1.707L3 14.586V11a7.002 7.002 0 0 1 6-6.93V3a1 1 0 0 1 1-1zm0 18a3 3 0 0 1-3-3h6a3 3 0 0 1-3 3z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>Approval List</span>
+                    @if($staffPendingRequestsCount > 0)
+                        <span class="nav-badge font-mono" style="background: var(--status-ongoing-bg); color: var(--status-ongoing-text);">
+                            {{ $staffPendingRequestsCount > 99 ? '99+' : $staffPendingRequestsCount }}
+                        </span>
+                    @endif
+                </a>
+            </li>
+            @endrole
         </ul>
     </div>
     @endrole

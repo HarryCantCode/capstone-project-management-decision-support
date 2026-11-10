@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Models\Project;
 use App\Models\Resource;
+use App\Models\StaffPendingAction;
 use App\Models\User;
 use App\Policies\ProjectPolicy;
 use App\Policies\ResourcePolicy;
+use App\Policies\StaffPendingActionPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -52,5 +54,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(Resource::class, ResourcePolicy::class);
+        Gate::policy(StaffPendingAction::class, StaffPendingActionPolicy::class);
     }
 }

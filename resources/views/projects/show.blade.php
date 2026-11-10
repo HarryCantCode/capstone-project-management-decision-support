@@ -32,12 +32,18 @@
     $orderedSubtasks = $tasks->flatMap(fn ($t) => $t->subtasks)->values();
     $initialSubtaskLocks = [];
     $initialSubtaskCompleted = [];
+    $initialSubtaskPending = [];
+    $pendingSubtaskIdSet = array_flip($pendingSubtaskIds ?? []);
+    $isStaffViewer = Auth::user()->hasRole('Staff');
     $foundFirstUncompleted = false;
     $totalOrderedSubtasks = $orderedSubtasks->count();
     $isProjectReadOnly = $project->trashed() || $project->status === 'completed';
 
     foreach ($orderedSubtasks as $idx => $st) {
+        $isPendingReview = isset($pendingSubtaskIdSet[$st->id]) && ! $st->is_completed;
         $initialSubtaskCompleted[$st->id] = (bool) $st->is_completed;
+        $initialSubtaskPending[$st->id] = $isPendingReview;
+
         if ($st->is_completed) {
             $hasCompletedAfter = false;
             for ($k = $idx + 1; $k < $totalOrderedSubtasks; $k++) {
@@ -47,6 +53,9 @@
                 }
             }
             $initialSubtaskLocks[$st->id] = $hasCompletedAfter;
+        } elseif ($isStaffViewer && $isPendingReview) {
+            // Staff already submitted this subtask for review; unlock subsequent subtask for Staff
+            $initialSubtaskLocks[$st->id] = false;
         } else {
             if (!$foundFirstUncompleted) {
                 $initialSubtaskLocks[$st->id] = false;
@@ -740,6 +749,15 @@
                                                     >
                                                         {{ $subtask->title }}
                                                     </span>
+                                                    <span
+                                                        x-show="!!pendingSubtasks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}]"
+                                                        x-cloak
+                                                        class="status-pill status-pill--ongoing"
+                                                        style="font-size: 0.6875rem; padding: 1px 8px;"
+                                                        title="Submitted by staff — awaiting Admin or Manager review"
+                                                    >
+                                                        Pending Review
+                                                    </span>
                                                 </label>
 
                                                 <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
@@ -988,6 +1006,15 @@
                                                                 >
                                                                     {{ $subtask->title }}
                                                                 </span>
+                                                                <span
+                                                                    x-show="!!pendingSubtasks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}]"
+                                                                    x-cloak
+                                                                    class="status-pill status-pill--ongoing"
+                                                                    style="font-size: 0.6875rem; padding: 1px 8px;"
+                                                                    title="Submitted by staff — awaiting Admin or Manager review"
+                                                                >
+                                                                    Pending Review
+                                                                </span>
                                                             </label>
                                                             <div style="display: flex; align-items: center; gap: var(--space-2);">
                                                                 @if ($subtask->due_date)
@@ -1022,34 +1049,50 @@
 
     {{-- ─── Expenditures Table (3 Recent Entries Shortcut) ────────────────────── --}}
     <section class="card card-glass mb-6" aria-labelledby="project-expenditures-heading">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);">
-            <div>
-                <h2 id="project-expenditures-heading" style="display: inline-block; margin-right: var(--space-2); margin-bottom: 0;">Expenditures</h2>
+        <div
+            class="card-header"
+            style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);"
+            :style="expendituresMinimized ? 'border-bottom: none;' : ''"
+        >
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
+                <h2 id="project-expenditures-heading" style="margin: 0; font-size: 1.0625rem; font-weight: 700;">Expenditures</h2>
                 <span class="text-muted" style="font-size: 0.8125rem;">
                     Total Spend: <strong class="font-mono text-dark">₱{{ number_format($project->actual_spend, 2) }}</strong> ({{ $project->costs->count() }} {{ Str::plural('entry', $project->costs->count()) }})
                 </span>
-                <span class="badge" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); margin-left: var(--space-2); font-size: 0.75rem; font-weight: 600;">
+                <span class="badge" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); font-size: 0.75rem; font-weight: 600;">
                     Recent 3 Entries
                 </span>
             </div>
-            <div style="display: flex; flex-direction: row; gap: var(--space-2); align-items: center; flex-wrap: nowrap;">
-                <a href="{{ route('costing.show', $project) }}" class="btn btn-secondary btn-sm" style="white-space: nowrap;">
+            <div style="display: inline-flex; flex-direction: row; gap: var(--space-2); align-items: center; flex-wrap: nowrap; margin-left: auto;">
+                <a href="{{ route('costing.show', $project) }}" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; white-space: nowrap;">
                     Full Breakdown ↗
                 </a>
                 @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
                     @if ($isProjectReadOnly)
-                        <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}">
+                        <button type="button" class="btn btn-secondary btn-sm" disabled style="display: inline-flex; align-items: center; opacity: 0.6; cursor: not-allowed; white-space: nowrap;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}">
                             + Log New Expense / Cost
                         </button>
                     @else
-                        <button type="button" class="btn btn-primary btn-sm" @click="openAddCostModal()" style="white-space: nowrap;">
+                        <button type="button" class="btn btn-primary btn-sm" @click="openAddCostModal()" style="display: inline-flex; align-items: center; white-space: nowrap;">
                             + Log New Expense / Cost
                         </button>
                     @endif
                 @endif
+                <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    @click="expendituresMinimized = !expendituresMinimized"
+                    :aria-expanded="!expendituresMinimized"
+                    id="btn-toggle-expenditures"
+                    style="display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;"
+                >
+                    <span x-show="expendituresMinimized">⊞ Expand</span>
+                    <span x-show="!expendituresMinimized" x-cloak>⊟ Minimize</span>
+                </button>
             </div>
         </div>
 
+        <div x-show="!expendituresMinimized" x-transition x-cloak>
         @if ($project->costs->isEmpty())
             <div class="card-body">
                 <div class="empty-state" style="padding: var(--space-6) var(--space-4);">
@@ -1140,13 +1183,18 @@
                 </div>
             @endif
         @endif
+        </div>
     </section>
 
     {{-- ─── Assigned Manpower / Project Personnel (Active & Archived Records) ─── --}}
     <section class="card card-glass mb-6" aria-labelledby="assigned-manpower-heading">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);">
-            <div>
-                <h2 id="assigned-manpower-heading" style="display: inline-block; margin-right: var(--space-2); margin-bottom: 0;">
+        <div
+            class="card-header"
+            style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);"
+            :style="manpowerMinimized ? 'border-bottom: none;' : ''"
+        >
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
+                <h2 id="assigned-manpower-heading" style="margin: 0; font-size: 1.0625rem; font-weight: 700;">
                     @if ($project->status === 'completed')
                         Manpower & Construction Team (Archived)
                     @else
@@ -1154,28 +1202,42 @@
                     @endif
                 </h2>
                 @if ($project->status === 'completed')
-                    <span class="badge" style="background: rgba(34, 197, 94, 0.15); color: var(--color-success); font-weight: 600; margin-left: var(--space-2);">
+                    <span class="badge" style="background: rgba(34, 197, 94, 0.15); color: var(--color-success); font-weight: 600;">
                         {{ $project->personnelHistory->unique('personnel_id')->count() }} Total {{ Str::plural('Contributor', $project->personnelHistory->unique('personnel_id')->count()) }}
                     </span>
                 @else
                     <span class="text-muted" style="font-size: 0.8125rem;">({{ $project->personnel->count() }} {{ Str::plural('personnel', $project->personnel->count()) }})</span>
                 @endif
             </div>
-            @if ($project->status !== 'completed')
-                @can('update', $project)
-                    @if ($project->trashed())
-                        <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="Cannot assign personnel to an archived project" id="btn-assign-personnel">
-                            + Assign Personnel
-                        </button>
-                    @else
-                        <button type="button" class="btn btn-primary btn-sm" @click="assignModalOpen = true" id="btn-assign-personnel">
-                            + Assign Personnel
-                        </button>
-                    @endif
-                @endcan
-            @endif
+            <div style="display: inline-flex; flex-direction: row; gap: var(--space-2); align-items: center; flex-wrap: nowrap; margin-left: auto;">
+                @if ($project->status !== 'completed')
+                    @can('update', $project)
+                        @if ($project->trashed())
+                            <button type="button" class="btn btn-secondary btn-sm" disabled style="display: inline-flex; align-items: center; opacity: 0.6; cursor: not-allowed; white-space: nowrap;" title="Cannot assign personnel to an archived project" id="btn-assign-personnel">
+                                + Assign Personnel
+                            </button>
+                        @else
+                            <button type="button" class="btn btn-primary btn-sm" @click="assignModalOpen = true" style="display: inline-flex; align-items: center; white-space: nowrap;" id="btn-assign-personnel">
+                                + Assign Personnel
+                            </button>
+                        @endif
+                    @endcan
+                @endif
+                <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    @click="manpowerMinimized = !manpowerMinimized"
+                    :aria-expanded="!manpowerMinimized"
+                    id="btn-toggle-manpower"
+                    style="display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;"
+                >
+                    <span x-show="manpowerMinimized">⊞ Expand</span>
+                    <span x-show="!manpowerMinimized" x-cloak>⊟ Minimize</span>
+                </button>
+            </div>
         </div>
 
+        <div x-show="!manpowerMinimized" x-transition x-cloak>
         @if ($project->status === 'completed')
             {{-- Completed & Archived Callout Banner --}}
             <div style="background: var(--color-surface-alt); padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--color-border); font-size: 0.875rem;">
@@ -1321,16 +1383,36 @@
                 </div>
             @endif
         @endif
+        </div>
     </section>
 
     {{-- ─── Status & Activity Audit Trail History ──────────────────────────── --}}
     <div class="project-detail-grid">
         <section class="card card-glass" aria-labelledby="status-history-heading" style="grid-column: 1 / -1;">
-            <div class="card-header">
-                <h2 id="status-history-heading">Audit Trail &amp; Status History</h2>
-                <span id="audit-trail-count" class="text-muted" style="font-size: 0.8125rem;">{{ $project->statusHistory->count() }} {{ Str::plural('event', $project->statusHistory->count()) }}</span>
+            <div
+                class="card-header"
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);"
+                :style="auditTrailMinimized ? 'border-bottom: none;' : ''"
+            >
+                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
+                    <h2 id="status-history-heading" style="margin: 0; font-size: 1.0625rem; font-weight: 700;">Audit Trail &amp; Status History</h2>
+                    <span id="audit-trail-count" class="text-muted" style="font-size: 0.8125rem;">({{ $project->statusHistory->count() }} {{ Str::plural('event', $project->statusHistory->count()) }})</span>
+                </div>
+                <div style="display: inline-flex; flex-direction: row; gap: var(--space-2); align-items: center; flex-wrap: nowrap; margin-left: auto;">
+                    <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        @click="auditTrailMinimized = !auditTrailMinimized"
+                        :aria-expanded="!auditTrailMinimized"
+                        id="btn-toggle-audit-trail"
+                        style="display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;"
+                    >
+                        <span x-show="auditTrailMinimized">⊞ Expand</span>
+                        <span x-show="!auditTrailMinimized" x-cloak>⊟ Minimize</span>
+                    </button>
+                </div>
             </div>
-            <div class="table-wrapper" style="max-height: 290px; overflow-y: auto; position: relative;">
+            <div class="table-wrapper" x-show="!auditTrailMinimized" x-transition x-cloak style="max-height: 290px; overflow-y: auto; position: relative;">
                 <table class="data-table">
                     <caption class="visually-hidden">Project status and update history</caption>
                     <thead style="position: sticky; top: 0; background: var(--color-surface); z-index: 2;">
@@ -3175,8 +3257,12 @@ function projectDetail() {
         },
         activeTaskId: {{ $project->tasks->first()?->id ?? 'null' }},
         checklistMinimized: true,
+        expendituresMinimized: true,
+        manpowerMinimized: true,
+        auditTrailMinimized: true,
         subtaskLocks: @js($initialSubtaskLocks),
         subtaskCompleted: @js($initialSubtaskCompleted),
+        pendingSubtasks: @js($initialSubtaskPending),
         initialSubtasks: [{ title: '', due_date: '{{ $defaultStartDate->format('Y-m-d') }}' }],
         editingTask: {
             id: null,
@@ -3280,6 +3366,10 @@ function projectDetail() {
                         checkboxes.forEach(cb => { cb.checked = false; });
                         if (checkboxEl) {
                             checkboxEl.checked = false;
+                        }
+                        this.pendingSubtasks[subtaskId] = true;
+                        if (data.subtask_locks) {
+                            this.subtaskLocks = data.subtask_locks;
                         }
                         window.dispatchEvent(new CustomEvent('show-toast', {
                             detail: {

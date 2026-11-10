@@ -242,4 +242,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(Notification::class)->orderByDesc('created_at');
     }
+
+    /**
+     * Staff pending actions submitted by this user.
+     */
+    public function pendingActions(): HasMany
+    {
+        return $this->hasMany(StaffPendingAction::class, 'user_id')->orderByDesc('created_at');
+    }
 }

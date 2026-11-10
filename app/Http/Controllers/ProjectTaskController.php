@@ -342,13 +342,31 @@ class ProjectTaskController extends Controller
         $currentSubtasks = $task->subtasks()->orderBy('sort_order')->orderBy('id')->get();
         $currentSubtaskIndex = $currentSubtasks->search(fn ($st) => $st->id === $subtask->id);
 
+        $isStaffUser = Auth::user()->hasRole('Staff');
+        $pendingSubtaskIds = [];
+        if ($isStaffUser) {
+            $pendingSubtaskIds = \App\Models\StaffPendingAction::query()
+                ->where('project_id', $project->id)
+                ->where('action_type', 'complete_subtask')
+                ->where('status', 'pending')
+                ->get(['payload'])
+                ->map(fn ($action) => (int) ($action->payload['subtask_id'] ?? 0))
+                ->filter(fn (int $id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        $isSubtaskSatisfied = fn ($st): bool => (bool) $st->is_completed
+            || ($isStaffUser && in_array((int) $st->id, $pendingSubtaskIds, true));
+
         // If ticking to complete: verify sequential prerequisites across tasks and subtasks
         if ($newCompleted) {
-            // 1. All previous major tasks must have all their subtasks completed
+            // 1. All previous major tasks must have all their subtasks completed (or pending review for Staff)
             if ($currentTaskIndex > 0) {
                 for ($i = 0; $i < $currentTaskIndex; $i++) {
                     $prevTask = $sortedTasks[$i];
-                    $hasUncompletedInPrev = $prevTask->subtasks->contains(fn ($st) => ! $st->is_completed);
+                    $hasUncompletedInPrev = $prevTask->subtasks->contains(fn ($st) => ! $isSubtaskSatisfied($st));
                     if ($hasUncompletedInPrev) {
                         $msg = 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task';
                         if ($request->wantsJson() || $request->ajax()) {
@@ -363,10 +381,10 @@ class ProjectTaskController extends Controller
                 }
             }
 
-            // 2. In the current major task, all previous subtasks before this one must be completed
+            // 2. In the current major task, all previous subtasks before this one must be completed (or pending review for Staff)
             if ($currentSubtaskIndex > 0) {
                 for ($j = 0; $j < $currentSubtaskIndex; $j++) {
-                    if (! $currentSubtasks[$j]->is_completed) {
+                    if (! $isSubtaskSatisfied($currentSubtasks[$j])) {
                         $msg = 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task';
                         if ($request->wantsJson() || $request->ajax()) {
                             return response()->json([
@@ -440,6 +458,7 @@ class ProjectTaskController extends Controller
                     'task_id' => $task->id,
                     'task_name' => $task->task_name,
                     'subtask_id' => $subtask->id,
+                    'subtask_name' => $subtask->title,
                     'subtask_title' => $subtask->title,
                 ],
                 'status' => 'pending',
@@ -447,11 +466,32 @@ class ProjectTaskController extends Controller
 
             app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
 
+            $pendingSubtaskIds[] = (int) $subtask->id;
+            $subtaskLocks = [];
+            $foundUncompleted = false;
+            foreach ($sortedTasks as $tItem) {
+                foreach ($tItem->subtasks as $sItem) {
+                    $satisfied = (bool) $sItem->is_completed || in_array((int) $sItem->id, $pendingSubtaskIds, true);
+                    if (! $satisfied) {
+                        if (! $foundUncompleted) {
+                            $subtaskLocks[$sItem->id] = false;
+                            $foundUncompleted = true;
+                        } else {
+                            $subtaskLocks[$sItem->id] = true;
+                        }
+                    } else {
+                        $subtaskLocks[$sItem->id] = false;
+                    }
+                }
+            }
+
             $msg = 'Your action has been submitted successfully and will be reviewed by your manager or admin to take effect.';
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => true,
                     'pending_approval' => true,
+                    'pending_subtask_id' => $subtask->id,
+                    'subtask_locks' => $subtaskLocks,
                     'message' => $msg,
                 ]);
             }

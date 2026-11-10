@@ -689,7 +689,11 @@
                             {{-- Modal Footer --}}
                             <div class="notification-modal-footer">
                                 <span class="font-mono" x-text="displayNotifications.length + ' record' + (displayNotifications.length === 1 ? '' : 's')"></span>
-                                <a href="{{ route('projects.index') }}" class="notification-footer-link">Go to Projects →</a>
+                                @if(Auth::user()->hasAnyRole(['Admin', 'Manager']))
+                                    <a href="{{ \Illuminate\Support\Facades\Route::has('pending-actions.index') ? route('pending-actions.index') : url('/pending-actions') }}" class="notification-footer-link">Staff Requests →</a>
+                                @else
+                                    <a href="{{ route('projects.index') }}" class="notification-footer-link">Go to Projects →</a>
+                                @endif
                             </div>
                         </div>
 
@@ -808,7 +812,7 @@
                                                                     <span class="text-muted" style="display: block; font-size: 0.6875rem;">File Name</span>
                                                                     <strong x-text="activeReviewItem.data.payload?.file_name || 'N/A'"></strong>
                                                                 </div>
-                                                                <template x-if="activeReviewItem.data.payload?.file_path">
+                                                                <template x-if="activeReviewItem.data.payload?.file_path && activeReviewItem.data.status !== 'rejected'">
                                                                     <a :href="'/storage/' + activeReviewItem.data.payload.file_path" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 2px 8px;">
                                                                         View / Download File
                                                                     </a>
