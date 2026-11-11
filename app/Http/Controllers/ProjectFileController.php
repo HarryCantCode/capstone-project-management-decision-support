@@ -30,7 +30,7 @@ class ProjectFileController extends Controller
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:pdf,docx,jpg,jpeg,png,webp', 'max:20480'],
-            'file_type' => ['nullable', 'string', 'in:invoice,general'],
+            'file_type' => ['nullable', 'string', 'in:invoice,general,project_document,project_transaction,project_notes,project_drawing'],
             'description' => ['nullable', 'string', 'max:255'],
         ], [
             'file.required' => 'Please select a file to upload.',

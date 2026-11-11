@@ -23,7 +23,7 @@
         @if($project->payment_status)
             <div style="margin-top: 2px;">
                 <span class="status-pill status-pill--{{ strtolower($project->payment_status) }}" style="font-size: 0.6875rem; padding: 1px 6px;">
-                    {{ $project->payment_status }}
+                    {{ $project->payment_status }}@if($project->payment_status === 'Partial' && $project->payment_terms) ({{ $project->payment_terms }})@endif
                 </span>
             </div>
         @endif

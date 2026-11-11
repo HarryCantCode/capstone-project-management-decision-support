@@ -3823,6 +3823,144 @@ input::-ms-clear {
     border-color: #243042;
 }
 
+/* ─── Personnel Assign Multi-Select Row Layout ──────────────────────── */
+.personnel-select-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding: 0.625rem 0.75rem !important;
+    border-bottom: 1px solid var(--color-surface-alt) !important;
+    cursor: pointer !important;
+    transition: background var(--transition-fast) !important;
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.personnel-select-row:last-child {
+    border-bottom: none !important;
+}
+
+.personnel-select-row:hover {
+    background: var(--color-surface-alt) !important;
+}
+
+.personnel-select-row.is-selected {
+    background: var(--color-surface-alt) !important;
+}
+
+.personnel-select-checkbox-cell {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    width: 28px !important;
+    margin-right: 0.625rem !important;
+}
+
+.personnel-select-checkbox {
+    margin: 0 !important;
+    width: 17px !important;
+    height: 17px !important;
+    flex-shrink: 0 !important;
+    cursor: pointer !important;
+    accent-color: var(--color-accent) !important;
+}
+
+.personnel-select-info-cell {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    gap: 0.5rem !important;
+}
+
+.personnel-select-name-wrap {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 0.375rem !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+}
+
+.personnel-select-name {
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+    color: var(--color-ink) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.personnel-select-id {
+    font-size: 0.75rem !important;
+    flex-shrink: 0 !important;
+}
+
+.personnel-select-badge {
+    background: var(--color-surface-alt) !important;
+    border: 1px solid var(--color-border) !important;
+    font-size: 0.6875rem !important;
+    font-weight: 600 !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+}
+
+/* ─── File Dropzone & Project Multi-File Upload Styles ───────────────── */
+.file-dropzone {
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-5) var(--space-4);
+    text-align: center;
+    background: var(--color-surface);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.file-dropzone:hover,
+.file-dropzone.is-dragging {
+    border-color: var(--color-accent);
+    background: var(--color-accent-light);
+}
+
+[data-theme="dark"] .file-dropzone {
+    background: #0E1522;
+    border-color: #243042;
+}
+
+[data-theme="dark"] .file-dropzone:hover,
+[data-theme="dark"] .file-dropzone.is-dragging {
+    border-color: var(--color-accent);
+    background: #1A263A;
+}
+
+/* ─── Initial Expenses Card & Repeater Styles ────────────────────────── */
+.expense-item-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.expense-item-card:hover {
+    border-color: var(--color-accent);
+}
+
+[data-theme="dark"] .expense-item-card {
+    background: #111A28;
+    border-color: #243042;
+}
+
+[data-theme="dark"] .expense-item-card:hover {
+    border-color: var(--color-accent);
+}
+
+
 
 
 

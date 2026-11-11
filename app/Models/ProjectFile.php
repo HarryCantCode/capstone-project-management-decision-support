@@ -27,6 +27,24 @@ class ProjectFile extends Model
 {
     use HasFactory;
 
+    public const TYPE_PROJECT_DOCUMENT = 'project_document';
+    public const TYPE_PROJECT_TRANSACTION = 'project_transaction';
+    public const TYPE_PROJECT_INVOICE = 'invoice';
+    public const TYPE_PROJECT_NOTES = 'project_notes';
+    public const TYPE_PROJECT_DRAWING = 'project_drawing';
+    public const TYPE_TASK_ATTACHMENT = 'task_attachment';
+    public const TYPE_GENERAL = 'general';
+
+    public const CATEGORY_LABELS = [
+        self::TYPE_PROJECT_DOCUMENT => 'Project Document',
+        self::TYPE_PROJECT_TRANSACTION => 'Project Transaction',
+        self::TYPE_PROJECT_INVOICE => 'Project Invoice',
+        self::TYPE_PROJECT_NOTES => 'Project Notes',
+        self::TYPE_PROJECT_DRAWING => 'Project Drawing / Blueprint',
+        self::TYPE_TASK_ATTACHMENT => 'Task Attachment',
+        self::TYPE_GENERAL => 'General Document',
+    ];
+
     protected $table = 'project_files';
 
     protected $fillable = [
@@ -60,6 +78,14 @@ class ProjectFile extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    /**
+     * Get human-friendly label for the file category/type.
+     */
+    public function getCategoryLabelAttribute(): string
+    {
+        return self::CATEGORY_LABELS[$this->file_type] ?? ucfirst(str_replace('_', ' ', (string) $this->file_type));
     }
 
     /**

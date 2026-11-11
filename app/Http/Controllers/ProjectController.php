@@ -73,7 +73,17 @@ class ProjectController extends Controller
     {
         $this->authorize('create', Project::class);
 
-        return view('projects.create');
+        $availablePersonnel = Personnel::query()
+            ->with('project')
+            ->orderBy('last_name')
+            ->get(['id', 'employee_id', 'first_name', 'middle_name', 'last_name', 'expertise', 'project_id']);
+
+        $catalogMaterials = \App\Models\Resource::query()
+            ->where('quantity_available', '>', 0)
+            ->orderBy('name')
+            ->get(['id', 'resource_code', 'name', 'model', 'price', 'unit_cost', 'quantity_available', 'type']);
+
+        return view('projects.create', compact('availablePersonnel', 'catalogMaterials'));
     }
 
     /**
@@ -154,6 +164,8 @@ class ProjectController extends Controller
             'personnelHistory.releasedBy',
             'costs' => fn ($query) => $query->with('creator')->orderByDesc('incurred_date')->orderByDesc('id'),
             'tasks.subtasks.files.uploader',
+            'tasks.subtasks.completedBy',
+            'tasks.subtasks.approvedBy',
             'files.uploader',
             'files.subtask',
         ]);
@@ -178,7 +190,15 @@ class ProjectController extends Controller
             ->values()
             ->all();
 
-        return view('projects.show', compact('project', 'availablePersonnel', 'catalogMaterials', 'pendingSubtaskIds'));
+        $pendingExpenses = \App\Models\StaffPendingAction::query()
+            ->where('project_id', $project->id)
+            ->where('action_type', 'add_expense')
+            ->where('status', 'pending')
+            ->with('user')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('projects.show', compact('project', 'availablePersonnel', 'catalogMaterials', 'pendingSubtaskIds', 'pendingExpenses'));
     }
 
     /** Show the edit project form. */
@@ -186,7 +206,17 @@ class ProjectController extends Controller
     {
         $this->authorize('update', $project);
 
-        return view('projects.edit', compact('project'));
+        $availablePersonnel = Personnel::query()
+            ->with('project')
+            ->orderBy('last_name')
+            ->get(['id', 'employee_id', 'first_name', 'middle_name', 'last_name', 'expertise', 'project_id']);
+
+        $catalogMaterials = \App\Models\Resource::query()
+            ->where('quantity_available', '>', 0)
+            ->orderBy('name')
+            ->get(['id', 'resource_code', 'name', 'model', 'price', 'unit_cost', 'quantity_available', 'type']);
+
+        return view('projects.edit', compact('project', 'availablePersonnel', 'catalogMaterials'));
     }
 
     /**

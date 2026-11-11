@@ -29,6 +29,35 @@ class StoreProjectRequest extends FormRequest
                 'contract_price' => str_replace(',', '', $this->input('contract_price')),
             ]);
         }
+
+        if ($this->input('payment_status') === 'Paid') {
+            $this->merge([
+                'payment_terms' => null,
+            ]);
+        }
+
+        if ($this->has('expenses') && is_array($this->input('expenses'))) {
+            $cleanExpenses = [];
+            foreach ($this->input('expenses') as $exp) {
+                if (!is_array($exp)) {
+                    continue;
+                }
+                $desc = trim((string) ($exp['description'] ?? ''));
+                $resId = !empty($exp['resource_id']) ? $exp['resource_id'] : null;
+                $rawAmt = $exp['amount'] ?? null;
+                // If completely empty row, ignore it
+                if ($desc === '' && empty($resId) && ($rawAmt === null || trim((string) $rawAmt) === '')) {
+                    continue;
+                }
+                if (is_string($rawAmt)) {
+                    $exp['amount'] = str_replace(',', '', $rawAmt);
+                }
+                $cleanExpenses[] = $exp;
+            }
+            $this->merge([
+                'expenses' => $cleanExpenses,
+            ]);
+        }
     }
 
     /**
@@ -59,6 +88,12 @@ class StoreProjectRequest extends FormRequest
             'warranty_period' => ['nullable', 'string', 'max:100'],
             'warranty_end_date' => ['nullable', 'date'],
             'payment_status' => ['required', 'string', 'in:Paid,Partial'],
+            'payment_terms' => [
+                'nullable',
+                'string',
+                'required_if:payment_status,Partial',
+                'in:10%,20%,30%,40%,50%',
+            ],
             'invoice_file' => [
                 'nullable',
                 'file',
@@ -103,14 +138,52 @@ class StoreProjectRequest extends FormRequest
                 },
             ],
             'contract_price' => ['required', 'numeric', 'min:100000', 'max:999999999.99'],
+            'personnel_ids' => ['required', 'array', 'min:1'],
+            'personnel_ids.*' => ['required', 'integer', 'exists:personnel,id'],
+            'expenses' => ['nullable', 'array'],
+            'expenses.*.resource_id' => ['nullable', 'integer', 'exists:resources,id'],
+            'expenses.*.description' => ['required_with:expenses.*.amount', 'nullable', 'string', 'max:255'],
+            'expenses.*.cost_type' => ['required_with:expenses.*.description', 'nullable', 'string', 'in:materials,equipment,labor,subcontractor,other'],
+            'expenses.*.quantity' => ['nullable', 'integer', 'min:1'],
+            'expenses.*.amount' => ['required_with:expenses.*.description', 'nullable', 'numeric', 'min:0.01', 'max:999999999.99'],
+            'attachments' => ['nullable', 'array'],
+            'attachments.*.file' => ['required', 'file', 'mimes:pdf,docx,doc,jpg,jpeg,png,webp', 'max:20480'],
+            'attachments.*.category' => ['required', 'string', 'in:project_document,project_transaction,invoice,project_notes,project_drawing'],
+            'attachments.*.description' => ['nullable', 'string', 'max:255'],
         ];
     }
 
     public function withValidator(\Illuminate\Validation\Validator $validator): void
     {
         $validator->after(function (\Illuminate\Validation\Validator $validator) {
-            if ($this->input('payment_status') === 'Paid' && !$this->hasFile('invoice_file')) {
+            $hasInvoice = $this->hasFile('invoice_file');
+            if (!$hasInvoice && $this->hasFile('attachments')) {
+                $attachments = $this->file('attachments');
+                if (is_array($attachments)) {
+                    foreach ($attachments as $idx => $att) {
+                        $cat = $this->input("attachments.{$idx}.category");
+                        if (isset($att['file']) && $att['file'] instanceof \Illuminate\Http\UploadedFile && in_array($cat, ['invoice', 'project_invoice'])) {
+                            $hasInvoice = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if ($this->input('payment_status') === 'Paid' && !$hasInvoice) {
                 $validator->errors()->add('invoice_file', 'An invoice attachment (PDF, DOCX, or Image) is required when payment status is Paid in full.');
+            }
+
+            if ($this->has('expenses') && is_array($this->input('expenses'))) {
+                foreach ($this->input('expenses') as $idx => $exp) {
+                    if (!empty($exp['resource_id'])) {
+                        $res = \App\Models\Resource::find($exp['resource_id']);
+                        $qty = !empty($exp['quantity']) && (int) $exp['quantity'] > 0 ? (int) $exp['quantity'] : 1;
+                        if ($res && $qty > $res->quantity_available) {
+                            $validator->errors()->add("expenses.{$idx}.quantity", "Requested quantity ({$qty}) exceeds available stock ({$res->quantity_available}) for {$res->name}.");
+                        }
+                    }
+                }
             }
 
             $name = trim((string) $this->input('name', ''));
@@ -151,6 +224,8 @@ class StoreProjectRequest extends FormRequest
             'operation.required' => 'Elevator operation type is required.',
             'payment_status.required' => 'Payment status is required.',
             'payment_status.in' => 'Payment status must be Paid or Partial.',
+            'payment_terms.required_if' => 'Payment Terms percentage is required when payment status is Partial.',
+            'payment_terms.in' => 'Please select a valid Payment Terms percentage (10%, 20%, 30%, 40%, or 50%).',
             'invoice_file.file' => 'The invoice must be a valid uploaded file.',
             'invoice_file.mimes' => 'The invoice must be a file of type: PDF, DOCX, or Image (JPG, PNG, WEBP).',
             'invoice_file.max' => 'The invoice file may not be greater than 20MB.',
@@ -162,6 +237,18 @@ class StoreProjectRequest extends FormRequest
             'contract_price.required' => 'Contract price is required.',
             'contract_price.numeric' => 'Contract price must be a valid number.',
             'contract_price.min' => 'Contract price cannot be less than ₱100,000.',
+            'personnel_ids.required' => 'At least one manpower personnel must be selected from the list.',
+            'personnel_ids.min' => 'Please select at least one manpower personnel from the list to assign to this project.',
+            'personnel_ids.*.exists' => 'The selected personnel record is invalid.',
+            'expenses.*.description.required_with' => 'Expenditure description is required when an amount is provided.',
+            'expenses.*.amount.required_with' => 'Expenditure amount is required when a description is provided.',
+            'expenses.*.amount.numeric' => 'Expenditure amount must be a valid number.',
+            'expenses.*.cost_type.in' => 'Cost type must be materials, equipment, labor, subcontractor, or other.',
+            'attachments.*.file.required' => 'The attachment file is required.',
+            'attachments.*.file.mimes' => 'Attachments must be PDF, DOCX, DOC, or Image (JPG, PNG, WEBP) files.',
+            'attachments.*.file.max' => 'Attachment files may not exceed 20MB.',
+            'attachments.*.category.required' => 'A file category is required for each attachment.',
+            'attachments.*.category.in' => 'The selected file category is invalid.',
         ];
     }
 }

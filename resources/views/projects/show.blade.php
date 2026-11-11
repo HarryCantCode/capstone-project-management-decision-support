@@ -53,9 +53,9 @@
                 }
             }
             $initialSubtaskLocks[$st->id] = $hasCompletedAfter;
-        } elseif ($isStaffViewer && $isPendingReview) {
-            // Staff already submitted this subtask for review; unlock subsequent subtask for Staff
-            $initialSubtaskLocks[$st->id] = false;
+        } elseif ($isPendingReview) {
+            // Task has been submitted and is pending review: strictly lock this task from further actions
+            $initialSubtaskLocks[$st->id] = true;
         } else {
             if (!$foundFirstUncompleted) {
                 $initialSubtaskLocks[$st->id] = false;
@@ -699,12 +699,47 @@
                                         @foreach ($task->subtasks as $subtask)
                                             @php
                                                 $isSubtaskLocked = $initialSubtaskLocks[$subtask->id] ?? false;
+                                                $isSubtaskPending = $initialSubtaskPending[$subtask->id] ?? false;
+
+                                                $subtaskProofFiles = $subtask->files->map(function($f) use ($project) {
+                                                    return [
+                                                        'id' => $f->id,
+                                                        'name' => $f->file_name,
+                                                        'size' => $f->formatted_size,
+                                                        'url' => route('projects.files.download', [$project, $f]),
+                                                        'is_img' => $f->is_image,
+                                                        'is_pdf' => $f->is_pdf,
+                                                        'is_word' => $f->is_word,
+                                                    ];
+                                                })->values();
+
+                                                $completedByName = $subtask->completedBy?->name ?? ($subtask->is_completed ? ($project->creator?->name ?? 'Admin / Manager') : null);
+                                                $completedByRole = $subtask->completedBy?->getRoleNames()->first() ?? ($subtask->is_completed ? 'Staff / User' : null);
+
+                                                $approvedByName = $subtask->approvedBy?->name ?? ($subtask->is_completed ? ($project->creator?->name ?? 'Direct Sign-off') : null);
+                                                $approvedByRole = $subtask->approvedBy?->getRoleNames()->first() ?? ($subtask->is_completed ? 'Manager / Admin' : null);
+
+                                                $subtaskProofPayload = [
+                                                    'subtask_id' => $subtask->id,
+                                                    'task_name' => $task->task_name,
+                                                    'subtask_title' => $subtask->title,
+                                                    'is_completed' => (bool) $subtask->is_completed,
+                                                    'completed_at' => $subtask->completed_at ? $subtask->completed_at->format('M j, Y · g:i A') : ($subtask->updated_at ? $subtask->updated_at->format('M j, Y · g:i A') : 'Completed'),
+                                                    'due_date' => $subtask->due_date ? $subtask->due_date->format('M j, Y') : null,
+                                                    'completed_by_name' => $completedByName,
+                                                    'completed_by_role' => $completedByRole,
+                                                    'approved_by_name' => $approvedByName,
+                                                    'approved_by_role' => $approvedByRole,
+                                                    'is_direct' => $subtask->completed_by && ($subtask->completed_by === $subtask->approved_by),
+                                                    'notes' => $subtask->notes ?? '',
+                                                    'files' => $subtaskProofFiles,
+                                                ];
                                             @endphp
                                             <li 
                                                 style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); background: var(--color-surface); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); transition: background 0.15s ease;"
                                                 :class="{ 
-                                                    'subtask-row-locked': !!subtaskLocks[{{ $subtask->id }}],
-                                                    'subtask-row-forward-locked': !!subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}]
+                                                    'subtask-row-locked': !!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}],
+                                                    'subtask-row-forward-locked': (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}]
                                                 }"
                                                 id="subtask-row-{{ $subtask->id }}"
                                                 x-data="{ showLockedTooltip: false }"
@@ -713,39 +748,39 @@
                                             >
                                                 {{-- Floating Brand-Orange Tooltip on Hover when untickable --}}
                                                 <div 
-                                                    x-show="showLockedTooltip && !!subtaskLocks[{{ $subtask->id }}]"
+                                                    x-show="showLockedTooltip && (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}])"
                                                     x-cloak
                                                     class="dex-tooltip-bubble"
                                                 >
-                                                    <span x-text="subtaskCompleted[{{ $subtask->id }}] ? 'You cannot uncheck your previous task unless you uncheck the task that comes after it.' : 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task.'"></span>
+                                                    <span x-text="pendingSubtasks[{{ $subtask->id }}] ? 'This task is awaiting review by a Manager or Admin.' : (subtaskCompleted[{{ $subtask->id }}] ? 'You cannot uncheck your previous task unless you uncheck the task that comes after it.' : 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task.')"></span>
                                                 </div>
 
                                                 <label 
-                                                    style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }};"
-                                                    :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
-                                                    @mouseenter="if (subtaskLocks[{{ $subtask->id }}]) showLockedTooltip = true"
-                                                    @click="if (subtaskLocks[{{ $subtask->id }}]) showLockedTooltip = true"
+                                                    style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending) ? 'not-allowed' : 'pointer' }};"
+                                                    :style="(subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) ? 'cursor: not-allowed !important;' : ''"
+                                                    @mouseenter="if (subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) showLockedTooltip = true"
+                                                    @click="if (subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) showLockedTooltip = true"
                                                 >
                                                     <input 
                                                         type="checkbox" 
                                                         class="subtask-checkbox subtask-check-{{ $subtask->id }}"
                                                         :class="{
-                                                            'is-forward-locked': !!subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}],
+                                                            'is-forward-locked': (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}],
                                                             'is-reverse-locked': !!subtaskLocks[{{ $subtask->id }}] && !!subtaskCompleted[{{ $subtask->id }}]
                                                         }"
                                                         id="subtask-check-{{ $subtask->id }}"
                                                         {{ $subtask->is_completed ? 'checked' : '' }}
-                                                        {{ ($isProjectReadOnly || $isSubtaskLocked || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'disabled' : '' }}
-                                                        :disabled="{{ ($isProjectReadOnly || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
-                                                        @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
-                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'not-allowed' : 'pointer' }};"
-                                                        :style="subtaskLocks[{{ $subtask->id }}] || ({{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'true' : 'false' }}) ? 'cursor: not-allowed !important;' : ''"
-                                                        title="{{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'Staff users cannot uncheck completed tasks' : '' }}"
+                                                        {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'disabled' : '' }}
+                                                        :disabled="{{ ($isProjectReadOnly || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'true' : '!!subtaskLocks[' . $subtask->id . '] || !!pendingSubtasks[' . $subtask->id . ']' }}"
+                                                        @change="onSubtaskCheckboxClick({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($task->task_name) }}', '{{ addslashes($subtask->title) }}', $el)"
+                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'not-allowed' : 'pointer' }};"
+                                                        :style="(subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}] || {{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'true' : 'false' }}) ? 'cursor: not-allowed !important;' : ''"
+                                                        title="{{ $isSubtaskPending ? 'This task is awaiting review by a Manager or Admin' : (($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'Staff users cannot uncheck completed tasks' : '') }}"
                                                     >
                                                     <span 
                                                         class="subtask-title-{{ $subtask->id }}"
                                                         style="font-size: 0.875rem; {{ $subtask->is_completed ? 'text-decoration: line-through; color: var(--color-muted);' : 'color: var(--color-ink); font-weight: 500;' }}"
-                                                        :style="(subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}]) ? 'color: var(--color-muted) !important;' : ''"
+                                                        :style="((subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}]) ? 'color: var(--color-muted) !important;' : ''"
                                                     >
                                                         {{ $subtask->title }}
                                                     </span>
@@ -767,22 +802,25 @@
                                                         </span>
                                                     @endif
 
-                                                    {{-- Subtask Attachment Button & Count --}}
-                                                    <button 
-                                                        type="button" 
-                                                        class="btn-icon" 
-                                                        title="{{ $isProjectReadOnly ? 'View files for this sub task (' . $subtask->files->count() . ' attached)' : 'Upload or view files for this sub task (' . $subtask->files->count() . ' attached)' }}"
-                                                        @click="openSubtaskUploadModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', {{ json_encode($subtask->files->map(fn($f) => ['id' => $f->id, 'name' => $f->file_name, 'size' => $f->formatted_size, 'url' => route('projects.files.download', [$project, $f]), 'is_img' => $f->is_image, 'is_pdf' => $f->is_pdf, 'is_word' => $f->is_word])) }})"
-                                                        style="background: none; border: none; cursor: pointer; color: {{ $subtask->files->isNotEmpty() ? 'var(--color-primary)' : 'var(--color-muted)' }}; padding: 4px; border-radius: var(--radius-sm); position: relative;"
-                                                        id="btn-files-subtask-{{ $subtask->id }}"
-                                                    >
-                                                        <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor">
-                                                            <path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.5 9.525l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.248z" clip-rule="evenodd" />
-                                                        </svg>
-                                                        @if ($subtask->files->isNotEmpty())
-                                                            <span style="font-size: 0.625rem; font-weight: 700; color: var(--color-primary); margin-left: 1px;">{{ $subtask->files->count() }}</span>
+                                                    {{-- Proof of Completion / View Files Modal Trigger --}}
+                                                    <div id="subtask-proof-container-{{ $subtask->id }}" style="display: inline-flex; align-items: center; gap: var(--space-1); {{ $subtask->is_completed ? '' : 'display: none;' }}">
+                                                        @if ($subtask->is_completed)
+                                                            <button 
+                                                                type="button" 
+                                                                class="btn btn-secondary btn-sm" 
+                                                                style="padding: 2px 8px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px; border-color: var(--color-border); color: var(--color-ink);"
+                                                                title="View Task Completion Details & Proofs"
+                                                                @click="openTaskProofModal(@js($subtaskProofPayload))"
+                                                                id="btn-proof-subtask-{{ $subtask->id }}"
+                                                            >
+                                                                <svg style="width: 13px; height: 13px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                                    <circle cx="12" cy="12" r="3"></circle>
+                                                                </svg>
+                                                                <span>View</span>
+                                                            </button>
                                                         @endif
-                                                    </button>
+                                                    </div>
 
                                                     @can('update', $project)
                                                         @if (!$isProjectReadOnly)
@@ -790,6 +828,7 @@
                                                                 type="button" 
                                                                 class="btn-icon" 
                                                                 title="Edit Sub Task"
+                                                                x-show="!pendingSubtasks[{{ $subtask->id }}]"
                                                                 @click="openEditSubtaskModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', '{{ $subtask->due_date ? $subtask->due_date->format('Y-m-d') : '' }}', '{{ $task->start_date->format('Y-m-d') }}', '{{ $task->end_date->format('Y-m-d') }}')"
                                                                 style="background: none; border: none; cursor: pointer; color: var(--color-muted); padding: 4px; border-radius: var(--radius-sm);"
                                                                 id="btn-edit-subtask-{{ $subtask->id }}"
@@ -956,12 +995,47 @@
                                                     @foreach ($task->subtasks as $subtask)
                                                         @php
                                                             $isSubtaskLocked = $initialSubtaskLocks[$subtask->id] ?? false;
+                                                            $isSubtaskPending = $initialSubtaskPending[$subtask->id] ?? false;
+
+                                                            $subtaskProofFiles = $subtask->files->map(function($f) use ($project) {
+                                                                return [
+                                                                    'id' => $f->id,
+                                                                    'name' => $f->file_name,
+                                                                    'size' => $f->formatted_size,
+                                                                    'url' => route('projects.files.download', [$project, $f]),
+                                                                    'is_img' => $f->is_image,
+                                                                    'is_pdf' => $f->is_pdf,
+                                                                    'is_word' => $f->is_word,
+                                                                ];
+                                                            })->values();
+
+                                                            $completedByName = $subtask->completedBy?->name ?? ($subtask->is_completed ? ($project->creator?->name ?? 'Admin / Manager') : null);
+                                                            $completedByRole = $subtask->completedBy?->getRoleNames()->first() ?? ($subtask->is_completed ? 'Staff / User' : null);
+
+                                                            $approvedByName = $subtask->approvedBy?->name ?? ($subtask->is_completed ? ($project->creator?->name ?? 'Direct Sign-off') : null);
+                                                            $approvedByRole = $subtask->approvedBy?->getRoleNames()->first() ?? ($subtask->is_completed ? 'Manager / Admin' : null);
+
+                                                            $subtaskProofPayload = [
+                                                                'subtask_id' => $subtask->id,
+                                                                'task_name' => $task->task_name,
+                                                                'subtask_title' => $subtask->title,
+                                                                'is_completed' => (bool) $subtask->is_completed,
+                                                                'completed_at' => $subtask->completed_at ? $subtask->completed_at->format('M j, Y · g:i A') : ($subtask->updated_at ? $subtask->updated_at->format('M j, Y · g:i A') : 'Completed'),
+                                                                'due_date' => $subtask->due_date ? $subtask->due_date->format('M j, Y') : null,
+                                                                'completed_by_name' => $completedByName,
+                                                                'completed_by_role' => $completedByRole,
+                                                                'approved_by_name' => $approvedByName,
+                                                                'approved_by_role' => $approvedByRole,
+                                                                'is_direct' => $subtask->completed_by && ($subtask->completed_by === $subtask->approved_by),
+                                                                'notes' => $subtask->notes ?? '',
+                                                                'files' => $subtaskProofFiles,
+                                                            ];
                                                         @endphp
                                                         <li 
                                                             style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: 0.8125rem;"
                                                             :class="{ 
-                                                                'subtask-row-locked': !!subtaskLocks[{{ $subtask->id }}],
-                                                                'subtask-row-forward-locked': !!subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}]
+                                                                'subtask-row-locked': !!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}],
+                                                                'subtask-row-forward-locked': (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}]
                                                             }"
                                                             id="expanded-subtask-row-{{ $subtask->id }}"
                                                             x-data="{ showExpandedLockedTooltip: false }"
@@ -970,39 +1044,39 @@
                                                         >
                                                             {{-- Floating Brand-Orange Tooltip on Hover when untickable --}}
                                                             <div 
-                                                                x-show="showExpandedLockedTooltip && !!subtaskLocks[{{ $subtask->id }}]"
+                                                                x-show="showExpandedLockedTooltip && (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}])"
                                                                 x-cloak
                                                                 class="dex-tooltip-bubble"
                                                             >
-                                                                <span x-text="subtaskCompleted[{{ $subtask->id }}] ? 'You cannot uncheck your previous task unless you uncheck the task that comes after it.' : 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task.'"></span>
+                                                                <span x-text="pendingSubtasks[{{ $subtask->id }}] ? 'This task is awaiting review by a Manager or Admin.' : (subtaskCompleted[{{ $subtask->id }}] ? 'You cannot uncheck your previous task unless you uncheck the task that comes after it.' : 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task.')"></span>
                                                             </div>
 
                                                             <label 
-                                                                style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: {{ ($isProjectReadOnly || $isSubtaskLocked) ? 'not-allowed' : 'pointer' }}; flex: 1;"
-                                                                :style="subtaskLocks[{{ $subtask->id }}] ? 'cursor: not-allowed !important;' : ''"
-                                                                @mouseenter="if (subtaskLocks[{{ $subtask->id }}]) showExpandedLockedTooltip = true"
-                                                                @click="if (subtaskLocks[{{ $subtask->id }}]) showExpandedLockedTooltip = true"
+                                                                style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending) ? 'not-allowed' : 'pointer' }}; flex: 1;"
+                                                                :style="(subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) ? 'cursor: not-allowed !important;' : ''"
+                                                                @mouseenter="if (subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) showExpandedLockedTooltip = true"
+                                                                @click="if (subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) showExpandedLockedTooltip = true"
                                                             >
                                                                 <input 
                                                                     type="checkbox" 
                                                                     class="subtask-checkbox subtask-check-{{ $subtask->id }}"
                                                                     :class="{
-                                                                        'is-forward-locked': !!subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}],
+                                                                        'is-forward-locked': (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}],
                                                                         'is-reverse-locked': !!subtaskLocks[{{ $subtask->id }}] && !!subtaskCompleted[{{ $subtask->id }}]
                                                                     }"
                                                                     id="expanded-subtask-check-{{ $subtask->id }}"
                                                                     {{ $subtask->is_completed ? 'checked' : '' }}
-                                                                    {{ ($isProjectReadOnly || $isSubtaskLocked || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'disabled' : '' }}
-                                                                    :disabled="{{ ($isProjectReadOnly || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'true' : '!!subtaskLocks[' . $subtask->id . ']' }}"
-                                                                    @change="toggleSubtask({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, $el)"
-                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'not-allowed' : 'pointer' }};"
-                                                                    :style="subtaskLocks[{{ $subtask->id }}] || ({{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'true' : 'false' }}) ? 'cursor: not-allowed !important;' : ''"
-                                                                    title="{{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'Staff users cannot uncheck completed tasks' : '' }}"
+                                                                    {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'disabled' : '' }}
+                                                                    :disabled="{{ ($isProjectReadOnly || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'true' : '!!subtaskLocks[' . $subtask->id . '] || !!pendingSubtasks[' . $subtask->id . ']' }}"
+                                                                    @change="onSubtaskCheckboxClick({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($task->task_name) }}', '{{ addslashes($subtask->title) }}', $el)"
+                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'not-allowed' : 'pointer' }};"
+                                                                    :style="(subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}] || {{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'true' : 'false' }}) ? 'cursor: not-allowed !important;' : ''"
+                                                                    title="{{ $isSubtaskPending ? 'This task is awaiting review by a Manager or Admin' : (($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'Staff users cannot uncheck completed tasks' : '') }}"
                                                                 >
                                                                 <span 
                                                                     class="subtask-title-{{ $subtask->id }}"
                                                                     style="{{ $subtask->is_completed ? 'text-decoration: line-through; color: var(--color-muted);' : 'color: var(--color-ink);' }}"
-                                                                    :style="(subtaskLocks[{{ $subtask->id }}] && !subtaskCompleted[{{ $subtask->id }}]) ? 'color: var(--color-muted) !important;' : ''"
+                                                                    :style="((subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}]) ? 'color: var(--color-muted) !important;' : ''"
                                                                 >
                                                                     {{ $subtask->title }}
                                                                 </span>
@@ -1022,15 +1096,26 @@
                                                                         📅 {{ $subtask->due_date->format('M j') }}
                                                                     </span>
                                                                 @endif
-                                                                <button 
-                                                                    type="button" 
-                                                                    class="btn-icon" 
-                                                                    title="Attachments ({{ $subtask->files->count() }})"
-                                                                    @click="openSubtaskUploadModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', {{ json_encode($subtask->files->map(fn($f) => ['id' => $f->id, 'name' => $f->file_name, 'size' => $f->formatted_size, 'url' => route('projects.files.download', [$project, $f]), 'is_img' => $f->is_image, 'is_pdf' => $f->is_pdf, 'is_word' => $f->is_word])) }})"
-                                                                    style="background: none; border: none; cursor: pointer; color: {{ $subtask->files->isNotEmpty() ? 'var(--color-primary)' : 'var(--color-muted)' }}; padding: 2px; border-radius: var(--radius-sm);"
-                                                                >
-                                                                    📎 @if($subtask->files->isNotEmpty())<span style="font-size: 0.6875rem; font-weight: bold;">{{ $subtask->files->count() }}</span>@endif
-                                                                </button>
+
+                                                                {{-- Proof of Completion / View Files Modal Trigger --}}
+                                                                <div id="expanded-subtask-proof-container-{{ $subtask->id }}" style="display: inline-flex; align-items: center; gap: var(--space-1); {{ $subtask->is_completed ? '' : 'display: none;' }}">
+                                                                    @if ($subtask->is_completed)
+                                                                        <button 
+                                                                            type="button" 
+                                                                            class="btn btn-secondary btn-sm" 
+                                                                            style="padding: 1px 6px; font-size: 0.6875rem; display: inline-flex; align-items: center; gap: 4px; border-color: var(--color-border); color: var(--color-ink);"
+                                                                            title="View Task Completion Details & Proofs"
+                                                                            @click="openTaskProofModal(@js($subtaskProofPayload))"
+                                                                            id="btn-expanded-proof-subtask-{{ $subtask->id }}"
+                                                                        >
+                                                                            <svg style="width: 12px; height: 12px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                                                <circle cx="12" cy="12" r="3"></circle>
+                                                                            </svg>
+                                                                            <span>View</span>
+                                                                        </button>
+                                                                    @endif
+                                                                </div>
                                                             </div>
                                                         </li>
                                                     @endforeach
@@ -1092,8 +1177,49 @@
             </div>
         </div>
 
+        @php
+            $unifiedExpenditures = collect();
+
+            foreach (($pendingExpenses ?? []) as $pe) {
+                $incurredDate = !empty($pe->payload['incurred_date']) 
+                    ? \Carbon\Carbon::parse($pe->payload['incurred_date']) 
+                    : $pe->created_at;
+                $unifiedExpenditures->push([
+                    'is_pending' => true,
+                    'description' => $pe->payload['description'] ?? 'Expense Entry',
+                    'cost_type' => $pe->payload['cost_type'] ?? 'materials',
+                    'resource_name' => $pe->payload['resource_name'] ?? null,
+                    'quantity' => $pe->payload['quantity'] ?? 1,
+                    'amount' => (float) ($pe->payload['amount'] ?? 0),
+                    'date_display' => $incurredDate ? $incurredDate->format('M j, Y') : $pe->created_at->format('M j, Y'),
+                    'sort_time' => $pe->created_at ? $pe->created_at->timestamp : 0,
+                    'logged_by' => $pe->user ? $pe->user->name : 'Staff',
+                    'model' => $pe,
+                ]);
+            }
+
+            foreach ($project->costs as $c) {
+                $incurredDate = $c->incurred_date ?: $c->created_at;
+                $unifiedExpenditures->push([
+                    'is_pending' => false,
+                    'description' => $c->description,
+                    'cost_type' => $c->cost_type,
+                    'resource_name' => null,
+                    'quantity' => $c->quantity ?? 1,
+                    'amount' => (float) $c->amount,
+                    'date_display' => $incurredDate ? $incurredDate->format('M j, Y') : $c->created_at->format('M j, Y'),
+                    'sort_time' => $c->created_at ? $c->created_at->timestamp : 0,
+                    'logged_by' => $c->creator ? $c->creator->name : 'System',
+                    'model' => $c,
+                ]);
+            }
+
+            $recentExpenditures = $unifiedExpenditures->sortByDesc('sort_time')->take(3);
+            $totalExpendituresCount = $unifiedExpenditures->count();
+        @endphp
+
         <div x-show="!expendituresMinimized" x-transition x-cloak>
-        @if ($project->costs->isEmpty())
+        @if ($recentExpenditures->isEmpty())
             <div class="card-body">
                 <div class="empty-state" style="padding: var(--space-6) var(--space-4);">
                     <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -1117,11 +1243,16 @@
                 </div>
             </div>
         @else
-            {{-- Indicator banner for recent 3 entries --}}
-            <div style="background: var(--color-surface-alt); padding: var(--space-2) var(--space-6); border-bottom: 1px solid var(--color-border); font-size: 0.8125rem;">
+            {{-- Indicator banner for recent entries and pending items --}}
+            <div style="background: var(--color-surface-alt); padding: var(--space-2) var(--space-6); border-bottom: 1px solid var(--color-border); font-size: 0.8125rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                 <span class="text-muted">
-                    📌 <strong>Quick View:</strong> Displaying the <strong>3 most recent expenditures</strong> for this project.
+                    📌 <strong>Quick View:</strong> Displaying the <strong>{{ $recentExpenditures->count() }} most recent expenditures</strong> for this project.
                 </span>
+                @if (($pendingExpenses ?? collect())->isNotEmpty())
+                    <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.6875rem; font-weight: 600;">
+                        ⏳ {{ $pendingExpenses->count() }} {{ Str::plural('Expense', $pendingExpenses->count()) }} Pending Review
+                    </span>
+                @endif
             </div>
             <div class="table-wrapper">
                 <table class="data-table">
@@ -1138,47 +1269,109 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($project->costs->take(3) as $cost)
-                            <tr>
-                                <td><strong>{{ $cost->description }}</strong></td>
-                                <td>
-                                    <span class="badge" style="background: var(--color-surface-alt); text-transform: capitalize;">
-                                        {{ $cost->cost_type }}
-                                    </span>
-                                </td>
-                                <td class="text-center font-mono font-bold">
-                                    {{ $cost->quantity ?? 1 }}
-                                </td>
-                                <td class="cell-numeric text-success">
-                                    ₱{{ number_format($cost->amount, 2) }}
-                                </td>
-                                <td class="font-mono">
-                                    {{ $cost->incurred_date ? $cost->incurred_date->format('M j, Y') : $cost->created_at->format('M j, Y') }}
-                                </td>
-                                <td>{{ $cost->creator ? $cost->creator->name : 'System' }}</td>
-                                <td class="text-right">
-                                    @can('update', $project)
-                                        @if (!$isProjectReadOnly)
-                                            <button
-                                                type="button"
-                                                class="btn btn-secondary btn-sm"
-                                                style="color: var(--color-danger); border-color: #fad2cf;"
-                                                @click="openDeleteCostModal('{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}', '{{ addslashes($cost->description) }}', '{{ number_format($cost->amount, 2) }}')"
-                                            >
-                                                Delete
-                                            </button>
+                        @foreach ($recentExpenditures as $exp)
+                            @if ($exp['is_pending'])
+                                <tr 
+                                    class="expense-row-pending"
+                                    style="opacity: 0.65; background: var(--color-surface-alt); transition: opacity 0.2s ease;"
+                                    onmouseover="this.style.opacity='0.85'" 
+                                    onmouseout="this.style.opacity='0.65'"
+                                >
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <strong style="color: var(--color-muted);">{{ $exp['description'] }}</strong>
+                                            <span class="status-pill status-pill--ongoing" style="font-size: 0.6875rem; padding: 1px 8px; background: rgba(245, 158, 11, 0.15); color: #d97706; border-color: rgba(245, 158, 11, 0.3);" title="Awaiting Manager or Admin approval">
+                                                Pending Review
+                                            </span>
+                                        </div>
+                                        @if(!empty($exp['resource_name']))
+                                            <div style="font-size: 0.75rem; color: var(--color-muted);">Catalog: {{ $exp['resource_name'] }}</div>
                                         @endif
-                                    @endcan
-                                </td>
-                            </tr>
+                                    </td>
+                                    <td>
+                                        <span class="badge" style="background: var(--color-surface); text-transform: capitalize; color: var(--color-muted); font-weight: 600;">
+                                            {{ $exp['cost_type'] }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center font-mono font-bold" style="color: var(--color-muted);">
+                                        {{ $exp['quantity'] }}
+                                    </td>
+                                    <td class="cell-numeric font-mono" style="color: var(--color-muted); font-style: italic;">
+                                        ₱{{ number_format($exp['amount'], 2) }}
+                                    </td>
+                                    <td class="font-mono" style="color: var(--color-muted);">
+                                        {{ $exp['date_display'] }}
+                                    </td>
+                                    <td style="color: var(--color-muted);">
+                                        {{ $exp['logged_by'] }}
+                                    </td>
+                                    <td class="text-right">
+                                        @if(Auth::user()->hasAnyRole(['Admin', 'Manager']))
+                                            <a 
+                                                href="{{ route('pending-actions.index', ['action_type' => 'add_expense', 'project_id' => $project->id]) }}" 
+                                                class="btn btn-secondary btn-sm" 
+                                                style="padding: 1px 8px; font-size: 0.75rem; border-color: rgba(245, 158, 11, 0.4); color: #d97706;"
+                                                title="Review this staff expense in Pending Actions"
+                                            >
+                                                Review
+                                            </a>
+                                        @else
+                                            <a 
+                                                href="{{ route('approval-list.index', ['action_type' => 'add_expense', 'project_id' => $project->id]) }}" 
+                                                class="status-pill status-pill--ongoing" 
+                                                style="font-size: 0.6875rem; padding: 1px 8px; text-decoration: none;"
+                                                title="View in your Approval List"
+                                            >
+                                                Awaiting Review
+                                            </a>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @else
+                                @php $cost = $exp['model']; @endphp
+                                <tr>
+                                    <td><strong>{{ $cost->description }}</strong></td>
+                                    <td>
+                                        <span class="badge" style="background: var(--color-surface-alt); text-transform: capitalize;">
+                                            {{ $cost->cost_type }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center font-mono font-bold">
+                                        {{ $cost->quantity ?? 1 }}
+                                    </td>
+                                    <td class="cell-numeric text-success">
+                                        ₱{{ number_format($cost->amount, 2) }}
+                                    </td>
+                                    <td class="font-mono">
+                                        {{ $exp['date_display'] }}
+                                    </td>
+                                    <td>{{ $cost->creator ? $cost->creator->name : 'System' }}</td>
+                                    <td class="text-right">
+                                        @can('update', $project)
+                                            @if (!$isProjectReadOnly)
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-secondary btn-sm"
+                                                    style="color: var(--color-danger); border-color: #fad2cf;"
+                                                    @click="openDeleteCostModal('{{ route('projects.costs.destroy', ['project' => $project, 'cost' => $cost]) }}', '{{ addslashes($cost->description) }}', '{{ number_format($cost->amount, 2) }}')"
+                                                >
+                                                    Delete
+                                                </button>
+                                            @endif
+                                        @endcan
+                                    </td>
+                                </tr>
+                            @endif
                         @endforeach
                     </tbody>
                 </table>
             </div>
 
-            @if ($project->costs->count() > 3)
-                <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; background: var(--color-surface-alt);">
-                    <span class="text-muted">Showing 3 most recent expenditures (out of {{ $project->costs->count() }} total logged).</span>
+            @if ($totalExpendituresCount > 3)
+                <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; background: var(--color-surface-alt); flex-wrap: wrap; gap: 8px;">
+                    <span class="text-muted">
+                        Showing {{ $recentExpenditures->count() }} most recent expenditures (out of {{ $totalExpendituresCount }} total logged).
+                    </span>
                     <a href="{{ route('costing.show', $project) }}" class="table-link font-bold">View Complete History in Full Breakdown ↗</a>
                 </div>
             @endif
@@ -2365,14 +2558,23 @@
         <div class="reassign-modal-content card" x-show="subtaskFileModalOpen" x-transition style="max-width: 520px;">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0;">
-                    <svg style="width: 18px; height: 18px; color: var(--color-primary); flex-shrink: 0;" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.5 9.525l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.248z" clip-rule="evenodd" />
+                    <svg style="width: 18px; height: 18px; color: var(--color-accent); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
                     </svg>
-                    <span style="font-weight: 700; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="'Subtask Files: ' + activeSubtaskData.title"></span>
+                    <span style="font-weight: 700; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="'Task Proofs: ' + activeSubtaskData.title"></span>
                 </div>
                 <button type="button" class="flash-close" @click="subtaskFileModalOpen = false" aria-label="Close modal">&times;</button>
             </div>
             <div class="card-body">
+                {{-- Completion Remarks & Notes if present --}}
+                <template x-if="activeSubtaskData.notes">
+                    <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--color-accent); border-radius: var(--radius-sm); padding: var(--space-3); margin-bottom: var(--space-4);">
+                        <span class="text-muted font-bold" style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 2px;">Completion Remarks / Notes</span>
+                        <p style="margin: 0; font-size: 0.8125rem; color: var(--color-ink); white-space: pre-wrap;" x-text="activeSubtaskData.notes"></p>
+                    </div>
+                </template>
+
                 {{-- Existing Subtask Files List --}}
                 <div style="margin-bottom: var(--space-4);">
                     <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-2);">
@@ -2457,6 +2659,318 @@
                         </div>
                     @endif
                 @endif
+            </div>
+        </div>
+    </div>
+
+    {{-- ─── Modal 11: Task Completion Record & Proof Details Modal ─── --}}
+    <div class="reassign-modal-overlay" style="display: none;" x-show="taskProofModalOpen" x-cloak>
+        <div class="reassign-modal-backdrop" @click="taskProofModalOpen = false"></div>
+        <div class="reassign-modal-content card" x-show="taskProofModalOpen" x-transition style="max-width: 580px; width: 100%; border-top: 4px solid var(--color-success); max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0;">
+                    <svg style="width: 18px; height: 18px; color: var(--color-success); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    <span style="font-weight: 700; font-size: 0.9375rem; color: var(--color-ink);">
+                        Task Completion Record & Proof
+                    </span>
+                </div>
+                <button type="button" class="flash-close" @click="taskProofModalOpen = false" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="card-body" style="padding: var(--space-5); overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: var(--space-4);">
+                {{-- Task Information Summary --}}
+                <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
+                    <div style="font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: 2px;">
+                        Milestone / Major Task
+                    </div>
+                    <div style="font-size: 0.875rem; font-weight: 600; color: var(--color-ink); margin-bottom: var(--space-2);" x-text="taskProofData.task_name || 'Project Milestone'"></div>
+                    
+                    <div style="font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: 2px;">
+                        Specific Task Completed
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-2); font-size: 0.9375rem; font-weight: 700; color: var(--color-ink); margin-bottom: var(--space-3);">
+                        <svg style="width: 16px; height: 16px; color: var(--color-success); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        <span x-text="taskProofData.subtask_title"></span>
+                    </div>
+
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: 0.75rem; padding-top: var(--space-2); border-top: 1px dashed var(--color-border);">
+                        <span class="status-pill status-pill--completed" style="font-size: 0.6875rem; padding: 2px 8px;">
+                            ✓ Completed
+                        </span>
+                        <template x-if="taskProofData.due_date">
+                            <span class="badge font-mono" style="background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-muted); font-size: 0.75rem; padding: 2px 8px;">
+                                📅 Target: <span x-text="taskProofData.due_date"></span>
+                            </span>
+                        </template>
+                        <template x-if="taskProofData.completed_at">
+                            <span class="badge font-mono" style="background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-ink); font-size: 0.75rem; padding: 2px 8px;">
+                                Finished: <span x-text="taskProofData.completed_at"></span>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+
+                {{-- Accountability & Approval (Who Completed & Who Approved) --}}
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3);">
+                    {{-- Marked Completed By --}}
+                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
+                        <div style="font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-1); display: flex; align-items: center; gap: 4px;">
+                            <svg style="width: 12px; height: 12px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            <span>Marked Completed By</span>
+                        </div>
+                        <div style="font-weight: 700; font-size: 0.875rem; color: var(--color-ink); margin-bottom: 3px;" x-text="taskProofData.completed_by_name || 'Direct Completion'"></div>
+                        <span class="badge" style="background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-muted); font-size: 0.6875rem;" x-text="taskProofData.completed_by_role || 'Staff / User'"></span>
+                    </div>
+
+                    {{-- Approved & Verified By --}}
+                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
+                        <div style="font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-1); display: flex; align-items: center; gap: 4px;">
+                            <svg style="width: 12px; height: 12px; color: var(--color-success);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                            <span>Approved & Verified By</span>
+                        </div>
+                        <div style="font-weight: 700; font-size: 0.875rem; color: var(--color-ink); margin-bottom: 3px;" x-text="taskProofData.approved_by_name || (taskProofData.is_direct ? 'Direct Sign-off' : 'Manager / Admin')"></div>
+                        <span class="badge" style="background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-muted); font-size: 0.6875rem;" x-text="taskProofData.approved_by_role || (taskProofData.is_direct ? 'Direct Sign-off' : 'Manager / Admin')"></span>
+                    </div>
+                </div>
+
+                {{-- Remarks & Notes --}}
+                <div>
+                    <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: var(--space-1);">
+                        Remarks & Notes
+                    </div>
+                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); max-height: 120px; overflow-y: auto; font-size: 0.875rem; color: var(--color-ink); line-height: 1.5; white-space: pre-wrap;" x-text="taskProofData.notes ? taskProofData.notes : 'No specific remarks or inspection notes recorded.'"></div>
+                </div>
+
+                {{-- Attached Proof Files --}}
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted);">
+                            Attached Proof Files
+                        </div>
+                        <span class="badge" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); color: var(--color-muted); font-size: 0.6875rem; font-weight: 600;" x-text="(taskProofData.files && taskProofData.files.length) ? (taskProofData.files.length + ' file(s)') : '0 files'"></span>
+                    </div>
+
+                    <div style="border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-alt); padding: var(--space-2); max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-2);">
+                        <template x-if="!taskProofData.files || taskProofData.files.length === 0">
+                            <div style="text-align: center; padding: var(--space-4); color: var(--color-muted); font-size: 0.8125rem;">
+                                No proof files were attached to this task.
+                            </div>
+                        </template>
+                        <template x-for="file in (taskProofData.files || [])" :key="file.id || file.name">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);">
+                                <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1;">
+                                    <span style="font-size: 1.125rem; flex-shrink: 0;" x-text="getFileIcon(file.name)"></span>
+                                    <div style="min-width: 0; flex: 1;">
+                                        <div style="font-size: 0.8125rem; font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="file.name" x-text="file.name"></div>
+                                        <div style="font-size: 0.6875rem; color: var(--color-muted);" x-text="file.size"></div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
+                                    <a 
+                                        :href="file.url" 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        class="btn btn-secondary btn-sm"
+                                        style="padding: 2px 8px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px; border-color: var(--color-border); color: var(--color-ink);"
+                                        title="Preview file in new tab"
+                                    >
+                                        <svg style="width: 12px; height: 12px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                        <span>Preview</span>
+                                    </a>
+                                    <a 
+                                        :href="file.url" 
+                                        download 
+                                        class="btn btn-secondary btn-sm"
+                                        style="padding: 2px 8px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px; border-color: var(--color-border); color: var(--color-ink);"
+                                        title="Download file"
+                                    >
+                                        <svg style="width: 12px; height: 12px; color: var(--color-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                        <span>Download</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer" style="display: flex; justify-content: flex-end; padding: var(--space-3) var(--space-5); border-top: 1px solid var(--color-border); flex-shrink: 0;">
+                <button type="button" class="btn btn-secondary" @click="taskProofModalOpen = false">Close</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─── Modal 10: Task Completion Confirmation & Proof Upload Modal ─── --}}
+    <div class="reassign-modal-overlay" style="display: none;" x-show="confirmCompletionModalOpen" x-cloak>
+        <div class="reassign-modal-backdrop" @click="cancelTaskCompletion()"></div>
+        <div class="reassign-modal-content card" x-show="confirmCompletionModalOpen" x-transition style="max-width: 540px; border-top: 4px solid var(--color-accent);">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0;">
+                    <svg style="width: 18px; height: 18px; color: var(--color-success); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    <span style="font-weight: 700; font-size: 0.9375rem;">
+                        {{ Auth::user()->hasRole('Staff') ? 'Submit Task Completion Request' : 'Confirm Task Completion' }}
+                    </span>
+                </div>
+                <button type="button" class="flash-close" @click="cancelTaskCompletion()" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="card-body" style="padding: var(--space-5);">
+                {{-- Task Information Summary --}}
+                <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4);">
+                    <div style="font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: 2px;">
+                        Milestone / Major Task
+                    </div>
+                    <div style="font-size: 0.875rem; font-weight: 600; color: var(--color-ink); margin-bottom: var(--space-2);" x-text="completingSubtask.taskName"></div>
+                    
+                    <div style="font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted); margin-bottom: 2px;">
+                        Specific Task to Complete
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-2); font-size: 0.9375rem; font-weight: 700; color: var(--color-accent);">
+                        <svg style="width: 16px; height: 16px; color: var(--color-success); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        <span x-text="completingSubtask.subtaskTitle"></span>
+                    </div>
+                </div>
+
+                @if(Auth::user()->hasRole('Staff'))
+                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid #f59e0b; padding: var(--space-3); border-radius: var(--radius-sm); margin-bottom: var(--space-4); font-size: 0.8125rem; color: var(--color-ink);">
+                        <strong style="color: #f59e0b;">Staff Submission Notice:</strong> <span style="color: var(--color-muted);">Your remarks and proof attachment will be submitted to the project manager or administrator for review and approval before this task is marked as finished.</span>
+                    </div>
+                @endif
+
+                {{-- Remarks & Notes Field (Multi-line) --}}
+                <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
+                    <label for="completion_notes_input" class="form-label">
+                        Remarks & Notes <span class="text-danger">*</span>
+                    </label>
+                    <textarea
+                        id="completion_notes_input"
+                        x-model="completionNotes"
+                        rows="3"
+                        class="form-control"
+                        placeholder="Enter completion remarks, site observations, technician details, or inspection sign-off..."
+                        required
+                    ></textarea>
+                    <p class="form-hint">Provide detailed completion notes, site observations, or inspection findings.</p>
+                </div>
+
+                {{-- Proof File Attachment Section with Border Separation --}}
+                <div class="completion-attachment-panel" style="border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); background: var(--color-surface-alt); margin-bottom: var(--space-4);">
+                    {{-- Header with separation border --}}
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border);">
+                        <label class="form-label" style="margin-bottom: 0; font-weight: 700; font-size: 0.875rem; color: var(--color-ink); display: flex; align-items: center; gap: 4px;">
+                            <span>Proof of Completion Attachment</span>
+                            <span class="text-danger">*</span>
+                        </label>
+                        <span class="badge" style="background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-muted); font-size: 0.6875rem; font-weight: 600;">
+                            PDF, DOCX, Images (Max 20MB)
+                        </span>
+                    </div>
+
+                    {{-- Hidden file input for single or multiple selection --}}
+                    <input 
+                        type="file" 
+                        x-ref="proofFileInput" 
+                        style="display: none;" 
+                        accept=".pdf,.doc,.docx,image/*"
+                        multiple
+                        @change="handleProofFilesSelected($event)"
+                    >
+
+                    {{-- Empty State / Upload Dropzone --}}
+                    <template x-if="completionFiles.length === 0">
+                        <div 
+                            style="border: 2px dashed var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); text-align: center; background: var(--color-surface); cursor: pointer; transition: all 0.15s ease;"
+                            @click="$refs.proofFileInput.click()"
+                            @dragover.prevent="$el.style.borderColor = 'var(--color-accent)'; $el.style.background = 'var(--color-surface-alt)';"
+                            @dragleave.prevent="$el.style.borderColor = 'var(--color-border)'; $el.style.background = 'var(--color-surface)';"
+                            @drop.prevent="$el.style.borderColor = 'var(--color-border)'; $el.style.background = 'var(--color-surface)'; handleProofFilesDropped($event)"
+                        >
+                            <svg style="width: 28px; height: 28px; color: var(--color-accent); margin: 0 auto 6px auto; display: block;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <div style="font-size: 0.8125rem; font-weight: 600; color: var(--color-ink);">Click or drag &amp; drop to attach proof file(s)</div>
+                            <div class="form-hint" style="margin-top: 2px; font-size: 0.75rem;">Photos, signed inspection sheets, or delivery certificates</div>
+                        </div>
+                    </template>
+
+                    {{-- Populated State: Attached Files List + "Attach Another File" button --}}
+                    <template x-if="completionFiles.length > 0">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                                <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-muted);">
+                                    Attached Proofs (<span x-text="completionFiles.length"></span>)
+                                </span>
+                                <button 
+                                    type="button" 
+                                    class="btn btn-secondary btn-sm" 
+                                    style="font-size: 0.75rem; padding: 3px 10px; display: inline-flex; align-items: center; gap: 5px; border-color: var(--color-border); color: var(--color-ink); background: var(--color-surface);"
+                                    @click="$refs.proofFileInput.click()"
+                                >
+                                    <svg style="width: 13px; height: 13px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                    <span>Attach Another File</span>
+                                </button>
+                            </div>
+
+                            <div style="display: flex; flex-direction: column; gap: var(--space-2); max-height: 180px; overflow-y: auto; padding-right: 2px;">
+                                <template x-for="(item, idx) in completionFiles" :key="idx">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 8px 12px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm);">
+                                        <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1;">
+                                            <span style="font-size: 1.25rem; flex-shrink: 0;" x-text="getFileIcon(item.name)"></span>
+                                            <div style="min-width: 0; flex: 1;">
+                                                <div style="font-size: 0.8125rem; font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="item.name"></div>
+                                                <span style="font-size: 0.6875rem; color: var(--color-muted);" x-text="item.size"></span>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            type="button" 
+                                            class="btn btn-secondary btn-sm" 
+                                            style="color: var(--color-danger); padding: 2px 8px; font-size: 0.75rem; flex-shrink: 0; border-color: var(--color-border); background: var(--color-surface);" 
+                                            @click.stop="removeProofFile(idx)"
+                                            title="Remove file"
+                                        >
+                                            ✕ Remove
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
+                    <p class="form-hint" style="margin-top: var(--space-2); margin-bottom: 0; font-size: 0.75rem;">Proof document or photographic evidence is required before completing this task.</p>
+                </div>
+
+                {{-- Error Message Display --}}
+                <template x-if="completionFileError">
+                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid var(--color-danger); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); margin-top: var(--space-3); font-size: 0.8125rem; color: var(--color-danger);" x-text="completionFileError"></div>
+                </template>
+            </div>
+            <div class="card-footer" style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+                <button 
+                    type="button" 
+                    class="btn btn-secondary" 
+                    @click="cancelTaskCompletion()" 
+                    :disabled="completionSubmitting"
+                >
+                    Cancel
+                </button>
+                <button 
+                    type="button" 
+                    class="btn btn-primary" 
+                    @click="submitTaskCompletion()" 
+                    :disabled="completionSubmitting || !completionNotes.trim() || completionFiles.length === 0"
+                    style="display: inline-flex; align-items: center; gap: 6px;"
+                >
+                    <span x-show="completionSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span x-text="completionSubmitting ? 'Submitting...' : '{{ Auth::user()->hasRole('Staff') ? 'Submit Completion Request' : 'Confirm & Complete Task' }}'"></span>
+                </button>
             </div>
         </div>
     </div>
@@ -3017,6 +3531,7 @@ document.addEventListener('alpine:init', () => {
 function projectDetail() {
     return {
         init() {
+            window.__projectDetailComponent = this;
             const params = new URLSearchParams(window.location.search);
             const taskIdParam = params.get('task_id');
             if (taskIdParam) {
@@ -3026,6 +3541,9 @@ function projectDetail() {
                     this.checklistMinimized = false;
                 }
             }
+            @if(session('staff_submitted') || session('status'))
+                this.expendituresMinimized = false;
+            @endif
         },
         timelineMode: 'minimized',
         archiveModalOpen: false,
@@ -3117,6 +3635,25 @@ function projectDetail() {
         uploadFileModalOpen: false,
         subtaskFileModalOpen: false,
         viewFileModalOpen: false,
+        confirmCompletionModalOpen: false,
+        taskProofModalOpen: false,
+        taskProofData: {},
+        openTaskProofModal(payload) {
+            this.taskProofData = payload || {};
+            this.taskProofModalOpen = true;
+        },
+        completingSubtask: {
+            projectId: null,
+            taskId: null,
+            subtaskId: null,
+            taskName: '',
+            subtaskTitle: '',
+            checkboxEl: null,
+        },
+        completionNotes: '',
+        completionFiles: [],
+        completionFileError: '',
+        completionSubmitting: false,
         selectedMaterialId: '',
         materialSearch: '',
         materialDropdownOpen: false,
@@ -3304,11 +3841,12 @@ function projectDetail() {
             if (!this.activeFileData.delete_url) return;
             this.openDeleteFileModal(this.activeFileData.delete_url, this.activeFileData.name);
         },
-        openSubtaskUploadModal(taskId, subtaskId, title, files = []) {
+        openSubtaskUploadModal(taskId, subtaskId, title, files = [], notes = '') {
             this.activeSubtaskData = {
                 taskId: taskId,
                 subtaskId: subtaskId,
                 title: title,
+                notes: notes || '',
                 files: files || [],
                 uploadUrl: `/projects/{{ $project->id }}/tasks/${taskId}/subtasks/${subtaskId}/files`
             };
@@ -3346,43 +3884,290 @@ function projectDetail() {
                 track.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
             }
         },
-        toggleSubtask(projectId, taskId, subtaskId, checkboxEl) {
+        onSubtaskCheckboxClick(projectId, taskId, subtaskId, taskName, subtaskTitle, checkboxEl) {
+            if (this.pendingSubtasks && this.pendingSubtasks[subtaskId]) {
+                checkboxEl.checked = false;
+                if (window.showToast) {
+                    window.showToast({
+                        type: 'warning',
+                        title: 'Awaiting Review',
+                        message: 'This task completion request is currently pending review by a manager or administrator.',
+                        duration: 5000
+                    });
+                }
+                return;
+            }
+
+            if (this.subtaskLocks && this.subtaskLocks[subtaskId]) {
+                checkboxEl.checked = !checkboxEl.checked;
+                return;
+            }
+
+            if (checkboxEl.checked) {
+                // Keep visually unchecked while confirmation modal is open
+                checkboxEl.checked = false;
+                this.completingSubtask = {
+                    projectId: projectId,
+                    taskId: taskId,
+                    subtaskId: subtaskId,
+                    taskName: taskName,
+                    subtaskTitle: subtaskTitle,
+                    checkboxEl: checkboxEl
+                };
+                this.completionNotes = '';
+                this.completionFiles = [];
+                this.completionFileError = '';
+                this.completionSubmitting = false;
+                this.confirmCompletionModalOpen = true;
+            } else {
+                // Unchecking an already completed task (Admin/Manager only)
+                if (!confirm('Are you sure you want to uncheck this task and mark it as incomplete?')) {
+                    checkboxEl.checked = true;
+                    return;
+                }
+                this.executeToggleSubtask(projectId, taskId, subtaskId, checkboxEl, false);
+            }
+        },
+
+        handleProofFilesSelected(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+            this.addProofFiles(Array.from(files));
+            event.target.value = '';
+        },
+
+        handleProofFilesDropped(event) {
+            const files = event.dataTransfer.files;
+            if (!files || files.length === 0) return;
+            this.addProofFiles(Array.from(files));
+        },
+
+        addProofFiles(newFiles) {
+            this.completionFileError = '';
+            const maxSize = 20 * 1024 * 1024; // 20MB
+            for (const file of newFiles) {
+                if (file.size > maxSize) {
+                    this.completionFileError = `File "${file.name}" exceeds the 20MB limit.`;
+                    continue;
+                }
+                const already = this.completionFiles.some(f => f.name === file.name && f.file.size === file.size);
+                if (!already) {
+                    this.completionFiles.push({
+                        file: file,
+                        name: file.name,
+                        size: (file.size / (1024 * 1024)).toFixed(2) + ' MB'
+                    });
+                }
+            }
+        },
+
+        removeProofFile(index) {
+            this.completionFiles.splice(index, 1);
+        },
+
+        getFileIcon(name) {
+            if (!name) return '📄';
+            const ext = name.split('.').pop().toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return '🖼️';
+            if (['pdf'].includes(ext)) return '📕';
+            if (['doc', 'docx'].includes(ext)) return '📘';
+            if (['xls', 'xlsx'].includes(ext)) return '📗';
+            return '📄';
+        },
+
+        cancelTaskCompletion() {
+            this.confirmCompletionModalOpen = false;
+            const subtaskId = this.completingSubtask ? this.completingSubtask.subtaskId : null;
+            if (subtaskId) {
+                const checkboxes = document.querySelectorAll(`.subtask-check-${subtaskId}`);
+                checkboxes.forEach(cb => { cb.checked = false; });
+            }
+            this.completingSubtask = {};
+            this.completionNotes = '';
+            this.completionFiles = [];
+            this.completionFileError = '';
+            this.completionSubmitting = false;
+        },
+
+        submitTaskCompletion() {
+            if (!this.completingSubtask || !this.completingSubtask.subtaskId) return;
+
+            const notes = (this.completionNotes || '').trim();
+            if (!notes) {
+                this.completionFileError = 'Please enter remarks and notes before confirming.';
+                return;
+            }
+            if (!this.completionFiles || this.completionFiles.length === 0) {
+                this.completionFileError = 'Please attach at least one proof file before confirming.';
+                return;
+            }
+
+            this.completionSubmitting = true;
+            this.completionFileError = '';
+
+            const formData = new FormData();
+            formData.append('_method', 'PATCH');
+            formData.append('notes', notes);
+            formData.append('proof_file', this.completionFiles[0].file);
+            this.completionFiles.forEach(item => {
+                formData.append('proof_files[]', item.file);
+            });
+
+            const projectId = this.completingSubtask.projectId;
+            const taskId = this.completingSubtask.taskId;
+            const subtaskId = this.completingSubtask.subtaskId;
+            const checkboxEl = this.completingSubtask.checkboxEl;
+
             const url = `/projects/${projectId}/tasks/${taskId}/subtasks/${subtaskId}/toggle`;
+
             fetch(url, {
-                method: 'PATCH',
+                method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: JSON.stringify({})
+                body: formData
+            })
+            .then(async res => {
+                let data = {};
+                try {
+                    data = await res.json();
+                } catch (e) {
+                    data = { message: res.statusText || 'Unexpected response from server.' };
+                }
+                return { status: res.status, ok: res.ok, data };
+            })
+            .then(({ status, ok, data }) => {
+                this.completionSubmitting = false;
+
+                if (!ok || !data.success) {
+                    const errorMsg = data.message || (data.errors ? Object.values(data.errors).flat().join(' ') : 'Unable to complete task.');
+                    this.completionFileError = errorMsg;
+                    if (checkboxEl) checkboxEl.checked = false;
+                    if (window.showToast) {
+                        window.showToast({
+                            type: 'error',
+                            title: 'Submission Failed',
+                            message: errorMsg,
+                            duration: 5000
+                        });
+                    }
+                    return;
+                }
+
+                this.confirmCompletionModalOpen = false;
+
+                if (data.pending_approval) {
+                    const checkboxes = document.querySelectorAll(`.subtask-check-${subtaskId}`);
+                    checkboxes.forEach(cb => { cb.checked = false; });
+                    this.pendingSubtasks[subtaskId] = true;
+                    if (data.subtask_locks) {
+                        this.subtaskLocks = data.subtask_locks;
+                    }
+                    window.dispatchEvent(new CustomEvent('refresh-notifications'));
+                    const toastDetail = {
+                        type: 'success',
+                        title: 'Waiting for approval',
+                        message: data.message || 'Your action has been submitted successfully and will be reviewed by your manager or admin to take effect.',
+                        duration: 6500
+                    };
+                    if (window.showToast) {
+                        window.showToast(toastDetail);
+                    } else {
+                        window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
+                    }
+                    return;
+                }
+
+                // Admin / Manager direct completion
+                const checkboxes = document.querySelectorAll(`.subtask-check-${subtaskId}`);
+                checkboxes.forEach(cb => { cb.checked = true; });
+
+                const titleEls = document.querySelectorAll(`.subtask-title-${subtaskId}`);
+                titleEls.forEach(el => {
+                    el.style.textDecoration = 'line-through';
+                    el.style.color = 'var(--color-muted)';
+                });
+
+                window.__proofModalData = window.__proofModalData || {};
+                if (data.proof_modal_data) {
+                    window.__proofModalData[subtaskId] = data.proof_modal_data;
+                }
+                const proofContainers = [
+                    document.getElementById(`subtask-proof-container-${subtaskId}`),
+                    document.getElementById(`expanded-subtask-proof-container-${subtaskId}`)
+                ];
+                proofContainers.forEach(container => {
+                    if (container) {
+                        container.style.display = 'inline-flex';
+                        const btnLabel = 'View';
+                        container.innerHTML = `
+                            <button type="button" onclick="window.__openProofModal(${subtaskId})" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px; border-color: var(--color-border); color: var(--color-ink);" title="${btnLabel}">
+                                <svg style="width: 13px; height: 13px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <span>${btnLabel}</span>
+                            </button>
+                        `;
+                    }
+                });
+
+                this.applySubtaskResponseUI(taskId, subtaskId, data);
+
+                if (window.showToast) {
+                    window.showToast({
+                        type: 'success',
+                        title: 'Task Completed',
+                        message: 'Task marked as done with completion proof recorded.',
+                        duration: 5000
+                    });
+                } else {
+                    window.dispatchEvent(new CustomEvent('show-toast', {
+                        detail: {
+                            type: 'success',
+                            title: 'Task Completed',
+                            message: 'Task marked as done with completion proof recorded.',
+                            duration: 5000
+                        }
+                    }));
+                }
+            })
+            .catch(err => {
+                this.completionSubmitting = false;
+                const netErrMsg = 'A network error occurred while submitting. Please try again.';
+                this.completionFileError = netErrMsg;
+                if (checkboxEl) checkboxEl.checked = false;
+                if (window.showToast) {
+                    window.showToast({
+                        type: 'error',
+                        title: 'Submission Error',
+                        message: netErrMsg,
+                        duration: 5000
+                    });
+                }
+                console.error('Error completing subtask:', err);
+            });
+        },
+
+        executeToggleSubtask(projectId, taskId, subtaskId, checkboxEl, newCompleted) {
+            const url = `/projects/${projectId}/tasks/${taskId}/subtasks/${subtaskId}/toggle`;
+            const formData = new FormData();
+            formData.append('_method', 'PATCH');
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
             })
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    if (data.pending_approval) {
-                        const checkboxes = document.querySelectorAll(`.subtask-check-${subtaskId}`);
-                        checkboxes.forEach(cb => { cb.checked = false; });
-                        if (checkboxEl) {
-                            checkboxEl.checked = false;
-                        }
-                        this.pendingSubtasks[subtaskId] = true;
-                        if (data.subtask_locks) {
-                            this.subtaskLocks = data.subtask_locks;
-                        }
-                        window.dispatchEvent(new CustomEvent('show-toast', {
-                            detail: {
-                                type: 'success',
-                                title: 'Action Submitted',
-                                message: data.message || 'Your action has been submitted successfully and will be reviewed by your manager or admin to take effect.',
-                                duration: 6500
-                            }
-                        }));
-                        return;
-                    }
-
-                    // Keep all checkboxes for this subtask in sync (card checklist & expanded view)
                     const checkboxes = document.querySelectorAll(`.subtask-check-${subtaskId}`);
                     checkboxes.forEach(cb => { cb.checked = data.is_completed; });
 
@@ -3397,158 +4182,24 @@ function projectDetail() {
                         }
                     });
 
-                    const color = data.progress === 100 
-                        ? 'var(--color-success)' 
-                        : (data.progress > 0 ? 'var(--color-accent)' : 'var(--color-border)');
+                    this.applySubtaskResponseUI(taskId, subtaskId, data);
 
-                    // 1. Update Carousel Card Progress Bar, Percentage & Count
-                    const cardProgressText = document.getElementById(`card-progress-text-${taskId}`);
-                    const cardProgressBar = document.getElementById(`card-progress-bar-${taskId}`);
-                    const cardTaskCount = document.getElementById(`card-task-count-${taskId}`);
-                    if (cardProgressText) cardProgressText.textContent = `${data.progress}%`;
-                    if (cardProgressBar) {
-                        cardProgressBar.style.width = `${data.progress}%`;
-                        cardProgressBar.style.background = color;
-                    }
-                    if (cardTaskCount) {
-                        cardTaskCount.textContent = `${data.completed_count}/${data.total_count} tasks`;
-                    }
-
-                    // 2. Update Status Pills (Card & Detail)
-                    const statusLabel = data.status === 'completed' ? 'Completed' : (data.status === 'in_progress' ? 'In Progress' : 'Scheduled');
-                    const statusClass = data.status === 'completed' ? 'completed' : (data.status === 'in_progress' ? 'ongoing' : 'pending');
-
-                    const cardPill = document.getElementById(`card-status-pill-${taskId}`);
-                    if (cardPill) {
-                        cardPill.textContent = statusLabel;
-                        cardPill.className = `status-pill status-pill--${statusClass}`;
-                    }
-
-                    const detailPill = document.getElementById(`detail-status-pill-${taskId}`);
-                    if (detailPill) {
-                        detailPill.textContent = statusLabel;
-                        detailPill.className = `status-pill status-pill--${statusClass}`;
-                    }
-
-                    // 3. Update Expanded View Progress Bar, Text, Count, Status Pill & Dot
-                    const expProgressBar = document.getElementById(`expanded-progress-bar-${taskId}`);
-                    const expProgressText = document.getElementById(`expanded-progress-text-${taskId}`);
-                    const expProgressCount = document.getElementById(`expanded-progress-count-${taskId}`);
-                    const expStatusPill = document.getElementById(`expanded-status-pill-${taskId}`);
-                    const expDot = document.getElementById(`expanded-week-dot-${taskId}`);
-
-                    if (expProgressBar) {
-                        expProgressBar.style.width = `${data.progress}%`;
-                        expProgressBar.style.background = color;
-                    }
-                    if (expProgressText) expProgressText.textContent = `${data.progress}%`;
-                    if (expProgressCount) expProgressCount.textContent = `Progress (${data.completed_count}/${data.total_count} tasks)`;
-                    if (expStatusPill) {
-                        expStatusPill.textContent = statusLabel;
-                        expStatusPill.className = `status-pill status-pill--${statusClass}`;
-                    }
-                    if (expDot) {
-                        if (data.status === 'completed') {
-                            expDot.className = 'timeline-week-dot timeline-week-dot--passed';
-                            expDot.textContent = '✓';
-                        } else if (data.status === 'in_progress') {
-                            expDot.className = 'timeline-week-dot timeline-week-dot--current';
-                            expDot.textContent = expDot.getAttribute('data-week-num') || '';
-                        } else {
-                            expDot.className = 'timeline-week-dot';
-                            expDot.textContent = expDot.getAttribute('data-week-num') || '';
+                    window.dispatchEvent(new CustomEvent('show-toast', {
+                        detail: {
+                            type: 'info',
+                            title: 'Task Incomplete',
+                            message: 'Task marked as incomplete.',
+                            duration: 4000
                         }
-                    }
-
-                    // 4. Update Overall Project Progress in Timeline Card Header
-                    const overallContainer = document.getElementById('project-overall-progress-container');
-                    const overallProgressText = document.getElementById('project-overall-progress-text');
-                    const overallCountText = document.getElementById('project-overall-count-text');
-                    if (overallContainer) overallContainer.style.display = '';
-                    if (overallProgressText && data.overall_progress !== undefined) {
-                        overallProgressText.textContent = `${data.overall_progress}%`;
-                        overallProgressText.style.color = data.overall_progress === 100 ? 'var(--color-success)' : 'var(--color-accent)';
-                    }
-                    if (overallCountText && data.completed_subtasks_across_project !== undefined) {
-                        overallCountText.textContent = `(${data.completed_subtasks_across_project}/${data.total_subtasks_across_project} tasks)`;
-                    }
-
-                    // 5. Refresh project status badge in overview header if updated
-                    if (data.project_status) {
-                        const projectPill = document.getElementById('project-overview-status-pill');
-                        if (projectPill) {
-                            projectPill.textContent = data.project_status_label;
-                            const pillClass = (data.project_status === 'ongoing' || data.project_status === 'in_progress') ? 'ongoing' : data.project_status;
-                            projectPill.className = `status-pill status-pill--${pillClass}`;
-                        }
-                    }
-
-                    // 6. Dynamically update Audit Trail & Status History table
-                    const tbody = document.getElementById('audit-trail-tbody');
-                    if (tbody) {
-                        const appendAuditRow = (entry) => {
-                            const emptyRow = document.getElementById('audit-trail-empty-row');
-                            if (emptyRow) {
-                                emptyRow.remove();
-                            }
-                            const tr = document.createElement('tr');
-                            const pillClass = (entry.status === 'ongoing' || entry.status === 'in_progress') ? 'ongoing' : entry.status;
-                            tr.innerHTML = `
-                                <td class="font-mono" style="font-size: 0.8125rem; white-space: nowrap;">
-                                    ${entry.date_time}
-                                </td>
-                                <td>
-                                    <span class="status-pill status-pill--${pillClass}">
-                                        <span class="status-dot"></span>
-                                        ${entry.status_label}
-                                    </span>
-                                </td>
-                                <td>
-                                    <strong>${entry.user_name}</strong>
-                                </td>
-                                <td>
-                                    ${entry.notes}
-                                </td>
-                            `;
-                            tbody.prepend(tr);
-                        };
-
-                        if (data.transition_audit_entry) {
-                            appendAuditRow(data.transition_audit_entry);
-                        }
-                        if (data.audit_entry) {
-                            appendAuditRow(data.audit_entry);
-                        }
-
-                        const countEl = document.getElementById('audit-trail-count');
-                        if (countEl) {
-                            const currentRows = tbody.querySelectorAll('tr').length;
-                            countEl.textContent = `${currentRows} ${currentRows === 1 ? 'event' : 'events'}`;
-                        }
-                    }
-
-                    // 7. Pop up completion confirmation modal if all subtasks across the project are completed
-                    if (data.prompt_completion) {
-                        this.markCompletedModalOpen = true;
-                    }
-
-                    // 8. Update subtaskLocks map so succeeding checkboxes unlock or lock sequentially
-                    if (data.subtask_locks) {
-                        this.subtaskLocks = data.subtask_locks;
-                    }
-                    if (data.subtask_completed) {
-                        this.subtaskCompleted = data.subtask_completed;
-                    } else {
-                        this.subtaskCompleted[subtaskId] = data.is_completed;
-                    }
+                    }));
                 } else if (data.message) {
                     if (checkboxEl) {
-                        checkboxEl.checked = data.already_pending ? false : !checkboxEl.checked;
+                        checkboxEl.checked = !newCompleted;
                     }
                     window.dispatchEvent(new CustomEvent('show-toast', {
                         detail: {
                             type: 'warning',
-                            title: data.already_pending ? 'Already Pending Review' : 'Sequential Task Progression',
+                            title: 'Sequential Task Progression',
                             message: data.message,
                             duration: 5000
                         }
@@ -3558,12 +4209,169 @@ function projectDetail() {
             .catch(err => {
                 console.error('Error toggling subtask:', err);
                 if (checkboxEl) {
-                    checkboxEl.checked = !checkboxEl.checked;
+                    checkboxEl.checked = !newCompleted;
                 }
             });
+        },
+
+        toggleSubtask(projectId, taskId, subtaskId, checkboxEl) {
+            this.executeToggleSubtask(projectId, taskId, subtaskId, checkboxEl, false);
+        },
+
+        applySubtaskResponseUI(taskId, subtaskId, data) {
+            const color = data.progress === 100 
+                ? 'var(--color-success)' 
+                : (data.progress > 0 ? 'var(--color-accent)' : 'var(--color-border)');
+
+            // 1. Update Carousel Card Progress Bar, Percentage & Count
+            const cardProgressText = document.getElementById(`card-progress-text-${taskId}`);
+            const cardProgressBar = document.getElementById(`card-progress-bar-${taskId}`);
+            const cardTaskCount = document.getElementById(`card-task-count-${taskId}`);
+            if (cardProgressText) cardProgressText.textContent = `${data.progress}%`;
+            if (cardProgressBar) {
+                cardProgressBar.style.width = `${data.progress}%`;
+                cardProgressBar.style.background = color;
+            }
+            if (cardTaskCount) {
+                cardTaskCount.textContent = `${data.completed_count}/${data.total_count} tasks`;
+            }
+
+            // 2. Update Status Pills (Card & Detail)
+            const statusLabel = data.status === 'completed' ? 'Completed' : (data.status === 'in_progress' ? 'In Progress' : 'Scheduled');
+            const statusClass = data.status === 'completed' ? 'completed' : (data.status === 'in_progress' ? 'ongoing' : 'pending');
+
+            const cardPill = document.getElementById(`card-status-pill-${taskId}`);
+            if (cardPill) {
+                cardPill.textContent = statusLabel;
+                cardPill.className = `status-pill status-pill--${statusClass}`;
+            }
+
+            const detailPill = document.getElementById(`detail-status-pill-${taskId}`);
+            if (detailPill) {
+                detailPill.textContent = statusLabel;
+                detailPill.className = `status-pill status-pill--${statusClass}`;
+            }
+
+            // 3. Update Expanded View Progress Bar, Text, Count, Status Pill & Dot
+            const expProgressBar = document.getElementById(`expanded-progress-bar-${taskId}`);
+            const expProgressText = document.getElementById(`expanded-progress-text-${taskId}`);
+            const expProgressCount = document.getElementById(`expanded-progress-count-${taskId}`);
+            const expStatusPill = document.getElementById(`expanded-status-pill-${taskId}`);
+            const expDot = document.getElementById(`expanded-week-dot-${taskId}`);
+
+            if (expProgressBar) {
+                expProgressBar.style.width = `${data.progress}%`;
+                expProgressBar.style.background = color;
+            }
+            if (expProgressText) expProgressText.textContent = `${data.progress}%`;
+            if (expProgressCount) expProgressCount.textContent = `Progress (${data.completed_count}/${data.total_count} tasks)`;
+            if (expStatusPill) {
+                expStatusPill.textContent = statusLabel;
+                expStatusPill.className = `status-pill status-pill--${statusClass}`;
+            }
+            if (expDot) {
+                if (data.status === 'completed') {
+                    expDot.className = 'timeline-week-dot timeline-week-dot--passed';
+                    expDot.textContent = '✓';
+                } else if (data.status === 'in_progress') {
+                    expDot.className = 'timeline-week-dot timeline-week-dot--current';
+                    expDot.textContent = expDot.getAttribute('data-week-num') || '';
+                } else {
+                    expDot.className = 'timeline-week-dot';
+                    expDot.textContent = expDot.getAttribute('data-week-num') || '';
+                }
+            }
+
+            // 4. Update Overall Project Progress in Timeline Card Header
+            const overallContainer = document.getElementById('project-overall-progress-container');
+            const overallProgressText = document.getElementById('project-overall-progress-text');
+            const overallCountText = document.getElementById('project-overall-count-text');
+            if (overallContainer) overallContainer.style.display = '';
+            if (overallProgressText && data.overall_progress !== undefined) {
+                overallProgressText.textContent = `${data.overall_progress}%`;
+                overallProgressText.style.color = data.overall_progress === 100 ? 'var(--color-success)' : 'var(--color-accent)';
+            }
+            if (overallCountText && data.completed_subtasks_across_project !== undefined) {
+                overallCountText.textContent = `(${data.completed_subtasks_across_project}/${data.total_subtasks_across_project} tasks)`;
+            }
+
+            // 5. Refresh project status badge in overview header if updated
+            if (data.project_status) {
+                const projectPill = document.getElementById('project-overview-status-pill');
+                if (projectPill) {
+                    projectPill.textContent = data.project_status_label;
+                    const pillClass = (data.project_status === 'ongoing' || data.project_status === 'in_progress') ? 'ongoing' : data.project_status;
+                    projectPill.className = `status-pill status-pill--${pillClass}`;
+                }
+            }
+
+            // 6. Dynamically update Audit Trail & Status History table
+            const tbody = document.getElementById('audit-trail-tbody');
+            if (tbody) {
+                const appendAuditRow = (entry) => {
+                    const emptyRow = document.getElementById('audit-trail-empty-row');
+                    if (emptyRow) {
+                        emptyRow.remove();
+                    }
+                    const tr = document.createElement('tr');
+                    const pillClass = (entry.status === 'ongoing' || entry.status === 'in_progress') ? 'ongoing' : entry.status;
+                    tr.innerHTML = `
+                        <td class="font-mono" style="font-size: 0.8125rem; white-space: nowrap;">
+                            ${entry.date_time}
+                        </td>
+                        <td>
+                            <span class="status-pill status-pill--${pillClass}">
+                                <span class="status-dot"></span>
+                                ${entry.status_label}
+                            </span>
+                        </td>
+                        <td>
+                            <strong>${entry.user_name}</strong>
+                        </td>
+                        <td>
+                            ${entry.notes}
+                        </td>
+                    `;
+                    tbody.prepend(tr);
+                };
+
+                if (data.transition_audit_entry) {
+                    appendAuditRow(data.transition_audit_entry);
+                }
+                if (data.audit_entry) {
+                    appendAuditRow(data.audit_entry);
+                }
+
+                const countEl = document.getElementById('audit-trail-count');
+                if (countEl) {
+                    const currentRows = tbody.querySelectorAll('tr').length;
+                    countEl.textContent = `${currentRows} ${currentRows === 1 ? 'event' : 'events'}`;
+                }
+            }
+
+            // 7. Pop up completion confirmation modal if all subtasks across the project are completed
+            if (data.prompt_completion) {
+                this.markCompletedModalOpen = true;
+            }
+
+            // 8. Update subtaskLocks map so succeeding checkboxes unlock or lock sequentially
+            if (data.subtask_locks) {
+                this.subtaskLocks = data.subtask_locks;
+            }
+            if (data.subtask_completed) {
+                this.subtaskCompleted = data.subtask_completed;
+            } else {
+                this.subtaskCompleted[subtaskId] = data.is_completed;
+            }
         }
     };
 }
 window.projectDetail = projectDetail;
+
+window.__openProofModal = function(subtaskId) {
+    if (window.__proofModalData && window.__proofModalData[subtaskId] && window.__projectDetailComponent) {
+        window.__projectDetailComponent.openTaskProofModal(window.__proofModalData[subtaskId]);
+    }
+};
 </script>
 @endpush

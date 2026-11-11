@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Personnel;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\User;
@@ -81,6 +82,7 @@ class ProjectService
                 'warranty_period' => $warrantyPeriod,
                 'warranty_end_date' => $warrantyEndDate,
                 'payment_status' => $validated['payment_status'] ?? 'Partial',
+                'payment_terms' => ($validated['payment_status'] ?? '') === 'Partial' ? ($validated['payment_terms'] ?? null) : null,
                 'project_code' => $this->generateProjectCode(),
                 'status' => 'pending',
                 'start_date' => $startDate,
@@ -97,6 +99,81 @@ class ProjectService
             // Handle optional invoice attachment if provided
             if (isset($validated['invoice_file']) && $validated['invoice_file'] instanceof \Illuminate\Http\UploadedFile) {
                 $this->storeProjectFile($project, $validated['invoice_file'], 'invoice', $user->id, 'Initial project invoice attachment.');
+            }
+
+            // Assign selected manpower (Required)
+            if (!empty($validated['personnel_ids']) && is_array($validated['personnel_ids'])) {
+                $personnelList = Personnel::whereIn('id', $validated['personnel_ids'])->get();
+                $now = $startDate ?? now()->toDateString();
+                foreach ($personnelList as $personnel) {
+                    $oldProjectId = $personnel->project_id;
+                    if ($oldProjectId && $oldProjectId != $project->id) {
+                        \App\Models\ProjectPersonnelHistory::where('project_id', $oldProjectId)
+                            ->where('personnel_id', $personnel->id)
+                            ->whereNull('released_at')
+                            ->update([
+                                'released_at'    => $now,
+                                'release_reason' => 'reassigned',
+                                'released_by'    => $user->id,
+                            ]);
+                    }
+
+                    $personnel->update([
+                        'project_id'    => $project->id,
+                        'date_assigned' => $now,
+                        'updated_by'    => $user->id,
+                    ]);
+
+                    \App\Models\ProjectPersonnelHistory::create([
+                        'project_id'   => $project->id,
+                        'personnel_id' => $personnel->id,
+                        'assigned_at'  => $now,
+                        'assigned_by'  => $user->id,
+                    ]);
+                }
+
+                $count = $personnelList->count();
+                $manpowerSummary = $personnelList->map(fn ($p) => "{$p->employee_id} ({$p->full_name} - {$p->expertise})")->implode(', ');
+                \App\Models\ProjectStatusHistory::create([
+                    'project_id'  => $project->id,
+                    'from_status' => 'pending',
+                    'to_status'   => 'pending',
+                    'notes'       => $count === 1
+                        ? "Assigned initial manpower: {$manpowerSummary}"
+                        : "Assigned initial manpower team ({$count}): {$manpowerSummary}",
+                    'changed_by'  => $user->id,
+                    'changed_at'  => now(),
+                ]);
+
+                $this->notificationService->notifyManpowerAssigned($project, $personnelList);
+            }
+
+            // Handle optional initial materials / expenditures
+            if (!empty($validated['expenses']) && is_array($validated['expenses'])) {
+                foreach ($validated['expenses'] as $expenseData) {
+                    if (!empty($expenseData['description']) && !empty($expenseData['amount'])) {
+                        $this->addCost($project, [
+                            'resource_id'   => !empty($expenseData['resource_id']) ? (int) $expenseData['resource_id'] : null,
+                            'description'   => $expenseData['description'],
+                            'cost_type'     => !empty($expenseData['resource_id']) ? 'materials' : ($expenseData['cost_type'] ?? 'materials'),
+                            'amount'        => $expenseData['amount'],
+                            'quantity'      => !empty($expenseData['quantity']) ? (int) $expenseData['quantity'] : 1,
+                            'incurred_date' => $startDate ?? now()->toDateString(),
+                            'created_by'    => $user->id,
+                        ]);
+                    }
+                }
+            }
+
+            // Handle categorized multi-file attachments
+            if (!empty($validated['attachments']) && is_array($validated['attachments'])) {
+                foreach ($validated['attachments'] as $att) {
+                    if (!empty($att['file']) && $att['file'] instanceof \Illuminate\Http\UploadedFile) {
+                        $category = !empty($att['category']) ? $att['category'] : 'project_document';
+                        $description = $att['description'] ?? null;
+                        $this->storeProjectFile($project, $att['file'], $category, $user->id, $description);
+                    }
+                }
             }
 
             $stats = Project::getDashboardStats();
@@ -205,6 +282,7 @@ class ProjectService
             'warranty_end_date' => $warrantyEndDate,
             'status' => $targetStatus,
             'payment_status' => $validated['payment_status'] ?? $project->payment_status,
+            'payment_terms' => ($validated['payment_status'] ?? $project->payment_status) === 'Partial' ? ($validated['payment_terms'] ?? $project->payment_terms) : null,
             'start_date' => $startDate,
             'target_completion_date' => $validated['target_completion_date'] ?? $project->target_completion_date,
             'contract_price' => $validated['contract_price'] ?? $project->contract_price,

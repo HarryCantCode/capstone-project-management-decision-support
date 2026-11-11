@@ -323,6 +323,28 @@ class StaffPendingActionService
         $payload = $action->payload ?? [];
         $fileExists = !empty($payload['file_path']) && $action->status !== 'rejected' && Storage::disk('public')->exists($payload['file_path']);
 
+        $filesList = [];
+        if (!empty($payload['files']) && is_array($payload['files'])) {
+            foreach ($payload['files'] as $fItem) {
+                $exists = !empty($fItem['file_path']) && $action->status !== 'rejected' && Storage::disk('public')->exists($fItem['file_path']);
+                $filesList[] = [
+                    'name' => $fItem['file_name'] ?? 'Proof File',
+                    'path' => $fItem['file_path'] ?? '',
+                    'size' => !empty($fItem['file_size']) ? number_format($fItem['file_size'] / 1048576, 2) . ' MB' : '0 MB',
+                    'exists' => $exists,
+                    'url' => $exists ? asset('storage/' . $fItem['file_path']) : null,
+                ];
+            }
+        } elseif ($fileExists) {
+            $filesList[] = [
+                'name' => $payload['file_name'] ?? 'Proof File',
+                'path' => $payload['file_path'],
+                'size' => !empty($payload['file_size']) ? number_format($payload['file_size'] / 1048576, 2) . ' MB' : '0 MB',
+                'exists' => true,
+                'url' => asset('storage/' . $payload['file_path']),
+            ];
+        }
+
         return [
             'id' => $action->id,
             'action_type' => $action->action_type,
@@ -342,6 +364,7 @@ class StaffPendingActionService
             'payload' => $payload,
             'file_exists' => $fileExists,
             'file_url' => $fileExists ? asset('storage/' . $payload['file_path']) : null,
+            'files' => $filesList,
             'submitted_at' => $action->created_at?->format('M j, Y · g:i A') ?? 'N/A',
             'submitted_diff' => $action->created_at?->diffForHumans() ?? '',
             'submitted_timestamp' => $action->created_at?->timestamp ?? 0,
@@ -391,7 +414,7 @@ class StaffPendingActionService
 
             match ($lockedAction->action_type) {
                 'add_expense' => $this->executeAddExpense($project, $lockedAction->user_id, $payload),
-                'complete_subtask' => $this->executeCompleteSubtask($project, $lockedAction->user?->name ?? 'Staff', $reviewerId, $payload),
+                'complete_subtask' => $this->executeCompleteSubtask($project, $lockedAction->user?->name ?? 'Staff', $reviewerId, $payload, $lockedAction->user_id),
                 'add_file' => $this->executeAddFile($project, $lockedAction->user_id, $payload),
                 default => null,
             };
@@ -441,9 +464,17 @@ class StaffPendingActionService
                 ];
             }
 
-            if ($lockedAction->action_type === 'add_file' && !empty($lockedAction->payload['file_path'])) {
-                if (Storage::disk('public')->exists($lockedAction->payload['file_path'])) {
-                    Storage::disk('public')->delete($lockedAction->payload['file_path']);
+            if (in_array($lockedAction->action_type, ['add_file', 'complete_subtask'], true)) {
+                if (!empty($lockedAction->payload['files']) && is_array($lockedAction->payload['files'])) {
+                    foreach ($lockedAction->payload['files'] as $fItem) {
+                        if (!empty($fItem['file_path']) && Storage::disk('public')->exists($fItem['file_path'])) {
+                            Storage::disk('public')->delete($fItem['file_path']);
+                        }
+                    }
+                } elseif (!empty($lockedAction->payload['file_path'])) {
+                    if (Storage::disk('public')->exists($lockedAction->payload['file_path'])) {
+                        Storage::disk('public')->delete($lockedAction->payload['file_path']);
+                    }
                 }
             }
 
@@ -539,7 +570,7 @@ class StaffPendingActionService
         $this->projectService->addCost($project, $costData);
     }
 
-    private function executeCompleteSubtask($project, string $staffName, int $reviewerId, array $payload): void
+    private function executeCompleteSubtask($project, string $staffName, int $reviewerId, array $payload, ?int $staffUserId = null): void
     {
         $subtaskId = $payload['subtask_id'] ?? null;
         if (!$subtaskId) {
@@ -554,10 +585,45 @@ class StaffPendingActionService
         $task = $subtask->task;
         $wasCompleted = $task && $task->status === 'completed';
 
+        $notes = $payload['notes'] ?? null;
+
         $subtask->update([
             'is_completed' => true,
             'completed_at' => now(),
+            'completed_by' => $staffUserId ?: ($project->created_by ?? 1),
+            'approved_by' => $reviewerId ?: ($project->created_by ?? 1),
+            'notes' => $notes,
         ]);
+
+        $filesToCreate = [];
+        if (!empty($payload['files']) && is_array($payload['files'])) {
+            $filesToCreate = $payload['files'];
+        } elseif (!empty($payload['file_path'])) {
+            $filesToCreate[] = [
+                'file_name' => $payload['file_name'] ?? 'Proof File',
+                'file_path' => $payload['file_path'],
+                'mime_type' => $payload['mime_type'] ?? 'application/octet-stream',
+                'file_size' => $payload['file_size'] ?? 0,
+            ];
+        }
+
+        foreach ($filesToCreate as $fData) {
+            if (!empty($fData['file_path'])) {
+                $projectFile = ProjectFile::create([
+                    'project_id' => $project->id,
+                    'project_subtask_id' => $subtask->id,
+                    'uploaded_by' => $reviewerId ?: ($project->created_by ?? 1),
+                    'file_name' => $fData['file_name'] ?? 'Proof File',
+                    'file_path' => $fData['file_path'],
+                    'file_type' => 'task_attachment',
+                    'mime_type' => $fData['mime_type'] ?? 'application/octet-stream',
+                    'file_size' => $fData['file_size'] ?? 0,
+                    'description' => $notes ?? "Proof of completion for '{$subtask->title}'",
+                ]);
+
+                $this->notificationService->notifyFileUpload($project, $projectFile);
+            }
+        }
 
         if ($task) {
             $task->load('subtasks');

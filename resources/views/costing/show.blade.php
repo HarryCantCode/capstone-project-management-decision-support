@@ -247,7 +247,7 @@
             @endif
         </div>
 
-        @if ($costs->isEmpty())
+        @if ($costs->isEmpty() && ($pendingExpenses ?? collect())->isEmpty())
             <div class="card-body">
                 <div class="empty-state">
                     <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -279,6 +279,15 @@
                 </div>
             </div>
         @else
+            @if (($pendingExpenses ?? collect())->isNotEmpty())
+                <div style="background: rgba(245, 158, 11, 0.08); border-bottom: 1px solid rgba(245, 158, 11, 0.25); padding: var(--space-2) var(--space-6); display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #f59e0b; color: #fff; font-size: 11px; font-weight: bold;">⏳</span>
+                        <span style="color: var(--color-ink);"><strong>{{ $pendingExpenses->count() }} {{ Str::plural('Expense', $pendingExpenses->count()) }} Pending Approval:</strong> Submitted by staff and awaiting review by a Manager or Administrator.</span>
+                    </div>
+                    <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.75rem;">Grayed out entries are pending review</span>
+                </div>
+            @endif
             <div class="table-wrapper">
                 <table class="data-table">
                     <caption class="visually-hidden">Complete cost breakdown for {{ $project->name }}</caption>
@@ -294,6 +303,65 @@
                         </tr>
                     </thead>
                     <tbody>
+                        {{-- Pending Expenses submitted by Staff (grayed out with pending indicator) --}}
+                        @foreach (($pendingExpenses ?? []) as $pendingExpense)
+                            <tr 
+                                class="expense-row-pending"
+                                style="opacity: 0.65; background: var(--color-surface-alt); transition: opacity 0.2s ease;"
+                                onmouseover="this.style.opacity='0.85'" 
+                                onmouseout="this.style.opacity='0.65'"
+                            >
+                                <td>
+                                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                        <strong style="color: var(--color-muted);">{{ $pendingExpense->payload['description'] ?? 'Expense Entry' }}</strong>
+                                        <span class="status-pill status-pill--ongoing" style="font-size: 0.6875rem; padding: 1px 8px; background: rgba(245, 158, 11, 0.15); color: #d97706; border-color: rgba(245, 158, 11, 0.3);" title="Awaiting Manager or Admin approval">
+                                            Pending Review
+                                        </span>
+                                    </div>
+                                    @if(!empty($pendingExpense->payload['resource_name']))
+                                        <div style="font-size: 0.75rem; color: var(--color-muted);">Catalog: {{ $pendingExpense->payload['resource_name'] }}</div>
+                                    @endif
+                                </td>
+                                <td>
+                                    <span class="badge" style="background: var(--color-surface); text-transform: capitalize; color: var(--color-muted); font-weight: 600;">
+                                        {{ $pendingExpense->payload['cost_type'] ?? 'materials' }}
+                                    </span>
+                                </td>
+                                <td class="text-center font-mono font-bold" style="color: var(--color-muted);">
+                                    {{ $pendingExpense->payload['quantity'] ?? 1 }}
+                                </td>
+                                <td class="cell-numeric font-mono" style="color: var(--color-muted); font-size: 0.9375rem; font-style: italic;">
+                                    ₱{{ number_format((float) ($pendingExpense->payload['amount'] ?? 0), 2) }}
+                                </td>
+                                <td class="font-mono" style="color: var(--color-muted);">
+                                    {{ !empty($pendingExpense->payload['incurred_date']) ? \Carbon\Carbon::parse($pendingExpense->payload['incurred_date'])->format('M j, Y') : $pendingExpense->created_at->format('M j, Y') }}
+                                </td>
+                                <td style="color: var(--color-muted);">
+                                    {{ $pendingExpense->user ? $pendingExpense->user->name : 'Staff' }}
+                                </td>
+                                <td class="text-right">
+                                    @if(Auth::user()->hasAnyRole(['Admin', 'Manager']))
+                                        <a 
+                                            href="{{ route('pending-actions.index', ['action_type' => 'add_expense', 'project_id' => $project->id]) }}" 
+                                            class="btn btn-secondary btn-sm" 
+                                            style="padding: 1px 8px; font-size: 0.75rem; border-color: rgba(245, 158, 11, 0.4); color: #d97706;"
+                                            title="Review this staff expense in Pending Actions"
+                                        >
+                                            Review
+                                        </a>
+                                    @else
+                                        <a 
+                                            href="{{ route('approval-list.index', ['action_type' => 'add_expense', 'project_id' => $project->id]) }}" 
+                                            class="status-pill status-pill--ongoing" 
+                                            style="font-size: 0.6875rem; padding: 1px 8px; text-decoration: none;"
+                                            title="View in your Approval List"
+                                        >
+                                            Awaiting Review
+                                        </a>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
                         @foreach ($costs as $cost)
                             <tr>
                                 <td>

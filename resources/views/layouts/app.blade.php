@@ -60,6 +60,172 @@
             transition: background-color 5000s ease-in-out 0s;
             caret-color: #F1F5F9;
         }
+
+        /* ─── Global Toast Notifications ─── */
+        .app-toast-container {
+            position: fixed;
+            top: 1.5rem;
+            left: 0;
+            right: 0;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            gap: 0.75rem !important;
+            z-index: 99999 !important;
+            pointer-events: none !important;
+            padding: 0 1rem !important;
+        }
+
+        .app-toast-item {
+            pointer-events: auto !important;
+            width: 100% !important;
+            max-width: 480px !important;
+            margin: 0 auto !important;
+        }
+
+        .app-toast-card {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: flex-start !important;
+            justify-content: space-between !important;
+            gap: 0.875rem !important;
+            padding: 1rem 1.25rem !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.15) !important;
+            border-width: 1px !important;
+            border-style: solid !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        .app-toast-card--success {
+            background: #064e3b !important;
+            border-color: #059669 !important;
+            color: #ecfdf5 !important;
+        }
+        .app-toast-card--success .app-toast-icon {
+            background: #10b981 !important;
+            color: #ffffff !important;
+        }
+        .app-toast-card--success .app-toast-title {
+            color: #ffffff !important;
+        }
+        .app-toast-card--success .app-toast-message {
+            color: #d1fae5 !important;
+        }
+        .app-toast-card--success .app-toast-close {
+            color: #a7f3d0 !important;
+        }
+
+        .app-toast-card--error {
+            background: #7f1d1d !important;
+            border-color: #dc2626 !important;
+            color: #fef2f2 !important;
+        }
+        .app-toast-card--error .app-toast-icon {
+            background: #ef4444 !important;
+            color: #ffffff !important;
+        }
+        .app-toast-card--error .app-toast-title {
+            color: #ffffff !important;
+        }
+        .app-toast-card--error .app-toast-message {
+            color: #fee2e2 !important;
+        }
+        .app-toast-card--error .app-toast-close {
+            color: #fca5a5 !important;
+        }
+
+        .app-toast-card--warning {
+            background: #78350f !important;
+            border-color: #d97706 !important;
+            color: #fffbeb !important;
+        }
+        .app-toast-card--warning .app-toast-icon {
+            background: #f59e0b !important;
+            color: #ffffff !important;
+        }
+        .app-toast-card--warning .app-toast-title {
+            color: #ffffff !important;
+        }
+        .app-toast-card--warning .app-toast-message {
+            color: #fef3c7 !important;
+        }
+        .app-toast-card--warning .app-toast-close {
+            color: #fde68a !important;
+        }
+
+        .app-toast-card--info {
+            background: #1e3a8a !important;
+            border-color: #3b82f6 !important;
+            color: #eff6ff !important;
+        }
+        .app-toast-card--info .app-toast-icon {
+            background: #3b82f6 !important;
+            color: #ffffff !important;
+        }
+        .app-toast-card--info .app-toast-title {
+            color: #ffffff !important;
+        }
+        .app-toast-card--info .app-toast-message {
+            color: #dbeafe !important;
+        }
+        .app-toast-card--info .app-toast-close {
+            color: #bfdbfe !important;
+        }
+
+        .app-toast-icon {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 24px !important;
+            height: 24px !important;
+            border-radius: 50% !important;
+            flex-shrink: 0 !important;
+            font-size: 13px !important;
+            font-weight: 700 !important;
+            line-height: 1 !important;
+            margin-top: 2px !important;
+        }
+
+        .app-toast-body {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 0.15rem !important;
+        }
+
+        .app-toast-title {
+            font-weight: 600 !important;
+            font-size: 0.9375rem !important;
+            line-height: 1.35 !important;
+            margin: 0 !important;
+        }
+
+        .app-toast-message {
+            font-size: 0.84375rem !important;
+            line-height: 1.45 !important;
+            margin: 0 !important;
+            word-break: break-word !important;
+        }
+
+        .app-toast-close {
+            background: transparent !important;
+            border: none !important;
+            cursor: pointer !important;
+            padding: 0 0.25rem !important;
+            font-size: 1.35rem !important;
+            line-height: 1 !important;
+            flex-shrink: 0 !important;
+            margin-top: -2px !important;
+            opacity: 0.8 !important;
+            transition: opacity 0.15s ease, transform 0.15s ease !important;
+        }
+        .app-toast-close:hover {
+            opacity: 1 !important;
+            transform: scale(1.1) !important;
+        }
     </style>
     @stack('styles')
 </head>
@@ -475,6 +641,7 @@
                         x-data="notificationBell()"
                         @click.outside="open = false"
                         @keydown.escape.window="open = false"
+                        @refresh-notifications.window="fetchUnreadCount()"
                     >
                         <button
                             type="button"
@@ -606,8 +773,13 @@
                                                     <template x-if="notification.type === 'staff_action_review'">
                                                         <span class="status-pill status-pill--pending" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border-color: rgba(245, 158, 11, 0.3);">Review Required</span>
                                                     </template>
+                                                    <template x-if="notification.type === 'staff_action_pending'">
+                                                        <span class="status-pill status-pill--pending" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border-color: rgba(245, 158, 11, 0.3);">Waiting For Approval</span>
+                                                    </template>
                                                     <template x-if="notification.type === 'staff_action_decision'">
-                                                        <span class="status-pill status-pill--completed">Action Decision</span>
+                                                        <span class="status-pill" :class="notification.data?.decision === 'rejected' ? 'status-pill--danger' : 'status-pill--completed'">
+                                                            <span x-text="notification.data?.decision === 'rejected' ? 'Action Rejected' : 'Action Approved'"></span>
+                                                        </span>
                                                     </template>
                                                     <template x-if="notification.type === 'warranty_expiry'">
                                                         <span class="status-pill status-pill--ongoing">Warranty</span>
@@ -957,9 +1129,11 @@
 
             {{-- Global Toast Notifications (Centered auto-dismissing floating alert) --}}
             <div
+                class="app-toast-container"
                 x-data="{
                     toasts: [],
                     init() {
+                        window.__dexAddToast = (t) => this.add(t);
                         const savedToast = sessionStorage.getItem('dex_pending_toast');
                         if (savedToast) {
                             sessionStorage.removeItem('dex_pending_toast');
@@ -970,47 +1144,45 @@
                         }
                     },
                     add(toast) {
+                        if (!toast) return;
                         const id = Date.now() + Math.random();
                         const t = {
                             id,
                             type: toast.type || 'info',
-                            title: toast.title || (toast.type === 'error' ? 'Error' : (toast.type === 'warning' ? 'Notice' : 'Notification')),
+                            title: toast.title || (toast.type === 'error' ? 'Error' : (toast.type === 'warning' ? 'Notice' : (toast.type === 'success' ? 'Success' : 'Notification'))),
                             message: toast.message || ''
                         };
                         this.toasts.push(t);
-                        setTimeout(() => this.remove(id), toast.duration || 6000);
+                        setTimeout(() => this.remove(id), toast.duration || 6500);
                     },
                     remove(id) {
                         this.toasts = this.toasts.filter(t => t.id !== id);
                     }
                 }"
                 @show-toast.window="add($event.detail)"
-                style="position: fixed; top: 1.5rem; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; z-index: 99999; pointer-events: none; padding: 0 1rem;"
                 role="region"
                 aria-label="Notification alerts"
             >
                 @if (session('staff_submitted'))
                     <div
+                        class="app-toast-item"
                         x-data="{ show: true }"
                         x-show="show"
                         x-init="setTimeout(() => show = false, 6500)"
                         x-transition.duration.300ms
-                        style="pointer-events: auto; width: 100%; max-width: 460px;"
                         role="status"
                         aria-live="polite"
                     >
-                        <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #064e3b; color: #ecfdf5; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #059669;">
-                            <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #10b981; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
-                                &#10003;
-                            </span>
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Action Submitted</div>
-                                <div style="font-size: 0.85rem; color: #d1fae5; line-height: 1.4;">{{ session('staff_submitted') }}</div>
+                        <div class="app-toast-card app-toast-card--success">
+                            <span class="app-toast-icon">&#10003;</span>
+                            <div class="app-toast-body">
+                                <div class="app-toast-title">Waiting for approval</div>
+                                <div class="app-toast-message">{{ session('staff_submitted') }}</div>
                             </div>
                             <button
                                 type="button"
+                                class="app-toast-close"
                                 @click="show = false"
-                                style="background: transparent; border: none; color: #a7f3d0; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
                                 aria-label="Close notification"
                             >
                                 &times;
@@ -1021,26 +1193,24 @@
 
                 @if (session('status') || session('success'))
                     <div
+                        class="app-toast-item"
                         x-data="{ show: true }"
                         x-show="show"
                         x-init="setTimeout(() => show = false, 5000)"
                         x-transition.duration.300ms
-                        style="pointer-events: auto; width: 100%; max-width: 440px;"
                         role="status"
                         aria-live="polite"
                     >
-                        <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #064e3b; color: #ecfdf5; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #059669;">
-                            <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #10b981; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
-                                &#10003;
-                            </span>
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Success</div>
-                                <div style="font-size: 0.85rem; color: #d1fae5; line-height: 1.4;">{{ session('status') ?? session('success') }}</div>
+                        <div class="app-toast-card app-toast-card--success">
+                            <span class="app-toast-icon">&#10003;</span>
+                            <div class="app-toast-body">
+                                <div class="app-toast-title">Success</div>
+                                <div class="app-toast-message">{{ session('status') ?? session('success') }}</div>
                             </div>
                             <button
                                 type="button"
+                                class="app-toast-close"
                                 @click="show = false"
-                                style="background: transparent; border: none; color: #a7f3d0; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
                                 aria-label="Close notification"
                             >
                                 &times;
@@ -1051,26 +1221,24 @@
 
                 @if (session('error'))
                     <div
+                        class="app-toast-item"
                         x-data="{ show: true }"
                         x-show="show"
                         x-init="setTimeout(() => show = false, 6000)"
                         x-transition.duration.300ms
-                        style="pointer-events: auto; width: 100%; max-width: 440px;"
                         role="alert"
                         aria-live="assertive"
                     >
-                        <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #7f1d1d; color: #fef2f2; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #dc2626;">
-                            <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #ef4444; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
-                                &times;
-                            </span>
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Error</div>
-                                <div style="font-size: 0.85rem; color: #fee2e2; line-height: 1.4;">{{ session('error') }}</div>
+                        <div class="app-toast-card app-toast-card--error">
+                            <span class="app-toast-icon">&times;</span>
+                            <div class="app-toast-body">
+                                <div class="app-toast-title">Error</div>
+                                <div class="app-toast-message">{{ session('error') }}</div>
                             </div>
                             <button
                                 type="button"
+                                class="app-toast-close"
                                 @click="show = false"
-                                style="background: transparent; border: none; color: #fca5a5; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
                                 aria-label="Close notification"
                             >
                                 &times;
@@ -1081,26 +1249,24 @@
 
                 @if (session('warning'))
                     <div
+                        class="app-toast-item"
                         x-data="{ show: true }"
                         x-show="show"
                         x-init="setTimeout(() => show = false, 6000)"
                         x-transition.duration.300ms
-                        style="pointer-events: auto; width: 100%; max-width: 440px;"
                         role="alert"
                         aria-live="polite"
                     >
-                        <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #78350f; color: #fffbeb; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #d97706;">
-                            <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #f59e0b; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
-                                !
-                            </span>
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;">Notice</div>
-                                <div style="font-size: 0.85rem; color: #fef3c7; line-height: 1.4;">{{ session('warning') }}</div>
+                        <div class="app-toast-card app-toast-card--warning">
+                            <span class="app-toast-icon">!</span>
+                            <div class="app-toast-body">
+                                <div class="app-toast-title">Notice</div>
+                                <div class="app-toast-message">{{ session('warning') }}</div>
                             </div>
                             <button
                                 type="button"
+                                class="app-toast-close"
                                 @click="show = false"
-                                style="background: transparent; border: none; color: #fde68a; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
                                 aria-label="Close notification"
                             >
                                 &times;
@@ -1112,73 +1278,40 @@
                 {{-- Dynamic Client-Side Toasts --}}
                 <template x-for="t in toasts" :key="t.id">
                     <div
+                        class="app-toast-item"
                         x-transition.duration.300ms
-                        style="pointer-events: auto; width: 100%; max-width: 440px;"
                         :role="t.type === 'error' ? 'alert' : 'status'"
                         aria-live="polite"
                     >
-                        {{-- Warning Toast --}}
-                        <template x-if="t.type === 'warning'">
-                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #78350f; color: #fffbeb; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #d97706;">
-                                <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #f59e0b; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
-                                    !
-                                </span>
-                                <div style="flex: 1;">
-                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;" x-text="t.title || 'Notice'"></div>
-                                    <div style="font-size: 0.85rem; color: #fef3c7; line-height: 1.4;" x-text="t.message"></div>
-                                </div>
-                                <button
-                                    type="button"
-                                    @click="remove(t.id)"
-                                    style="background: transparent; border: none; color: #fde68a; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
-                                    aria-label="Close notification"
-                                >
-                                    &times;
-                                </button>
+                        <div
+                            class="app-toast-card"
+                            :class="{
+                                'app-toast-card--success': t.type === 'success' || t.type === 'status',
+                                'app-toast-card--error': t.type === 'error',
+                                'app-toast-card--warning': t.type === 'warning',
+                                'app-toast-card--info': t.type === 'info'
+                            }"
+                        >
+                            <span
+                                class="app-toast-icon"
+                                x-html="t.type === 'error' ? '&times;' : (t.type === 'warning' ? '!' : (t.type === 'info' ? 'ℹ' : '&#10003;'))"
+                            ></span>
+                            <div class="app-toast-body">
+                                <div
+                                    class="app-toast-title"
+                                    x-text="t.title || (t.type === 'error' ? 'Error' : (t.type === 'warning' ? 'Notice' : (t.type === 'info' ? 'Information' : 'Success')))"
+                                ></div>
+                                <div class="app-toast-message" x-text="t.message"></div>
                             </div>
-                        </template>
-
-                        {{-- Error Toast --}}
-                        <template x-if="t.type === 'error'">
-                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #7f1d1d; color: #fef2f2; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #dc2626;">
-                                <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #ef4444; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
-                                    &times;
-                                </span>
-                                <div style="flex: 1;">
-                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;" x-text="t.title || 'Error'"></div>
-                                    <div style="font-size: 0.85rem; color: #fee2e2; line-height: 1.4;" x-text="t.message"></div>
-                                </div>
-                                <button
-                                    type="button"
-                                    @click="remove(t.id)"
-                                    style="background: transparent; border: none; color: #fca5a5; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
-                                    aria-label="Close notification"
-                                >
-                                    &times;
-                                </button>
-                            </div>
-                        </template>
-
-                        {{-- Success Toast --}}
-                        <template x-if="t.type === 'success' || t.type === 'status'">
-                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; background: #064e3b; color: #ecfdf5; padding: 1rem 1.25rem; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1); border: 1px solid #059669;">
-                                <span style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #10b981; border-radius: 50%; color: #ffffff; flex-shrink: 0; font-size: 13px; font-weight: bold;">
-                                    &#10003;
-                                </span>
-                                <div style="flex: 1;">
-                                    <div style="font-weight: 600; font-size: 0.925rem; margin-bottom: 0.15rem; color: #ffffff;" x-text="t.title || 'Success'"></div>
-                                    <div style="font-size: 0.85rem; color: #d1fae5; line-height: 1.4;" x-text="t.message"></div>
-                                </div>
-                                <button
-                                    type="button"
-                                    @click="remove(t.id)"
-                                    style="background: transparent; border: none; color: #a7f3d0; cursor: pointer; padding: 0.2rem; font-size: 1.25rem; line-height: 1;"
-                                    aria-label="Close notification"
-                                >
-                                    &times;
-                                </button>
-                            </div>
-                        </template>
+                            <button
+                                type="button"
+                                class="app-toast-close"
+                                @click="remove(t.id)"
+                                aria-label="Close notification"
+                            >
+                                &times;
+                            </button>
+                        </div>
                     </div>
                 </template>
             </div>
@@ -1673,6 +1806,16 @@
             const cleaned = String(val).replace(/[^0-9.]/g, '');
             const num = parseFloat(cleaned);
             return isNaN(num) ? 0 : num;
+        };
+
+        window.showToast = function(detail) {
+            if (!detail) return;
+            if (typeof window.__dexAddToast === 'function') {
+                try {
+                    window.__dexAddToast(detail);
+                } catch (e) {}
+            }
+            window.dispatchEvent(new CustomEvent('show-toast', { detail }));
         };
 
         document.addEventListener('input', function(e) {

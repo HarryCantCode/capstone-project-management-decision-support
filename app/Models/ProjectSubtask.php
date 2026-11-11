@@ -30,6 +30,9 @@ class ProjectSubtask extends Model
         'due_date',
         'is_completed',
         'completed_at',
+        'completed_by',
+        'approved_by',
+        'notes',
         'sort_order',
     ];
 
@@ -37,6 +40,8 @@ class ProjectSubtask extends Model
         'due_date' => 'date',
         'is_completed' => 'boolean',
         'completed_at' => 'datetime',
+        'completed_by' => 'integer',
+        'approved_by' => 'integer',
         'sort_order' => 'integer',
     ];
 
@@ -54,6 +59,22 @@ class ProjectSubtask extends Model
     public function task(): BelongsTo
     {
         return $this->belongsTo(ProjectTask::class, 'project_task_id');
+    }
+
+    /**
+     * User who marked / submitted this subtask as completed.
+     */
+    public function completedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'completed_by');
+    }
+
+    /**
+     * User who approved this subtask completion.
+     */
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     /**

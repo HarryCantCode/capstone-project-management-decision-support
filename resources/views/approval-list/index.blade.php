@@ -580,11 +580,50 @@
                                         </div>
                                         <div>
                                             <span class="text-muted" style="display: block; font-size: 0.6875rem;">Subtask Ticked</span>
-                                            <div style="display: flex; align-items: center; gap: var(--space-2); margin-top: 4px;">
+                                            <div style="display: flex; align-items: center; gap: var(--space-2); margin-top: 4px; margin-bottom: var(--space-3);">
                                                 <span style="color: var(--color-success); font-weight: 700;">☑</span>
                                                 <span class="font-bold" style="color: var(--color-ink);" x-text="selectedAction.payload.subtask_title || selectedAction.payload.subtask_name || 'Subtask'"></span>
                                             </div>
                                         </div>
+                                        <template x-if="selectedAction.payload.notes">
+                                            <div style="background: var(--color-surface-alt); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); border-left: 3px solid var(--color-accent); margin-bottom: var(--space-3);">
+                                                <span class="text-muted font-bold" style="display: block; font-size: 0.6875rem; text-transform: uppercase;">Staff Remarks & Notes</span>
+                                                <p style="margin: 4px 0 0 0; color: var(--color-ink); white-space: pre-wrap;" x-text="selectedAction.payload.notes"></p>
+                                            </div>
+                                        </template>
+                                        <template x-if="selectedAction.files && selectedAction.files.length > 0">
+                                            <div style="border-top: 1px dashed var(--color-border); padding-top: var(--space-2); margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2);">
+                                                <span class="text-muted font-bold" style="display: block; font-size: 0.6875rem; text-transform: uppercase;">
+                                                    Completion Proof Attachment<span x-show="selectedAction.files.length > 1">s (<span x-text="selectedAction.files.length"></span>)</span>
+                                                </span>
+                                                <template x-for="(fItem, fIdx) in selectedAction.files" :key="fIdx">
+                                                    <template x-if="fItem.exists && fItem.url">
+                                                        <a :href="fItem.url" target="_blank" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 0.75rem; width: 100%;">
+                                                            <span style="display: inline-flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;">
+                                                                <svg style="width: 14px; height: 14px; color: var(--color-accent); flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                                    <circle cx="12" cy="12" r="3"></circle>
+                                                                </svg>
+                                                                <span x-text="fItem.name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                                                            </span>
+                                                            <span class="text-muted font-mono" style="font-size: 0.6875rem; flex-shrink: 0;" x-text="fItem.size"></span>
+                                                        </a>
+                                                    </template>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        <template x-if="(!selectedAction.files || selectedAction.files.length === 0) && selectedAction.file_exists && selectedAction.file_url">
+                                            <div style="border-top: 1px dashed var(--color-border); padding-top: var(--space-2); margin-top: var(--space-2);">
+                                                <span class="text-muted font-bold" style="display: block; font-size: 0.6875rem; text-transform: uppercase; margin-bottom: 4px;">Completion Proof Attachment</span>
+                                                <a :href="selectedAction.file_url" target="_blank" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem;">
+                                                    <svg style="width: 14px; height: 14px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                        <circle cx="12" cy="12" r="3"></circle>
+                                                    </svg>
+                                                    <span x-text="'View Proof: ' + (selectedAction.payload.file_name || 'Attached File')"></span>
+                                                </a>
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
                             </template>

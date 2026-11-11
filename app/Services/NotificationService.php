@@ -482,7 +482,47 @@ class NotificationService
             'url' => route('projects.show', $project->id),
         ];
 
+        // Notify Admin & Manager reviewers
         $this->createForRecipients($recipients, 'staff_action_review', $title, $message, $data);
+
+        // Also notify the submitting Staff member that their action is waiting for approval
+        $this->notifyStaffActionSubmitted($pendingAction);
+    }
+
+    /**
+     * Notify the submitting Staff user that their action is waiting for approval.
+     */
+    public function notifyStaffActionSubmitted(StaffPendingAction $pendingAction): void
+    {
+        $pendingAction->loadMissing(['user', 'project']);
+        $recipient = $pendingAction->user;
+        if (!$recipient) {
+            return;
+        }
+
+        $projectName = $pendingAction->project->name ?? 'Project';
+        $projectCode = $pendingAction->project->project_code ?? 'N/A';
+        $payload = $pendingAction->payload ?? [];
+
+        $actionDetails = match ($pendingAction->action_type) {
+            'add_expense' => 'expense entry ("' . ($payload['description'] ?? 'Expense') . '", ₱' . number_format((float) ($payload['amount'] ?? 0), 2) . ')',
+            'complete_subtask' => 'task completion request for "' . ($payload['subtask_title'] ?? 'Task') . '"',
+            'add_file' => 'file upload ("' . ($payload['file_name'] ?? 'File') . '")',
+            default => 'action request',
+        };
+
+        $title = 'Action Waiting For Approval';
+        $message = "Your {$actionDetails} on project \"{$projectName}\" ({$projectCode}) has been submitted and is waiting for approval by your manager or administrator.";
+
+        $data = [
+            'pending_action_id' => $pendingAction->id,
+            'project_id' => $pendingAction->project_id,
+            'action_type' => $pendingAction->action_type,
+            'status' => 'waiting_approval',
+            'url' => route('projects.show', $pendingAction->project_id),
+        ];
+
+        $this->createForRecipients(collect([$recipient]), 'staff_action_pending', $title, $message, $data);
     }
 
     /**
@@ -559,6 +599,12 @@ class NotificationService
             'decision' => $decision,
             'url' => route('projects.show', $pendingAction->project_id),
         ];
+
+        // Mark the prior waiting-for-approval notification as read
+        Notification::where('user_id', $recipient->id)
+            ->where('type', 'staff_action_pending')
+            ->whereJsonContains('data->pending_action_id', $pendingAction->id)
+            ->update(['read_at' => now()]);
 
         $this->createForRecipients(collect([$recipient]), 'staff_action_decision', $title, $message, $data);
     }

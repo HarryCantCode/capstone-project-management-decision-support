@@ -332,6 +332,49 @@ class ProjectTaskController extends Controller
 
         $newCompleted = ! $subtask->is_completed;
 
+        if ($newCompleted) {
+            if ($request->has('remarks') && ! $request->has('notes')) {
+                $request->merge(['notes' => $request->input('remarks')]);
+            }
+
+            $validated = $request->validate([
+                'notes' => ['required', 'string', 'min:3', 'max:2000'],
+                'proof_file' => ['nullable', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
+                'proof_files' => ['nullable', 'array'],
+                'proof_files.*' => ['file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
+            ], [
+                'notes.required' => 'Completion remarks and notes are required before marking this task as done.',
+                'notes.min' => 'Remarks and notes must be at least 3 characters.',
+                'notes.max' => 'Remarks and notes may not exceed 2000 characters.',
+                'proof_file.file' => 'The proof must be a valid uploaded file.',
+                'proof_file.mimes' => 'The proof file must be a PDF, DOCX, or Image (JPG, JPEG, PNG, WEBP).',
+                'proof_file.max' => 'The proof file may not exceed 20MB.',
+                'proof_files.*.file' => 'Each proof file must be a valid uploaded file.',
+                'proof_files.*.mimes' => 'Each proof file must be a PDF, DOCX, or Image (JPG, JPEG, PNG, WEBP).',
+                'proof_files.*.max' => 'Each proof file may not exceed 20MB.',
+            ]);
+
+            $proofFilesList = [];
+            if ($request->hasFile('proof_files')) {
+                $proofFilesList = (array) $request->file('proof_files');
+            } elseif ($request->hasFile('proof_file')) {
+                $proofFilesList = [$request->file('proof_file')];
+            }
+
+            if (empty($proofFilesList)) {
+                $msg = 'A proof file attachment is required before marking this task as done.';
+                if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $msg,
+                        'errors' => ['proof_file' => [$msg]],
+                    ], 422);
+                }
+
+                return back()->withErrors(['proof_file' => $msg]);
+            }
+        }
+
         $sortedTasks = $project->tasks()->with(['subtasks' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')])
             ->orderBy('sort_order')
             ->orderBy('start_date')
@@ -450,6 +493,22 @@ class ProjectTaskController extends Controller
                 return back()->withErrors(['subtask' => $msg]);
             }
 
+            $storedFiles = [];
+            foreach ($proofFilesList as $pf) {
+                if ($pf && $pf->isValid()) {
+                    $storedPath = $pf->store('project-files/' . $project->id, 'public');
+                    $storedFiles[] = [
+                        'file_name' => $pf->getClientOriginalName(),
+                        'file_path' => $storedPath,
+                        'file_size' => $pf->getSize(),
+                        'mime_type' => $pf->getClientMimeType() ?: $pf->getMimeType(),
+                    ];
+                }
+            }
+
+            $primaryFile = $storedFiles[0] ?? null;
+            $notesText = $validated['notes'] ?? (string) $request->input('notes');
+
             $pendingAction = \App\Models\StaffPendingAction::create([
                 'user_id' => Auth::id(),
                 'project_id' => $project->id,
@@ -460,6 +519,14 @@ class ProjectTaskController extends Controller
                     'subtask_id' => $subtask->id,
                     'subtask_name' => $subtask->title,
                     'subtask_title' => $subtask->title,
+                    'notes' => $notesText,
+                    'file_name' => $primaryFile['file_name'] ?? null,
+                    'file_path' => $primaryFile['file_path'] ?? null,
+                    'file_size' => $primaryFile['file_size'] ?? 0,
+                    'mime_type' => $primaryFile['mime_type'] ?? null,
+                    'files' => $storedFiles,
+                    'file_type' => 'task_attachment',
+                    'description' => $notesText,
                 ],
                 'status' => 'pending',
             ]);
@@ -471,8 +538,10 @@ class ProjectTaskController extends Controller
             $foundUncompleted = false;
             foreach ($sortedTasks as $tItem) {
                 foreach ($tItem->subtasks as $sItem) {
-                    $satisfied = (bool) $sItem->is_completed || in_array((int) $sItem->id, $pendingSubtaskIds, true);
-                    if (! $satisfied) {
+                    $isPending = in_array((int) $sItem->id, $pendingSubtaskIds, true);
+                    if ($isPending) {
+                        $subtaskLocks[$sItem->id] = true;
+                    } elseif (! $sItem->is_completed) {
                         if (! $foundUncompleted) {
                             $subtaskLocks[$sItem->id] = false;
                             $foundUncompleted = true;
@@ -499,9 +568,40 @@ class ProjectTaskController extends Controller
             return back()->with('staff_submitted', $msg);
         }
 
+        $uploadedProjectFiles = [];
+        $notesText = $newCompleted ? ($validated['notes'] ?? (string) $request->input('notes')) : null;
+
+        if ($newCompleted && !empty($proofFilesList)) {
+            foreach ($proofFilesList as $pf) {
+                if ($pf && $pf->isValid()) {
+                    $upFile = $this->projectService->storeProjectFile(
+                        $project,
+                        $pf,
+                        'task_attachment',
+                        Auth::id(),
+                        $notesText,
+                        $subtask,
+                    );
+                    $uploadedProjectFiles[] = [
+                        'id' => $upFile->id,
+                        'name' => $upFile->file_name,
+                        'size' => $upFile->formatted_size,
+                        'url' => route('projects.files.download', [$project, $upFile]),
+                        'is_img' => $upFile->is_image,
+                        'is_pdf' => $upFile->is_pdf,
+                        'is_word' => $upFile->is_word,
+                    ];
+                }
+            }
+        }
+        $uploadedProjectFile = $uploadedProjectFiles[0] ?? null;
+
         $subtask->update([
             'is_completed' => $newCompleted,
             'completed_at' => $newCompleted ? now() : null,
+            'completed_by' => $newCompleted ? Auth::id() : null,
+            'approved_by' => $newCompleted ? Auth::id() : null,
+            'notes' => $notesText,
         ]);
 
         $wasCompleted = $task->status === 'completed';
@@ -678,6 +778,33 @@ class ProjectTaskController extends Controller
                 'prompt_completion' => $promptCompletion,
                 'subtask_locks' => $subtaskLockMap,
                 'subtask_completed' => $subtaskCompletedMap,
+                'notes' => $subtask->notes,
+                'file' => $uploadedProjectFile ? [
+                    'id' => $uploadedProjectFile->id,
+                    'name' => $uploadedProjectFile->file_name,
+                    'size' => $uploadedProjectFile->formatted_size,
+                    'url' => route('projects.files.download', [$project, $uploadedProjectFile]),
+                    'is_img' => $uploadedProjectFile->is_image,
+                    'is_pdf' => $uploadedProjectFile->is_pdf,
+                    'is_word' => $uploadedProjectFile->is_word,
+                ] : null,
+                'files' => $uploadedProjectFiles,
+                'files_count' => count($uploadedProjectFiles),
+                'proof_modal_data' => [
+                    'subtask_id' => $subtask->id,
+                    'task_name' => $task->task_name,
+                    'subtask_title' => $subtask->title,
+                    'is_completed' => (bool) $subtask->is_completed,
+                    'completed_at' => $subtask->completed_at ? $subtask->completed_at->format('M j, Y · g:i A') : now()->format('M j, Y · g:i A'),
+                    'due_date' => $subtask->due_date ? $subtask->due_date->format('M j, Y') : null,
+                    'completed_by_name' => Auth::user()?->name ?? 'System',
+                    'completed_by_role' => Auth::user()?->getRoleNames()->first() ?? 'Admin',
+                    'approved_by_name' => Auth::user()?->name ?? 'System',
+                    'approved_by_role' => Auth::user()?->getRoleNames()->first() ?? 'Admin',
+                    'is_direct' => true,
+                    'notes' => $subtask->notes ?? '',
+                    'files' => $uploadedProjectFiles,
+                ],
                 'audit_entry' => [
                     'date_time' => $history->changed_at->format('M j, Y · g:i A'),
                     'status' => $projectStatus,

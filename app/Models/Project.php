@@ -25,6 +25,8 @@ class Project extends \Illuminate\Database\Eloquent\Model
     use LogsActivity;
     use SoftDeletes;
 
+    public const PAYMENT_TERMS_OPTIONS = ['10%', '20%', '30%', '40%', '50%'];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -60,6 +62,7 @@ class Project extends \Illuminate\Database\Eloquent\Model
         'warranty_period',
         'warranty_end_date',
         'payment_status',
+        'payment_terms',
         'start_date',
         'target_completion_date',
         'contract_price',
@@ -100,6 +103,7 @@ class Project extends \Illuminate\Database\Eloquent\Model
                 'warranty_period',
                 'warranty_end_date',
                 'payment_status',
+                'payment_terms',
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()

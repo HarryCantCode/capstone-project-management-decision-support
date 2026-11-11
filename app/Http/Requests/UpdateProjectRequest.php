@@ -19,6 +19,12 @@ class UpdateProjectRequest extends FormRequest
                 'contract_price' => str_replace(',', '', $this->input('contract_price')),
             ]);
         }
+
+        if ($this->input('payment_status') === 'Paid') {
+            $this->merge([
+                'payment_terms' => null,
+            ]);
+        }
     }
 
     /**
@@ -53,6 +59,12 @@ class UpdateProjectRequest extends FormRequest
             'warranty_end_date' => ['nullable', 'date'],
             'status' => ['nullable', 'string', 'in:pending,ongoing,delayed,completed'],
             'payment_status' => ['required', 'string', 'in:Paid,Partial'],
+            'payment_terms' => [
+                'nullable',
+                'string',
+                'required_if:payment_status,Partial',
+                'in:10%,20%,30%,40%,50%',
+            ],
             'invoice_file' => [
                 'nullable',
                 'file',
@@ -160,6 +172,8 @@ class UpdateProjectRequest extends FormRequest
             'operation.required' => 'Elevator operation type is required.',
             'payment_status.required' => 'Payment status is required.',
             'payment_status.in' => 'Payment status must be Paid or Partial.',
+            'payment_terms.required_if' => 'Payment Terms percentage is required when payment status is Partial.',
+            'payment_terms.in' => 'Please select a valid Payment Terms percentage (10%, 20%, 30%, 40%, or 50%).',
             'invoice_file.file' => 'The invoice must be a valid uploaded file.',
             'invoice_file.mimes' => 'The invoice must be a file of type: PDF, DOCX, or Image (JPG, PNG, WEBP).',
             'invoice_file.max' => 'The invoice file may not be greater than 20MB.',

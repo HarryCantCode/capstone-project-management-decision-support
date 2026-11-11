@@ -114,6 +114,39 @@ class CostingController extends Controller implements HasMiddleware
             ->paginate(15)
             ->withQueryString();
 
+        $pendingExpensesQuery = \App\Models\StaffPendingAction::query()
+            ->where('project_id', $project->id)
+            ->where('action_type', 'add_expense')
+            ->where('status', 'pending')
+            ->with('user')
+            ->orderByDesc('created_at');
+
+        if (!empty($search)) {
+            $pendingExpensesQuery->where('payload->description', 'like', "%{$search}%");
+        }
+
+        if (!empty($category)) {
+            $pendingExpensesQuery->where('payload->cost_type', $category);
+        }
+
+        if (!empty($startDate)) {
+            $pendingExpensesQuery->where('payload->incurred_date', '>=', $startDate);
+        }
+
+        if (!empty($endDate)) {
+            $pendingExpensesQuery->where('payload->incurred_date', '<=', $endDate);
+        }
+
+        if ($minAmount !== null && $minAmount !== '' && is_numeric($minAmount)) {
+            $pendingExpensesQuery->where('payload->amount', '>=', (float) $minAmount);
+        }
+
+        if ($maxAmount !== null && $maxAmount !== '' && is_numeric($maxAmount)) {
+            $pendingExpensesQuery->where('payload->amount', '<=', (float) $maxAmount);
+        }
+
+        $pendingExpenses = $pendingExpensesQuery->get();
+
         $categoryTotals = \App\Models\ProjectCost::query()
             ->where('project_id', $project->id)
             ->selectRaw('cost_type, sum(amount) as total, count(*) as count')
@@ -128,6 +161,7 @@ class CostingController extends Controller implements HasMiddleware
         return view('costing.show', compact(
             'project',
             'costs',
+            'pendingExpenses',
             'categoryTotals',
             'catalogMaterials',
             'search',
