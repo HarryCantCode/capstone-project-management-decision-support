@@ -475,8 +475,8 @@
 
                 {{-- Pagination Links --}}
                 @if ($actions->hasPages())
-                    <div style="padding: var(--space-4) var(--space-5); border-top: 1px solid var(--color-border);">
-                        {{ $actions->links() }}
+                    <div class="card-footer pagination-wrapper">
+                        {{ $actions->links('pagination::bootstrap-5') }}
                     </div>
                 @endif
             @endif

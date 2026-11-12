@@ -96,8 +96,14 @@ class ProjectService
             // Create initial default Major Task: Pre-construction & Regulatory Compliance (covering Week 1)
             $this->createDefaultPermitTask($project, $user->id);
 
-            // Handle optional invoice attachment if provided
-            if (isset($validated['invoice_file']) && $validated['invoice_file'] instanceof \Illuminate\Http\UploadedFile) {
+            // Handle invoice attachments (multiple or single)
+            if (!empty($validated['invoice_files']) && is_array($validated['invoice_files'])) {
+                foreach ($validated['invoice_files'] as $invFile) {
+                    if ($invFile instanceof \Illuminate\Http\UploadedFile) {
+                        $this->storeProjectFile($project, $invFile, 'invoice', $user->id, 'Initial project invoice attachment.');
+                    }
+                }
+            } elseif (isset($validated['invoice_file']) && $validated['invoice_file'] instanceof \Illuminate\Http\UploadedFile) {
                 $this->storeProjectFile($project, $validated['invoice_file'], 'invoice', $user->id, 'Initial project invoice attachment.');
             }
 
@@ -289,8 +295,14 @@ class ProjectService
             'updated_by' => $user->id,
         ]);
 
-        // Handle invoice attachment if provided upon update
-        if (isset($validated['invoice_file']) && $validated['invoice_file'] instanceof \Illuminate\Http\UploadedFile) {
+        // Handle invoice attachments if provided upon update
+        if (!empty($validated['invoice_files']) && is_array($validated['invoice_files'])) {
+            foreach ($validated['invoice_files'] as $invFile) {
+                if ($invFile instanceof \Illuminate\Http\UploadedFile) {
+                    $this->storeProjectFile($project, $invFile, 'invoice', $user->id, 'Project invoice attachment.');
+                }
+            }
+        } elseif (isset($validated['invoice_file']) && $validated['invoice_file'] instanceof \Illuminate\Http\UploadedFile) {
             $this->storeProjectFile($project, $validated['invoice_file'], 'invoice', $user->id, 'Project invoice attachment.');
         }
 

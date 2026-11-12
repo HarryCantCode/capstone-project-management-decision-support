@@ -1056,8 +1056,8 @@
                     >
                         <div style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; line-height: 1.25;">
                             <span class="user-menu-name">{{ Auth::user()->name }}</span>
-                            @if(Auth::user()->account_number)
-                                <span class="user-menu-account font-mono text-muted" style="font-size: 0.75rem; font-weight: 500;">Acc: {{ Auth::user()->account_number }}</span>
+                            @if(Auth::user()->employee_number)
+                                <span class="user-menu-account font-mono text-muted" style="font-size: 0.75rem; font-weight: 500;">ID: {{ Auth::user()->employee_number }}</span>
                             @endif
                         </div>
                         <span class="user-menu-role badge">{{ Auth::user()->getRoleNames()->first() }}</span>

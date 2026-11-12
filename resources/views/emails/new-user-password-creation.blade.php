@@ -140,10 +140,6 @@
                 <span>{{ $user->employee_number ?? 'N/A' }}</span>
             </div>
             <div class="account-row">
-                <span class="account-label">Account Number:</span>
-                <span>{{ $user->account_number ?? 'N/A' }}</span>
-            </div>
-            <div class="account-row">
                 <span class="account-label">Registered Email:</span>
                 <span>{{ $user->email }}</span>
             </div>
@@ -177,7 +173,7 @@
         </div>
 
         <p style="font-size: 12px; color: #64748b; line-height: 1.5;">
-            <strong>Note:</strong> This link is secure and unique to your account. Once your password is set, you will be able to log in using either your email address or your 7-digit Account Number ({{ $user->account_number }}).
+            <strong>Note:</strong> This link is secure and unique to your account. Once your password is set, you will be able to log in using your registered email address.
         </p>
 
         <div class="footer">

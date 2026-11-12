@@ -47,7 +47,6 @@ class PasswordResetService
 
     /**
      * Request a password creation reset link and dispatch it to the user's email.
-     * Supports both email address and 7-digit account number.
      * Rate limited to 3 times per calendar day for normal user self-requests.
      *
      * @return array{success: bool, message: string}
@@ -56,16 +55,14 @@ class PasswordResetService
     {
         $input = trim($loginInput);
 
-        // Case-insensitive lookup supporting email address or 7-digit account number
+        // Case-insensitive lookup supporting email address
         $user = User::whereRaw('LOWER(email) = ?', [strtolower($input)])
-            ->orWhere('account_number', $input)
             ->first();
 
         // Security check: verify if the account is soft-deleted/archived
         if (! $user) {
             $archivedExists = User::onlyTrashed()
                 ->whereRaw('LOWER(email) = ?', [strtolower($input)])
-                ->orWhere('account_number', $input)
                 ->exists();
 
             if ($archivedExists) {
@@ -77,7 +74,7 @@ class PasswordResetService
 
             return [
                 'success' => false,
-                'message' => 'We could not find an active account associated with that email address or account number.',
+                'message' => 'We could not find an active account associated with that email address.',
             ];
         }
 

@@ -270,7 +270,7 @@ class Project extends \Illuminate\Database\Eloquent\Model
      */
     public function invoices(): HasMany
     {
-        return $this->hasMany(ProjectFile::class)->where('file_type', 'invoice')->orderByDesc('created_at');
+        return $this->hasMany(ProjectFile::class)->whereIn('file_type', ['invoice', 'project_invoice'])->orderByDesc('created_at');
     }
 
     // ─── Scopes ───────────────────────────────────────────────────────────────

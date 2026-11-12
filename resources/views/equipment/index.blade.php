@@ -97,8 +97,8 @@
             </table>
         </div>
         @if($equipments->hasPages())
-            <div class="card-footer">
-                {{ $equipments->links() }}
+            <div class="card-footer pagination-wrapper">
+                {{ $equipments->links('pagination::bootstrap-5') }}
             </div>
         @endif
     </div>

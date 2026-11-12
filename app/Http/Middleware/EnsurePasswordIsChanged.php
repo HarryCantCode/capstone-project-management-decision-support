@@ -43,9 +43,7 @@ class EnsurePasswordIsChanged
         // If the user does not need to change password, prevent them from accessing first-login page
         if ($user && ! $user->must_change_password) {
             if ($request->routeIs('password.first-login') || $request->routeIs('password.first-login.update')) {
-                return redirect()->intended(
-                    $user->hasRole('Staff') ? route('resources.index') : route('dashboard'),
-                );
+                return redirect($user->defaultLandingRoute());
             }
         }
 

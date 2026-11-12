@@ -86,7 +86,7 @@ class StaffPendingActionService
             default => $actionsQuery->orderByDesc('created_at')->orderByDesc('id'),
         };
 
-        $actions = $actionsQuery->paginate(20)->withQueryString();
+        $actions = $actionsQuery->paginate(10)->withQueryString();
 
         // 2. Staff List with request counts and eager-loaded requests for the Staff Modal
         $staffQuery = User::query()
@@ -108,7 +108,6 @@ class StaffPendingActionService
             $staffQuery->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('account_number', 'like', "%{$search}%")
                     ->orWhere('employee_number', 'like', "%{$search}%")
                     ->orWhere('job_title', 'like', "%{$search}%")
                     ->orWhereHas('pendingActions', function ($actionQ) use ($search) {
@@ -146,7 +145,6 @@ class StaffPendingActionService
                 'name' => $staff->name,
                 'initials' => strtoupper(substr($staff->first_name ?? $staff->name, 0, 1) . substr($staff->last_name ?? '', 0, 1)),
                 'email' => $staff->email,
-                'account_number' => $staff->account_number ?? 'N/A',
                 'employee_number' => $staff->employee_number ?? 'N/A',
                 'job_title' => $staff->job_title ?: 'Staff Member',
                 'total_count' => (int) $staff->total_requests_count,
@@ -237,7 +235,7 @@ class StaffPendingActionService
             default => $actionsQuery->orderByDesc('created_at')->orderByDesc('id'),
         };
 
-        $actions = $actionsQuery->paginate(20)->withQueryString();
+        $actions = $actionsQuery->paginate(10)->withQueryString();
 
         $actionsMap = [];
         $cooldownsMap = [];
@@ -356,7 +354,7 @@ class StaffPendingActionService
             'staff_id' => $action->user_id,
             'staff_name' => $action->user?->name ?? 'Staff',
             'staff_email' => $action->user?->email ?? '',
-            'staff_account_number' => $action->user?->account_number ?? 'N/A',
+            'staff_employee_number' => $action->user?->employee_number ?? 'N/A',
             'project_id' => $action->project_id,
             'project_name' => $action->project?->name ?? 'Project',
             'project_code' => $action->project?->project_code ?? 'N/A',
@@ -535,7 +533,6 @@ class StaffPendingActionService
                     $userQ->withTrashed()
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('account_number', 'like', "%{$search}%")
                         ->orWhere('employee_number', 'like', "%{$search}%");
                 })
                 ->orWhereHas('project', function ($projQ) use ($search) {
@@ -612,7 +609,7 @@ class StaffPendingActionService
                 $projectFile = ProjectFile::create([
                     'project_id' => $project->id,
                     'project_subtask_id' => $subtask->id,
-                    'uploaded_by' => $reviewerId ?: ($project->created_by ?? 1),
+                    'uploaded_by' => $staffUserId ?: ($reviewerId ?: ($project->created_by ?? 1)),
                     'file_name' => $fData['file_name'] ?? 'Proof File',
                     'file_path' => $fData['file_path'],
                     'file_type' => 'task_attachment',

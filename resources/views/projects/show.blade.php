@@ -188,7 +188,27 @@
                 <div class="detail-list__full"><dt>Site Location</dt><dd>{{ $project->full_address ?: 'Not specified' }}</dd></div>
                 <div><dt>Start Date</dt><dd class="font-mono">{{ $project->start_date ? $project->start_date->format('M j, Y') : ($project->created_at->format('M j, Y')) }}</dd></div>
                 <div><dt>Target Completion</dt><dd class="font-mono font-bold" style="color: var(--color-accent);">{{ $project->target_completion_date ? $project->target_completion_date->format('M j, Y') : 'Not set' }}</dd></div>
-                <div><dt>Warranty Period</dt><dd class="font-mono">{{ $project->warranty_period ?? '1 Year' }} @if($project->warranty_end_date)<span class="text-muted" style="font-size: 0.8125rem;">(Until {{ $project->warranty_end_date->format('M j, Y') }})</span>@endif</dd></div>
+                <div>
+                    <dt>Warranty Period</dt>
+                    <dd class="font-mono">
+                        <button 
+                            type="button" 
+                            @click="warrantyInfoModalOpen = true" 
+                            style="background: none; border: none; padding: 0; font-family: inherit; font-size: inherit; color: var(--color-ink); cursor: pointer; display: inline-flex; flex-direction: row; align-items: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; text-align: left;"
+                            title="Click to view Warranty & Maintenance inclusion terms"
+                        >
+                            <span>{{ $project->warranty_period ?? '1 Year' }}</span>
+                            @if($project->warranty_end_date)
+                                <span class="text-muted" style="font-size: 0.8125rem; font-weight: normal;">(Until {{ $project->warranty_end_date->format('M j, Y') }})</span>
+                            @endif
+                            <svg style="width: 14px; height: 14px; color: var(--color-primary); flex-shrink: 0; opacity: 0.85;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            </svg>
+                        </button>
+                    </dd>
+                </div>
                 <div><dt>Created by</dt><dd>{{ $project->creator?->name ?? 'System' }}</dd></div>
                 <div><dt>Last updated</dt><dd>{{ $project->updated_at->format('M j, Y · g:i A') }} by {{ $project->updater?->name ?? ($project->creator?->name ?? 'System') }}</dd></div>
                 <div class="detail-list__full"><dt>Description</dt><dd>{{ $project->description ?: 'No description provided.' }}</dd></div>
@@ -247,49 +267,202 @@
         </section>
 
             {{-- ─── Uploaded Project Files & Attachments (Placed directly below Financials & Budget) ─── --}}
-            <section class="card card-glass" aria-labelledby="project-files-heading" id="project-files-card">
-                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
+            <section 
+                class="card card-glass" 
+                aria-labelledby="project-files-heading" 
+                id="project-files-card"
+                x-data="{
+                    fileCategory: 'all',
+                    fileSearch: '',
+                    matchesCategory(fileType, searchBlob) {
+                        let catMatch = false;
+                        if (this.fileCategory === 'all') {
+                            catMatch = true;
+                        } else if (this.fileCategory === 'project_document') {
+                            catMatch = (fileType === 'project_document' || fileType === 'general');
+                        } else if (this.fileCategory === 'invoice') {
+                            catMatch = (fileType === 'invoice' || fileType === 'project_invoice');
+                        } else {
+                            catMatch = (fileType === this.fileCategory);
+                        }
+                        if (!catMatch) return false;
+
+                        const q = (this.fileSearch || '').toLowerCase().trim();
+                        if (!q) return true;
+                        return searchBlob && searchBlob.includes(q);
+                    }
+                }"
+            >
+                @php
+                    $allProjectFiles = $project->files;
+                    $countAllFiles = $allProjectFiles->count();
+                    $countDocFiles = $allProjectFiles->filter(fn($f) => in_array($f->file_type, ['project_document', 'general']))->count();
+                    $countTransFiles = $allProjectFiles->where('file_type', 'project_transaction')->count();
+                    $countInvFiles = $allProjectFiles->filter(fn($f) => in_array($f->file_type, ['invoice', 'project_invoice']))->count();
+                    $countNotesFiles = $allProjectFiles->where('file_type', 'project_notes')->count();
+                    $countDrawingFiles = $allProjectFiles->where('file_type', 'project_drawing')->count();
+                    $countTaskFiles = $allProjectFiles->where('file_type', 'task_attachment')->count();
+                @endphp
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-4);">
                     <div style="display: flex; align-items: center; gap: var(--space-2);">
-                        <svg style="width: 18px; height: 18px; color: var(--color-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg style="width: 20px; height: 20px; color: var(--color-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14 2 14 8 20 8"></polyline>
                             <line x1="16" y1="13" x2="8" y2="13"></line>
                             <line x1="16" y1="17" x2="8" y2="17"></line>
                             <polyline points="10 9 9 9 8 9"></polyline>
                         </svg>
-                        <h2 id="project-files-heading" style="margin: 0; font-size: 0.9375rem; font-weight: 700;">Project Files & Documents</h2>
-                        <span class="badge font-mono" style="background: var(--color-surface-alt); font-size: 0.75rem; font-weight: 600;">{{ $project->files->count() }}</span>
+                        <h2 id="project-files-heading" style="margin: 0; font-size: 1rem; font-weight: 700;">Project Files & Documents</h2>
+                        <span class="badge font-mono" style="background: var(--color-surface-alt); font-size: 0.8125rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">{{ $countAllFiles }}</span>
                     </div>
-                    @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
-                        @if ($isProjectReadOnly)
-                            <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap; font-size: 0.75rem; padding: 4px 10px;" title="{{ $project->trashed() ? 'Cannot upload files to an archived project' : 'Cannot upload files to a completed project unless reactivated' }}">
-                                + Upload File
-                            </button>
-                        @else
-                            <button type="button" class="btn btn-primary btn-sm" @click="uploadFileModalOpen = true" style="white-space: nowrap; font-size: 0.75rem; padding: 4px 10px;">
-                                + Upload File
-                            </button>
+
+                    <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
+                        {{-- Search Bar: Medium size with rounded pill corners placed on the left side of + Upload File --}}
+                        <div style="position: relative; width: 220px;">
+                            <svg style="position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--color-muted); pointer-events: none;" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                            </svg>
+                            <input
+                                type="search"
+                                x-model="fileSearch"
+                                class="form-control"
+                                placeholder="Search files..."
+                                aria-label="Search files"
+                                style="padding-left: 32px !important; padding-right: 12px; height: 34px !important; font-size: 0.8125rem !important; border-radius: 9999px !important; width: 100%;"
+                            >
+                        </div>
+
+                        @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
+                            @if ($isProjectReadOnly)
+                                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap; font-size: 0.8125rem; padding: 0 14px; height: 34px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center;" title="{{ $project->trashed() ? 'Cannot upload files to an archived project' : 'Cannot upload files to a completed project unless reactivated' }}">
+                                    + Upload File
+                                </button>
+                            @else
+                                <button type="button" class="btn btn-primary btn-sm" @click="openUploadProjectFileModal(fileCategory === 'all' ? 'project_document' : fileCategory)" style="white-space: nowrap; font-size: 0.8125rem; padding: 0 14px; height: 34px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center;">
+                                    + Upload File
+                                </button>
+                            @endif
                         @endif
-                    @endif
+                    </div>
                 </div>
-                <div class="card-body" style="padding: var(--space-3) var(--space-4);">
-                    @if ($project->files->isEmpty())
+
+                <div class="card-body" style="padding: var(--space-4);">
+                    @if ($allProjectFiles->isEmpty())
                         <div style="text-align: center; padding: var(--space-5) var(--space-3); color: var(--color-muted);">
-                            <svg style="width: 32px; height: 32px; margin: 0 auto var(--space-2); opacity: 0.4;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <svg style="width: 36px; height: 36px; margin: 0 auto var(--space-2); opacity: 0.4;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                             </svg>
-                            <p style="margin: 0; font-size: 0.8125rem;">No files uploaded yet.</p>
-                            <p class="form-hint" style="margin-top: 4px; font-size: 0.75rem;">Supported: PDF, DOCX, and Images (up to 20MB).</p>
+                            <p style="margin: 0; font-size: 0.875rem; font-weight: 600;">No files uploaded yet.</p>
+                            <p class="form-hint" style="margin-top: 4px; font-size: 0.8125rem;">Supported categories: Project document, transaction, invoice, notes, and drawings / blueprints.</p>
                         </div>
                     @else
-                        <div style="display: flex; flex-direction: column; gap: var(--space-2); max-height: 280px; overflow-y: auto; padding-right: 2px;">
-                            @foreach ($project->files as $file)
+                        {{-- Category Filter Navigation --}}
+                        <div style="margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 8px;">
+                            {{-- Category Filter Pills --}}
+                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="fileCategory === 'all' ? 'btn-primary' : 'btn-secondary'"
+                                    @click="fileCategory = 'all'"
+                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                >
+                                    All <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countAllFiles }})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="fileCategory === 'project_document' ? 'btn-primary' : 'btn-secondary'"
+                                    @click="fileCategory = 'project_document'"
+                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                >
+                                    Project document <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countDocFiles }})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="fileCategory === 'project_transaction' ? 'btn-primary' : 'btn-secondary'"
+                                    @click="fileCategory = 'project_transaction'"
+                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                >
+                                    Project transaction <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countTransFiles }})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="fileCategory === 'invoice' ? 'btn-primary' : 'btn-secondary'"
+                                    @click="fileCategory = 'invoice'"
+                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                >
+                                    Project invoice <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countInvFiles }})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="fileCategory === 'project_notes' ? 'btn-primary' : 'btn-secondary'"
+                                    @click="fileCategory = 'project_notes'"
+                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                >
+                                    Project notes <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countNotesFiles }})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="fileCategory === 'project_drawing' ? 'btn-primary' : 'btn-secondary'"
+                                    @click="fileCategory = 'project_drawing'"
+                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                >
+                                    Project drawing / blueprint <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countDrawingFiles }})</span>
+                                </button>
+                                @if ($countTaskFiles > 0)
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm"
+                                        :class="fileCategory === 'task_attachment' ? 'btn-primary' : 'btn-secondary'"
+                                        @click="fileCategory = 'task_attachment'"
+                                        style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                    >
+                                        Task Attachment <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countTaskFiles }})</span>
+                                    </button>
+                                @endif
+                            </div>
+
+                            {{-- Reset Filter Button: Pinned to the bottom-right corner when filtering/searching is active --}}
+                            <div 
+                                x-show="fileCategory !== 'all' || fileSearch" 
+                                x-cloak
+                                style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--color-muted); padding-top: 2px;"
+                            >
+                                <span>Filtered results &bull;</span>
+                                <button 
+                                    type="button" 
+                                    @click="fileCategory = 'all'; fileSearch = ''" 
+                                    class="btn btn-secondary btn-sm"
+                                    style="padding: 2px 10px; font-size: 0.75rem; height: 26px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; cursor: pointer; color: var(--color-ink);"
+                                    title="Reset filter"
+                                >
+                                    <svg style="width: 11px; height: 11px; opacity: 0.8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                    Reset filter
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Categorized Files List (Clean 2-row card, limited to ~4 files view with smooth scroll) --}}
+                        <div class="project-files-scroll-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 310px; overflow-y: auto; padding-right: 4px;">
+                            @foreach ($allProjectFiles as $file)
                                 @php
+                                    $searchBlob = strtolower($file->file_name . ' ' . str_replace(["\r", "\n", '"', "'", "\\"], ' ', $file->description ?? ''));
+                                    $searchBlobJson = json_encode($searchBlob);
+                                    $fileType = $file->file_type;
                                     $fileData = [
                                         'id' => $file->id,
                                         'name' => $file->file_name,
                                         'size' => $file->formatted_size,
                                         'type' => $file->file_type,
+                                        'category_label' => $file->category_label,
                                         'description' => $file->description ?? '',
                                         'uploader' => $file->uploader ? $file->uploader->name : 'System',
                                         'date' => $file->created_at->format('M j, Y · g:i A'),
@@ -304,55 +477,120 @@
                                 @endphp
                                 <div 
                                     class="project-file-item"
-                                    style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.8125rem; cursor: pointer; transition: all 0.15s ease;"
+                                    x-show='matchesCategory("{{ $fileType }}", {{ $searchBlobJson }})'
+                                    style="display: flex; flex-direction: column; gap: 5px; padding: 9px 13px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s ease;"
                                     @click="openViewFileModal({{ json_encode($fileData) }})"
                                     title="Click to view details, update description, download, or delete"
                                 >
-                                    <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1;">
-                                        @if ($file->is_image)
-                                            <span style="font-size: 1.125rem;">🖼️</span>
-                                        @elseif ($file->is_pdf)
-                                            <span style="font-size: 1.125rem;">📕</span>
-                                        @elseif ($file->is_word)
-                                            <span style="font-size: 1.125rem;">📘</span>
-                                        @else
-                                            <span style="font-size: 1.125rem;">📄</span>
-                                        @endif
-                                        <div style="min-width: 0; flex: 1;">
-                                            <div style="display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;">
-                                                <span class="table-link font-bold" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;" title="{{ $file->file_name }}">
-                                                    {{ $file->file_name }}
-                                                </span>
-                                                @if ($file->file_type === 'invoice')
-                                                    <span class="badge" style="background: rgba(34, 197, 94, 0.12); color: var(--color-success); font-size: 0.6875rem; font-weight: 700;">Invoice</span>
-                                                @elseif ($file->file_type === 'task_attachment' && $file->subtask)
-                                                    <span class="badge" style="background: var(--color-surface-alt); font-size: 0.6875rem;" title="Subtask: {{ $file->subtask->title }}">
-                                                        Task #{{ $file->subtask->id }}
-                                                    </span>
+                                    {{-- Row 1: [Fixed Icon Cell] [File Name] [Small Badge] ─────── [Size (normal)] [Actions] --}}
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;">
+                                        {{-- Left: Fixed Icon Cell + File Name + Small Badge --}}
+                                        <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+                                            {{-- Fixed Icon Cell (always directly on left side of name) --}}
+                                            <div style="width: 28px; height: 28px; min-width: 28px; border-radius: 6px; background: var(--color-surface-alt); border: 1px solid var(--color-border); display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;">
+                                                @if ($file->is_image)
+                                                    🖼️
+                                                @elseif ($file->is_pdf)
+                                                    📕
+                                                @elseif ($file->is_word)
+                                                    📘
+                                                @elseif ($file->file_type === 'project_drawing')
+                                                    📐
+                                                @else
+                                                    📄
                                                 @endif
                                             </div>
-                                            <div class="text-muted" style="font-size: 0.6875rem; display: flex; gap: var(--space-2); align-items: center;">
-                                                <span>{{ $file->formatted_size }}</span>
-                                                <span>·</span>
-                                                <span>{{ $file->created_at->format('M j, Y') }}</span>
-                                                @if ($file->uploader)
-                                                    <span>·</span>
-                                                    <span>by {{ $file->uploader->name }}</span>
-                                                @endif
-                                                @if ($file->description)
-                                                    <span>·</span>
-                                                    <span style="font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">"{{ $file->description }}"</span>
-                                                @endif
+
+                                            {{-- File Name --}}
+                                            <span class="table-link font-semibold" style="font-size: 0.875rem; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px;" title="{{ $file->file_name }}">
+                                                {{ $file->file_name }}
+                                            </span>
+
+                                            {{-- Small Category / Task Badge --}}
+                                            @if (in_array($file->file_type, ['invoice', 'project_invoice']))
+                                                <span class="badge" style="background: rgba(34, 197, 94, 0.14); color: var(--color-success); font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">Project invoice</span>
+                                            @elseif ($file->file_type === 'project_transaction')
+                                                <span class="badge" style="background: rgba(245, 158, 11, 0.14); color: #b45309; font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">Project transaction</span>
+                                            @elseif ($file->file_type === 'project_notes')
+                                                <span class="badge" style="background: rgba(139, 92, 246, 0.14); color: #7c3aed; font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">Project notes</span>
+                                            @elseif ($file->file_type === 'project_drawing')
+                                                <span class="badge" style="background: rgba(6, 182, 212, 0.14); color: #0891b2; font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">Project drawing</span>
+                                            @elseif ($file->file_type === 'task_attachment' && $file->subtask)
+                                                <span class="badge" style="background: var(--color-surface-alt); font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--color-border); flex-shrink: 0;" title="Subtask: {{ $file->subtask->title }}">
+                                                    Task #{{ $file->subtask->id }}
+                                                </span>
+                                            @else
+                                                <span class="badge" style="background: rgba(44, 95, 124, 0.14); color: var(--color-accent); font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">Project document</span>
+                                            @endif
+                                        </div>
+
+                                        {{-- Right: File Size (not bold, at top right) + Actions --}}
+                                        <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;" @click.stop>
+                                            <span class="font-mono text-muted" style="font-size: 0.75rem; font-weight: normal; color: var(--color-muted);">
+                                                {{ $file->formatted_size }}
+                                            </span>
+
+                                            {{-- Action Buttons (Locked fixed size, no overlap) --}}
+                                            <div style="display: flex; align-items: center; gap: 5px;">
+                                                {{-- Preview Button --}}
+                                                <a 
+                                                    href="{{ route('projects.files.download', [$project, $file]) }}?preview=1" 
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="btn btn-secondary btn-sm" 
+                                                    style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: var(--radius-sm);" 
+                                                    title="Preview File in new tab"
+                                                >
+                                                    <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                        <circle cx="12" cy="12" r="3"></circle>
+                                                    </svg>
+                                                </a>
+
+                                                {{-- Download Button --}}
+                                                <a 
+                                                    href="{{ route('projects.files.download', [$project, $file]) }}" 
+                                                    class="btn btn-secondary btn-sm" 
+                                                    style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: var(--radius-sm);" 
+                                                    title="Direct Download"
+                                                >
+                                                    <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                                    </svg>
+                                                </a>
+
+                                                {{-- Details & Edit Button --}}
+                                                <button 
+                                                    type="button" 
+                                                    class="btn btn-secondary btn-sm" 
+                                                    style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: var(--radius-sm);" 
+                                                    @click="openViewFileModal({{ json_encode($fileData) }})" 
+                                                    title="Details & Edit"
+                                                >
+                                                    <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <circle cx="12" cy="12" r="3"></circle>
+                                                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                                    </svg>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
-                                    <div style="display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0;" @click.stop>
-                                        <a href="{{ route('projects.files.download', [$project, $file]) }}" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem;" title="Direct Download">
-                                            ⬇
-                                        </a>
-                                        <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem;" @click="openViewFileModal({{ json_encode($fileData) }})" title="Details & Edit">
-                                            ⚙️
-                                        </button>
+
+                                    {{-- Row 2: Submitter & Date at bottom, with neatly truncated description notes --}}
+                                    <div style="display: flex; align-items: center; gap: 7px; font-size: 0.75rem; color: var(--color-muted); padding-left: 36px; overflow: hidden; white-space: nowrap;">
+                                        @if ($file->uploader)
+                                            <span>by <span style="color: var(--color-ink); font-weight: 500;">{{ $file->uploader->name }}</span></span>
+                                            <span style="opacity: 0.35;">&bull;</span>
+                                        @endif
+                                        <span>{{ $file->created_at->format('M j, Y') }}</span>
+                                        @if ($file->description)
+                                            <span style="opacity: 0.35;">&bull;</span>
+                                            <span style="font-style: italic; color: var(--color-ink); opacity: 0.85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 360px;" title="{{ Str::limit(strip_tags(str_replace(["\r", "\n", '"'], ' ', $file->description)), 200) }}">
+                                                "{{ Str::limit(strip_tags(str_replace(["\r", "\n", '"'], ' ', $file->description)), 45) }}"
+                                            </span>
+                                        @endif
                                     </div>
                                 </div>
                             @endforeach
@@ -2399,10 +2637,10 @@
         </div>
     @endcan
 
-    {{-- ─── Modal 7: Upload Project File (Invoice or General Document) ──── --}}
+    {{-- ─── Modal 7: Upload Project Files & Documents (Categorized & Multi-Upload) ──── --}}
     <div class="reassign-modal-overlay" style="display: none;" x-show="uploadFileModalOpen" x-cloak>
-        <div class="reassign-modal-backdrop" @click="uploadFileModalOpen = false"></div>
-        <div class="reassign-modal-content card" x-show="uploadFileModalOpen" x-transition style="max-width: 480px;">
+        <div class="reassign-modal-backdrop" @click="closeUploadProjectFileModal()"></div>
+        <div class="reassign-modal-content card" x-show="uploadFileModalOpen" x-transition style="max-width: 540px; width: 100%;">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: var(--space-2);">
                     <svg style="width: 18px; height: 18px; color: var(--color-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2410,49 +2648,168 @@
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    <span style="font-weight: 700; font-size: 1rem;">Upload Project Document</span>
+                    <span style="font-weight: 700; font-size: 1rem;">Upload Project Files</span>
                 </div>
-                <button type="button" class="flash-close" @click="uploadFileModalOpen = false" aria-label="Close modal">&times;</button>
+                <button type="button" class="flash-close" @click="closeUploadProjectFileModal()" aria-label="Close modal">&times;</button>
             </div>
-            <form action="{{ route('projects.files.store', $project) }}" method="POST" enctype="multipart/form-data">
+            <form id="project-upload-files-form" action="{{ route('projects.files.store', $project) }}" method="POST" enctype="multipart/form-data" @submit.prevent="submitModalUploadForm($event.target)">
                 @csrf
                 <div class="card-body">
-                    <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
-                        <label for="project_file_input" class="form-label">Select File <span class="required">*</span></label>
-                        <input
-                            type="file"
-                            id="project_file_input"
-                            name="file"
-                            class="form-control"
-                            accept=".pdf,.doc,.docx,image/*"
+                    {{-- Default File Type Category Selector --}}
+                    <div class="form-group form-group-premium" style="margin-bottom: var(--space-3);">
+                        <label for="project_file_default_category" class="form-label">File Type Category <span class="required">*</span></label>
+                        <select 
+                            id="project_file_default_category" 
+                            name="file_type" 
+                            class="form-control" 
+                            x-model="uploadModalDefaultCategory"
+                            @change="uploadModalFiles.forEach(f => f.category = uploadModalDefaultCategory); syncModalUploadInputs();"
                             required
                         >
-                        <p class="form-hint" style="margin-top: 4px;">Allowed formats: PDF, DOCX, and Images (up to 20MB).</p>
-                    </div>
-
-                    <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
-                        <label for="project_file_type" class="form-label">File Type <span class="required">*</span></label>
-                        <select id="project_file_type" name="file_type" class="form-control" required>
-                            <option value="general">General Project File / Document</option>
-                            <option value="invoice">Official Invoice / Payment Receipt</option>
+                            <option value="project_document">Project document</option>
+                            <option value="project_transaction">Project transaction</option>
+                            <option value="invoice">Project invoice</option>
+                            <option value="project_notes">Project notes</option>
+                            <option value="project_drawing">Project drawing / blueprint</option>
                         </select>
+                        <p class="form-hint" style="margin-top: 3px;">Select category for your upload. You can also customize categories per file below.</p>
                     </div>
 
-                    <div class="form-group form-group-premium" style="margin-bottom: 0;">
-                        <label for="project_file_description" class="form-label">Description / Note <span class="text-muted">(optional)</span></label>
-                        <input
-                            type="text"
-                            id="project_file_description"
-                            name="description"
-                            class="form-control"
-                            maxlength="255"
-                            placeholder="e.g. Official signed billing invoice #1024"
+                    {{-- Hidden synchronized inputs for form submission --}}
+                    <div id="modal_project_files_inputs" style="display: none;"></div>
+                    <div id="modal_single_file_slot" style="display: none;"></div>
+
+                    {{-- Hidden multiple file picker input --}}
+                    <input
+                        type="file"
+                        x-ref="modalProjectFilesInput"
+                        @change="handleModalFilesSelected($event)"
+                        multiple
+                        accept=".pdf,.doc,.docx,image/*"
+                        style="display: none;"
+                    >
+
+                    {{-- When Files are Attached: List with remove ("x") and "+ Attach Another File" --}}
+                    <template x-if="uploadModalFiles.length > 0">
+                        <div style="margin-bottom: var(--space-3);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                                <span style="font-size: 0.8125rem; font-weight: 700; color: var(--color-ink);">
+                                    Attached Files (<span x-text="uploadModalFiles.length"></span>)
+                                </span>
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary btn-sm"
+                                    @click="$refs.modalProjectFilesInput.click()"
+                                    style="padding: 2px 10px; font-size: 0.75rem;"
+                                >
+                                    + Attach Another File
+                                </button>
+                            </div>
+
+                            {{-- Scrollable staging list to prevent modal scroll fatigue --}}
+                            <div style="display: flex; flex-direction: column; gap: var(--space-2); max-height: 230px; overflow-y: auto; padding-right: 2px;">
+                                <template x-for="(fileItem, index) in uploadModalFiles" :key="fileItem.id">
+                                    <div 
+                                        style="display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) var(--space-3); background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.8125rem;"
+                                    >
+                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);">
+                                            <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1;">
+                                                <span x-text="getFileIcon(fileItem.name)" style="font-size: 1.1rem; flex-shrink: 0;"></span>
+                                                <div style="min-width: 0; flex: 1;">
+                                                    <div style="font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="fileItem.name"></div>
+                                                    <div class="text-muted" style="font-size: 0.6875rem;" x-text="fileItem.formattedSize"></div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                class="btn btn-secondary btn-sm"
+                                                @click="removeModalUploadFile(index)"
+                                                style="padding: 2px 7px; color: #ef4444; border-color: rgba(239, 68, 68, 0.3); font-weight: 700; line-height: 1; border-radius: 4px;"
+                                                title="Remove this attached file"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+
+                                        {{-- Inline Category & Description for this specific file --}}
+                                        <div style="display: flex; gap: var(--space-2); align-items: center; margin-top: 2px;">
+                                            <select 
+                                                x-model="fileItem.category" 
+                                                @change="syncModalUploadInputs()"
+                                                class="form-control"
+                                                style="padding: 2px 6px; font-size: 0.75rem; height: 26px; width: 175px; flex-shrink: 0;"
+                                                title="Select category for this file"
+                                            >
+                                                <option value="project_document">Project document</option>
+                                                <option value="project_transaction">Project transaction</option>
+                                                <option value="invoice">Project invoice</option>
+                                                <option value="project_notes">Project notes</option>
+                                                <option value="project_drawing">Project drawing / blueprint</option>
+                                            </select>
+                                            <input 
+                                                type="text" 
+                                                x-model="fileItem.description"
+                                                @input="syncModalUploadInputs()"
+                                                class="form-control"
+                                                placeholder="Optional notes..."
+                                                maxlength="255"
+                                                style="padding: 2px 8px; font-size: 0.75rem; height: 26px; flex: 1;"
+                                            >
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
+                    {{-- Empty Dropzone State --}}
+                    <template x-if="uploadModalFiles.length === 0">
+                        <div 
+                            class="pms-dropzone"
+                            :class="{ 'is-dragging': isDraggingModal }"
+                            @dragover.prevent="isDraggingModal = true"
+                            @dragleave.prevent="isDraggingModal = false"
+                            @drop.prevent="isDraggingModal = false; handleModalFilesDropped($event)"
+                            @click="$refs.modalProjectFilesInput.click()"
+                            style="padding: var(--space-4); text-align: center; border: 2px dashed var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); cursor: pointer; transition: all 0.15s ease;"
                         >
-                    </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                                <svg style="width: 28px; height: 28px; color: var(--color-accent); opacity: 0.85;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                                <span style="font-size: 0.875rem; font-weight: 600; color: var(--color-ink);">
+                                    Click to select or drop file(s)
+                                </span>
+                                <span class="text-muted" style="font-size: 0.75rem;">
+                                    PDF, DOCX, or Images up to 20MB. Multiple files supported.
+                                </span>
+                                <button type="button" class="btn btn-primary btn-sm" style="margin-top: 4px; pointer-events: none;">
+                                    + Attach Files
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+
+                    {{-- Error message --}}
+                    <template x-if="uploadModalError">
+                        <div class="form-error" style="color: #ef4444; font-size: 0.75rem; margin-top: 6px;" x-text="uploadModalError"></div>
+                    </template>
+
+                    @if(Auth::user()->hasRole('Staff'))
+                        <div style="margin-top: var(--space-3); padding: var(--space-2) var(--space-3); background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-sm); font-size: 0.75rem; color: #b45309;">
+                            <strong>Staff Notice:</strong> Uploaded files will be submitted for manager or admin approval before reflecting in the project.
+                        </div>
+                    @endif
                 </div>
+
                 <div class="card-footer" style="display: flex; justify-content: flex-end; gap: var(--space-2);">
-                    <button type="button" class="btn btn-secondary" @click="uploadFileModalOpen = false">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Upload File</button>
+                    <button type="button" class="btn btn-secondary" @click="closeUploadProjectFileModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" :disabled="uploadModalFiles.length === 0 || uploadModalSubmitting">
+                        <span x-show="!uploadModalSubmitting" x-text="uploadModalFiles.length > 1 ? 'Upload ' + uploadModalFiles.length + ' Files' : (uploadModalFiles.length === 1 ? 'Upload 1 File' : 'Upload File')"></span>
+                        <span x-show="uploadModalSubmitting">Uploading...</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -2461,10 +2818,10 @@
     {{-- ─── Modal 9: File Details, Description Editor & Actions ─────── --}}
     <div class="reassign-modal-overlay" style="display: none;" x-show="viewFileModalOpen" x-cloak>
         <div class="reassign-modal-backdrop" @click="viewFileModalOpen = false"></div>
-        <div class="reassign-modal-content card" x-show="viewFileModalOpen" x-transition style="max-width: 520px;">
+        <div class="reassign-modal-content card" x-show="viewFileModalOpen" x-transition style="max-width: 620px; width: 100%;">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0;">
-                    <span x-text="activeFileData.is_img ? '🖼️' : (activeFileData.is_pdf ? '📕' : (activeFileData.is_word ? '📘' : '📄'))"></span>
+                    <span x-text="activeFileData.is_img ? '🖼️' : (activeFileData.is_pdf ? '📕' : (activeFileData.is_word ? '📘' : (activeFileData.type === 'project_drawing' ? '📐' : '📄')))"></span>
                     <span style="font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="activeFileData.name"></span>
                 </div>
                 <button type="button" class="flash-close" @click="viewFileModalOpen = false" aria-label="Close modal">&times;</button>
@@ -2482,7 +2839,7 @@
                         </div>
                         <div>
                             <span class="text-muted" style="display: block; font-size: 0.6875rem; text-transform: uppercase; font-weight: 700;">Category</span>
-                            <span class="badge" style="text-transform: capitalize; background: var(--color-surface); font-size: 0.75rem;" x-text="activeFileData.type === 'invoice' ? 'Invoice / Billing' : (activeFileData.type === 'task_attachment' ? 'Task Attachment' : 'General Document')"></span>
+                            <span class="badge" style="background: var(--color-surface); font-size: 0.75rem;" x-text="activeFileData.category_label || (activeFileData.type === 'invoice' ? 'Project invoice' : (activeFileData.type === 'project_transaction' ? 'Project transaction' : (activeFileData.type === 'project_notes' ? 'Project notes' : (activeFileData.type === 'project_drawing' ? 'Project drawing / blueprint' : (activeFileData.type === 'task_attachment' ? 'Task Attachment' : 'Project document')))))"></span>
                         </div>
                         <div>
                             <span class="text-muted" style="display: block; font-size: 0.6875rem; text-transform: uppercase; font-weight: 700;">Uploaded By</span>
@@ -2519,26 +2876,52 @@
                     </div>
                 </div>
 
-                <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
-                    <div style="display: flex; gap: var(--space-2);">
-                        <a :href="activeFileData.download_url" class="btn btn-secondary btn-sm" target="_blank" style="display: inline-flex; align-items: center; gap: 4px;">
-                            ⬇ Download File
+                <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: nowrap; padding: var(--space-3) var(--space-4);">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                        <a 
+                            :href="activeFileData.download_url ? (activeFileData.download_url + (activeFileData.download_url.includes('?') ? '&preview=1' : '?preview=1')) : '#'" 
+                            class="btn btn-secondary btn-sm" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            style="display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; height: 32px; padding: 0 10px;"
+                        >
+                            <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            <span>Preview</span>
+                        </a>
+                        <a 
+                            :href="activeFileData.download_url" 
+                            class="btn btn-secondary btn-sm" 
+                            target="_blank" 
+                            style="display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; height: 32px; padding: 0 10px;"
+                        >
+                            <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span>Download</span>
                         </a>
                         @can('update', $project)
                             <button
                                 type="button"
                                 class="btn btn-secondary btn-sm"
-                                style="color: var(--color-danger); border-color: #fecaca;"
+                                style="color: var(--color-danger); border-color: rgba(239, 68, 68, 0.35); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; height: 32px; padding: 0 10px;"
                                 @click="deleteActiveFile()"
                             >
-                                🗑 Delete File
+                                <svg style="width: 13px; height: 13px;" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                </svg>
+                                <span>Delete</span>
                             </button>
                         @endcan
                     </div>
-                    <div style="display: flex; gap: var(--space-2);">
-                        <button type="button" class="btn btn-secondary btn-sm" @click="viewFileModalOpen = false">Close</button>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                        <button type="button" class="btn btn-secondary btn-sm" style="white-space: nowrap; height: 32px; padding: 0 12px;" @click="viewFileModalOpen = false">Close</button>
                         @can('update', $project)
-                            <button type="submit" class="btn btn-primary btn-sm">Save Description</button>
+                            <button type="submit" class="btn btn-primary btn-sm" style="white-space: nowrap; height: 32px; padding: 0 14px; font-weight: 600;">Save Description</button>
                         @endcan
                     </div>
                 </div>
@@ -2769,7 +3152,7 @@
                                 </div>
                                 <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
                                     <a 
-                                        :href="file.url" 
+                                        :href="file.url ? (file.url + (file.url.includes('?') ? '&preview=1' : '?preview=1')) : '#'" 
                                         target="_blank" 
                                         rel="noopener noreferrer" 
                                         class="btn btn-secondary btn-sm"
@@ -3205,14 +3588,36 @@
         </div>
     </div>
 
+    {{-- ─── Modal 13: Warranty & Maintenance Information Modal ───────────────────── --}}
+    @include('projects.partials.warranty-modal')
+
 </div>
 @endsection
 
 @push('styles')
 <style>
+.project-file-item {
+    transition: all 0.15s ease-in-out !important;
+}
 .project-file-item:hover {
     border-color: var(--color-primary) !important;
     background: var(--color-surface-alt) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.project-files-scroll-list::-webkit-scrollbar {
+    width: 6px;
+}
+.project-files-scroll-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.project-files-scroll-list::-webkit-scrollbar-thumb {
+    background: var(--color-border, rgba(255, 255, 255, 0.15));
+    border-radius: 9999px;
+}
+.project-files-scroll-list::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted, rgba(255, 255, 255, 0.3));
 }
 
 .timeline-stages-grid {
@@ -3632,7 +4037,120 @@ function projectDetail() {
         editMajorTaskModalOpen: false,
         editSubtaskModalOpen: false,
         markCompletedModalOpen: false,
+        warrantyInfoModalOpen: false,
         uploadFileModalOpen: false,
+        uploadModalDefaultCategory: 'project_document',
+        uploadModalFiles: [],
+        uploadModalError: '',
+        uploadModalSubmitting: false,
+        isDraggingModal: false,
+        openUploadProjectFileModal(defaultCat = 'project_document') {
+            this.uploadModalDefaultCategory = defaultCat || 'project_document';
+            this.uploadModalFiles = [];
+            this.uploadModalError = '';
+            this.uploadModalSubmitting = false;
+            this.uploadFileModalOpen = true;
+        },
+        closeUploadProjectFileModal() {
+            this.uploadFileModalOpen = false;
+            this.uploadModalFiles = [];
+            this.uploadModalError = '';
+            this.uploadModalSubmitting = false;
+        },
+        handleModalFilesSelected(e) {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            this.addModalFiles(Array.from(files));
+            e.target.value = '';
+        },
+        handleModalFilesDropped(e) {
+            const files = e.dataTransfer ? e.dataTransfer.files : null;
+            if (!files || files.length === 0) return;
+            this.addModalFiles(Array.from(files));
+        },
+        addModalFiles(newFiles) {
+            this.uploadModalError = '';
+            const maxSize = 20 * 1024 * 1024; // 20MB
+            for (const file of newFiles) {
+                if (file.size > maxSize) {
+                    this.uploadModalError = `File "${file.name}" exceeds the 20MB limit.`;
+                    continue;
+                }
+                if (!this.uploadModalFiles.some(f => f.name === file.name && f.file.size === file.size)) {
+                    this.uploadModalFiles.push({
+                        id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                        file: file,
+                        name: file.name,
+                        size: file.size,
+                        formattedSize: (file.size >= 1048576) ? (file.size / 1048576).toFixed(2) + ' MB' : (file.size / 1024).toFixed(1) + ' KB',
+                        category: this.uploadModalDefaultCategory,
+                        description: ''
+                    });
+                }
+            }
+            this.syncModalUploadInputs();
+        },
+        removeModalUploadFile(index) {
+            this.uploadModalFiles.splice(index, 1);
+            this.syncModalUploadInputs();
+        },
+        syncModalUploadInputs() {
+            const container = document.getElementById('modal_project_files_inputs');
+            if (!container) return;
+            container.innerHTML = '';
+            this.uploadModalFiles.forEach((item, idx) => {
+                const fInput = document.createElement('input');
+                fInput.type = 'file';
+                fInput.name = `files[${idx}]`;
+                fInput.style.display = 'none';
+                try {
+                    const dt = new DataTransfer();
+                    dt.items.add(item.file);
+                    fInput.files = dt.files;
+                } catch (e) {
+                    console.error('DataTransfer error', e);
+                }
+                container.appendChild(fInput);
+
+                const cInput = document.createElement('input');
+                cInput.type = 'hidden';
+                cInput.name = `categories[${idx}]`;
+                cInput.value = item.category || this.uploadModalDefaultCategory;
+                container.appendChild(cInput);
+
+                const dInput = document.createElement('input');
+                dInput.type = 'hidden';
+                dInput.name = `descriptions[${idx}]`;
+                dInput.value = item.description || '';
+                container.appendChild(dInput);
+            });
+
+            const singleSlot = document.getElementById('modal_single_file_slot');
+            if (singleSlot) {
+                singleSlot.innerHTML = '';
+                if (this.uploadModalFiles.length > 0) {
+                    const singleInput = document.createElement('input');
+                    singleInput.type = 'file';
+                    singleInput.name = 'file';
+                    singleInput.style.display = 'none';
+                    try {
+                        const dt = new DataTransfer();
+                        dt.items.add(this.uploadModalFiles[0].file);
+                        singleInput.files = dt.files;
+                    } catch(e) {}
+                    singleSlot.appendChild(singleInput);
+                }
+            }
+        },
+        submitModalUploadForm(formEl) {
+            if (!this.uploadModalFiles || this.uploadModalFiles.length === 0) {
+                this.uploadModalError = 'Please select at least one file to upload.';
+                return;
+            }
+            this.uploadModalSubmitting = true;
+            this.syncModalUploadInputs();
+            formEl.submit();
+        },
         subtaskFileModalOpen: false,
         viewFileModalOpen: false,
         confirmCompletionModalOpen: false,
@@ -3972,6 +4490,7 @@ function projectDetail() {
             if (['pdf'].includes(ext)) return '📕';
             if (['doc', 'docx'].includes(ext)) return '📘';
             if (['xls', 'xlsx'].includes(ext)) return '📗';
+            if (['dwg', 'dxf', 'cad'].includes(ext)) return '📐';
             return '📄';
         },
 

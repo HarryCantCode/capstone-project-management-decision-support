@@ -7,7 +7,7 @@
 --}}
 
 <div class="sidebar-header">
-    <a href="{{ route('dashboard') }}" class="sidebar-brand" aria-label="Dex PMS home">
+    <a href="{{ Auth::user() ? Auth::user()->defaultLandingRoute() : route('dashboard') }}" class="sidebar-brand" aria-label="Dex PMS home">
         <img src="{{ asset('images/dex-logo.png') }}" alt="Dex International Co. Logo" class="sidebar-brand-icon" width="28" height="28" style="border-radius: 8px; object-fit: cover;">
         <span>Dex International Co.</span>
     </a>

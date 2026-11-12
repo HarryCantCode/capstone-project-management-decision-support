@@ -11,7 +11,7 @@
         </div>
     </div>
 
-    <form method="POST" action="{{ route('projects.store') }}" class="project-form-layout" enctype="multipart/form-data" novalidate>
+    <form method="POST" action="{{ route('projects.store') }}" class="project-form-layout" enctype="multipart/form-data" novalidate x-data="{ warrantyInfoModalOpen: false }">
         @csrf
         @include('projects._form')
     </form>

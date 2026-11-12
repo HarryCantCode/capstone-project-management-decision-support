@@ -22,46 +22,122 @@ class ProjectFileController extends Controller
     }
 
     /**
-     * Upload a file directly to the project (invoice or general file).
+     * Upload a file or multiple files directly to the project.
      */
     public function store(Request $request, Project $project): RedirectResponse|JsonResponse
     {
         abort_unless(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']), 403);
 
-        $validated = $request->validate([
-            'file' => ['required', 'file', 'mimes:pdf,docx,jpg,jpeg,png,webp', 'max:20480'],
-            'file_type' => ['nullable', 'string', 'in:invoice,general,project_document,project_transaction,project_notes,project_drawing'],
+        $request->validate([
+            'file' => ['nullable', 'file', 'mimes:pdf,docx,jpg,jpeg,png,webp', 'max:20480'],
+            'files' => ['nullable', 'array'],
+            'files.*' => ['file', 'mimes:pdf,docx,jpg,jpeg,png,webp', 'max:20480'],
+            'file_type' => ['nullable', 'string', 'in:invoice,project_invoice,general,project_document,project_transaction,project_notes,project_drawing'],
+            'categories' => ['nullable', 'array'],
+            'categories.*' => ['nullable', 'string', 'in:invoice,project_invoice,general,project_document,project_transaction,project_notes,project_drawing'],
             'description' => ['nullable', 'string', 'max:255'],
+            'descriptions' => ['nullable', 'array'],
+            'descriptions.*' => ['nullable', 'string', 'max:255'],
         ], [
-            'file.required' => 'Please select a file to upload.',
             'file.mimes' => 'Only PDF, DOCX, and Image (JPG, JPEG, PNG, WEBP) files are allowed.',
             'file.max' => 'The file size cannot exceed 20MB.',
+            'files.*.mimes' => 'Only PDF, DOCX, and Image (JPG, JPEG, PNG, WEBP) files are allowed.',
+            'files.*.max' => 'Each file size cannot exceed 20MB.',
         ]);
 
+        $hasMultiple = $request->hasFile('files');
+        $hasSingle = $request->hasFile('file');
+
+        if (!$hasMultiple && !$hasSingle) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please select at least one file to upload.',
+                ], 422);
+            }
+
+            return back()->withErrors(['file' => 'Please select at least one file to upload.']);
+        }
+
+        $items = [];
+        $defaultCategory = $request->input('file_type', 'project_document');
+        if ($defaultCategory === 'general') {
+            $defaultCategory = 'project_document';
+        }
+        if ($defaultCategory === 'project_invoice') {
+            $defaultCategory = 'invoice';
+        }
+
+        if ($hasMultiple) {
+            $filesList = $request->file('files');
+            $cats = (array) $request->input('categories', []);
+            $descs = (array) $request->input('descriptions', []);
+            foreach ($filesList as $idx => $uploadedFile) {
+                if ($uploadedFile instanceof \Illuminate\Http\UploadedFile) {
+                    $cat = $cats[$idx] ?? $defaultCategory;
+                    if ($cat === 'general') {
+                        $cat = 'project_document';
+                    }
+                    if ($cat === 'project_invoice') {
+                        $cat = 'invoice';
+                    }
+                    $desc = $descs[$idx] ?? $request->input('description');
+                    $items[] = [
+                        'file' => $uploadedFile,
+                        'category' => $cat,
+                        'description' => $desc,
+                    ];
+                }
+            }
+        } elseif ($hasSingle) {
+            $uploadedFile = $request->file('file');
+            $items[] = [
+                'file' => $uploadedFile,
+                'category' => $defaultCategory,
+                'description' => $request->input('description'),
+            ];
+        }
+
+        if (empty($items)) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'No valid files provided.'], 422);
+            }
+
+            return back()->withErrors(['file' => 'No valid files provided.']);
+        }
+
         if (Auth::user()->hasRole('Staff')) {
-            $uploadedFile = $validated['file'];
-            $storedPath = $uploadedFile->store('project-files/' . $project->id, 'public');
+            $pendingActions = [];
+            foreach ($items as $item) {
+                $uploadedFile = $item['file'];
+                $storedPath = $uploadedFile->store('project-files/' . $project->id, 'public');
 
-            $pendingAction = \App\Models\StaffPendingAction::create([
-                'user_id' => Auth::id(),
-                'project_id' => $project->id,
-                'action_type' => 'add_file',
-                'payload' => [
-                    'file_name' => $uploadedFile->getClientOriginalName(),
-                    'file_path' => $storedPath,
-                    'file_size' => $uploadedFile->getSize(),
-                    'mime_type' => $uploadedFile->getClientMimeType() ?: $uploadedFile->getMimeType(),
-                    'file_type' => $validated['file_type'] ?? 'general',
-                    'description' => $validated['description'] ?? null,
-                    'subtask_id' => null,
-                    'subtask_title' => null,
-                ],
-                'status' => 'pending',
-            ]);
+                $pendingAction = \App\Models\StaffPendingAction::create([
+                    'user_id' => Auth::id(),
+                    'project_id' => $project->id,
+                    'action_type' => 'add_file',
+                    'payload' => [
+                        'file_name' => $uploadedFile->getClientOriginalName(),
+                        'file_path' => $storedPath,
+                        'file_size' => $uploadedFile->getSize(),
+                        'mime_type' => $uploadedFile->getClientMimeType() ?: $uploadedFile->getMimeType(),
+                        'file_type' => $item['category'],
+                        'description' => $item['description'],
+                        'subtask_id' => null,
+                        'subtask_title' => null,
+                    ],
+                    'status' => 'pending',
+                ]);
 
-            app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
+                app(\App\Services\NotificationService::class)->notifyStaffActionPending($pendingAction);
+                $pendingActions[] = $pendingAction;
+            }
 
-            $msg = 'Your action has been submitted successfully and will be reviewed by your manager or admin to take effect.';
+            $count = count($pendingActions);
+            $msg = $count > 1
+                ? "{$count} file upload requests have been submitted successfully and will be reviewed by your manager or admin."
+                : 'Your file upload request has been submitted successfully and will be reviewed by your manager or admin.';
+
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => true,
@@ -75,25 +151,31 @@ class ProjectFileController extends Controller
                 ->with('staff_submitted', $msg);
         }
 
-        $projectFile = $this->projectService->storeProjectFile(
-            $project,
-            $validated['file'],
-            $validated['file_type'] ?? 'general',
-            Auth::id(),
-            $validated['description'] ?? null,
-        );
+        $storedFiles = [];
+        foreach ($items as $item) {
+            $storedFiles[] = $this->projectService->storeProjectFile(
+                $project,
+                $item['file'],
+                $item['category'],
+                Auth::id(),
+                $item['description'],
+            );
+        }
+
+        $count = count($storedFiles);
+        $msg = $count > 1 ? "{$count} files uploaded successfully." : 'File uploaded successfully.';
 
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'File uploaded successfully.',
-                'file' => $projectFile->load('uploader'),
+                'message' => $msg,
+                'files' => $storedFiles,
             ]);
         }
 
         return redirect()
             ->route('projects.show', $project)
-            ->with('status', 'File uploaded successfully.');
+            ->with('status', $msg);
     }
 
     /**
@@ -187,6 +269,10 @@ class ProjectFileController extends Controller
 
         if (!Storage::disk('public')->exists($file->file_path)) {
             abort(404, 'File not found on server storage.');
+        }
+
+        if (request()->has('preview')) {
+            return Storage::disk('public')->response($file->file_path, $file->file_name);
         }
 
         return Storage::disk('public')->download($file->file_path, $file->file_name);

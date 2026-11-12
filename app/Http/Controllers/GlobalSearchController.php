@@ -249,11 +249,7 @@ class GlobalSearchController extends Controller
 
             $files = $fileResults->map(function (ProjectFile $f) {
                 $project = $f->project;
-                $typeLabel = match ($f->file_type) {
-                    'invoice' => 'Invoice',
-                    'task_attachment' => 'Task Attachment',
-                    default => 'General Document',
-                };
+                $typeLabel = $f->category_label;
 
                 return [
                     'id' => $f->id,

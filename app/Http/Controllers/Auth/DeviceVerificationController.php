@@ -86,6 +86,8 @@ class DeviceVerificationController extends Controller
 
         // Staff redirected to resources index
         if ($user->hasRole('Staff')) {
+            $request->session()->forget('url.intended');
+
             return redirect()->route('resources.index');
         }
 

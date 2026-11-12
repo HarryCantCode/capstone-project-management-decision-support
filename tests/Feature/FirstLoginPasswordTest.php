@@ -12,6 +12,10 @@ beforeEach(function () {
 });
 
 test('user with must_change_password flag is redirected to first-login password change on login', function () {
+    $this->mock(\App\Services\OtpService::class, function ($mock) {
+        $mock->shouldReceive('isDeviceKnownAndVerified')->andReturn(true);
+    });
+
     $user = User::factory()->create([
         'password' => Hash::make('@tempPass123'),
         'must_change_password' => true,
@@ -137,8 +141,8 @@ test('first-login password update rejects password containing user first name', 
     $user->assignRole('Manager');
 
     $response = $this->actingAs($user)->post(route('password.first-login.update'), [
-        'password' => 'Alexand3r!99',
-        'password_confirmation' => 'Alexand3r!99',
+        'password' => 'Alexander!99',
+        'password_confirmation' => 'Alexander!99',
     ]);
 
     $response->assertSessionHasErrors(['password']);

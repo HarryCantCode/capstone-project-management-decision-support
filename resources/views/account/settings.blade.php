@@ -121,16 +121,9 @@
 
             <div class="profile-details-grid">
                 <div class="detail-item">
-                    <span class="detail-label">Account Number</span>
-                    <div class="detail-value">
-                        <span class="font-mono detail-accent">{{ Auth::user()->account_number ?? 'N/A' }}</span>
-                    </div>
-                </div>
-
-                <div class="detail-item">
                     <span class="detail-label">Employee ID</span>
                     <div class="detail-value">
-                        <span class="font-mono">{{ Auth::user()->employee_number ?? 'N/A' }}</span>
+                        <span class="font-mono detail-accent">{{ Auth::user()->employee_number ?? 'N/A' }}</span>
                     </div>
                 </div>
 
@@ -138,6 +131,13 @@
                     <span class="detail-label">Email Address</span>
                     <div class="detail-value text-break">
                         {{ Auth::user()->email }}
+                    </div>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Member Since</span>
+                    <div class="detail-value">
+                        <span class="font-mono text-muted">{{ Auth::user()->created_at?->format('M d, Y') ?? 'N/A' }}</span>
                     </div>
                 </div>
 
@@ -178,13 +178,12 @@
                 form.action = this.archiveUserTarget.url;
                 form.submit();
             },
-            matchRow(accountNo, employeeId, name, email, jobTitle, role) {
+            matchRow(employeeId, name, email, jobTitle, role) {
                 const q = this.searchQuery.toLowerCase().trim();
                 const matchesRole = this.roleFilter === 'all' || role.toLowerCase() === this.roleFilter.toLowerCase();
                 if (!matchesRole) return false;
                 if (!q) return true;
                 return (
-                    (accountNo && accountNo.toLowerCase().includes(q)) ||
                     (employeeId && employeeId.toLowerCase().includes(q)) ||
                     (name && name.toLowerCase().includes(q)) ||
                     (email && email.toLowerCase().includes(q)) ||
@@ -239,7 +238,7 @@
                     type="search"
                     x-model="searchQuery"
                     class="form-control directory-search__input"
-                    placeholder="Filter by name, email, account no., employee ID, or title..."
+                    placeholder="Filter by name, email, employee ID, or title..."
                     aria-label="Filter users"
                 >
             </div>
@@ -261,8 +260,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th scope="col" style="width: 140px;">Account No.</th>
-                            <th scope="col" style="width: 140px;">Employee ID</th>
+                            <th scope="col" style="width: 160px;">Employee ID</th>
                             <th scope="col">User</th>
                             <th scope="col">Job Title</th>
                             <th scope="col">System Role</th>
@@ -275,13 +273,10 @@
                                 $uRole = $u->getRoleNames()->first() ?? 'None';
                             @endphp
                             <tr
-                                x-show="matchRow('{{ addslashes($u->account_number ?? '') }}', '{{ addslashes($u->employee_number ?? '') }}', '{{ addslashes($u->name) }}', '{{ addslashes($u->email) }}', '{{ addslashes($u->job_title ?? '') }}', '{{ addslashes($uRole) }}')"
+                                x-show="matchRow('{{ addslashes($u->employee_number ?? '') }}', '{{ addslashes($u->name) }}', '{{ addslashes($u->email) }}', '{{ addslashes($u->job_title ?? '') }}', '{{ addslashes($uRole) }}')"
                             >
                                 <td>
-                                    <span class="font-mono table-accent-text">{{ $u->account_number ?? 'N/A' }}</span>
-                                </td>
-                                <td>
-                                    <span class="font-mono text-muted">{{ $u->employee_number ?? 'N/A' }}</span>
+                                    <span class="font-mono table-accent-text">{{ $u->employee_number ?? 'N/A' }}</span>
                                 </td>
                                 <td>
                                     <div class="user-row-identity">
@@ -343,7 +338,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center text-muted empty-cell-state">
+                                <td colspan="5" class="text-center text-muted empty-cell-state">
                                     No active user accounts found in the system.
                                 </td>
                             </tr>
@@ -359,8 +354,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th scope="col" style="width: 140px;">Account No.</th>
-                            <th scope="col" style="width: 140px;">Employee ID</th>
+                            <th scope="col" style="width: 160px;">Employee ID</th>
                             <th scope="col">User</th>
                             <th scope="col">Job Title</th>
                             <th scope="col">System Role</th>
@@ -375,11 +369,8 @@
                             @endphp
                             <tr
                                 class="tr--archived"
-                                x-show="matchRow('{{ addslashes($u->account_number ?? '') }}', '{{ addslashes($u->employee_number ?? '') }}', '{{ addslashes($u->name) }}', '{{ addslashes($u->email) }}', '{{ addslashes($u->job_title ?? '') }}', '{{ addslashes($uRole) }}')"
+                                x-show="matchRow('{{ addslashes($u->employee_number ?? '') }}', '{{ addslashes($u->name) }}', '{{ addslashes($u->email) }}', '{{ addslashes($u->job_title ?? '') }}', '{{ addslashes($uRole) }}')"
                             >
-                                <td>
-                                    <span class="font-mono text-muted">{{ $u->account_number ?? 'N/A' }}</span>
-                                </td>
                                 <td>
                                     <span class="font-mono text-muted">{{ $u->employee_number ?? 'N/A' }}</span>
                                 </td>
@@ -421,7 +412,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center text-muted empty-cell-state">
+                                <td colspan="6" class="text-center text-muted empty-cell-state">
                                     No archived accounts. All user accounts are currently active.
                                 </td>
                             </tr>

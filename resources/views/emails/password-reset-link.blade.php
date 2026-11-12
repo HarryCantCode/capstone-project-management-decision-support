@@ -167,12 +167,6 @@
                 <span class="account-label">Email:</span>
                 <span>{{ $user->email }}</span>
             </div>
-            @if ($user->account_number)
-                <div class="account-row">
-                    <span class="account-label">Account No.:</span>
-                    <span style="font-family: monospace;">{{ $user->account_number }}</span>
-                </div>
-            @endif
             @if ($user->employee_number)
                 <div class="account-row">
                     <span class="account-label">Employee ID:</span>

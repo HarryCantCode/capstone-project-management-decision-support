@@ -97,31 +97,17 @@
 
             <div class="card-header">User Details</div>
             <div class="card-body">
-                {{-- Employee Number & Account Number (Read-only) --}}
-                <div class="personnel-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
-                    <div class="form-group-premium">
-                        <label for="employee_number" class="form-label">Employee Number</label>
-                        <input
-                            type="text"
-                            id="employee_number"
-                            class="form-control font-mono"
-                            value="{{ $user->employee_number ?? 'N/A' }}"
-                            disabled
-                            style="background: var(--color-surface-alt); font-weight: 600;"
-                        >
-                    </div>
-
-                    <div class="form-group-premium">
-                        <label for="account_number" class="form-label">7-Digit Account Number</label>
-                        <input
-                            type="text"
-                            id="account_number"
-                            class="form-control font-mono"
-                            value="{{ $user->account_number ?? 'N/A' }}"
-                            disabled
-                            style="background: var(--color-surface-alt); font-weight: 600;"
-                        >
-                    </div>
+                {{-- Employee Number (Read-only) --}}
+                <div class="form-group-premium" style="max-width: 360px; margin-bottom: 1rem;">
+                    <label for="employee_number" class="form-label">Employee ID</label>
+                    <input
+                        type="text"
+                        id="employee_number"
+                        class="form-control font-mono"
+                        value="{{ $user->employee_number ?? 'N/A' }}"
+                        disabled
+                        style="background: var(--color-surface-alt); font-weight: 600;"
+                    >
                 </div>
 
                 {{-- Name Grid --}}
@@ -338,13 +324,8 @@
                                 <span class="text-muted">Email Address:</span>
                                 <strong style="color: var(--color-primary);">{{ $user->email }}</strong>
 
-                                @if($user->account_number)
-                                    <span class="text-muted">Account No.:</span>
-                                    <span class="font-mono">{{ $user->account_number }}</span>
-                                @endif
-
                                 @if($user->employee_number)
-                                    <span class="text-muted">Employee No.:</span>
+                                    <span class="text-muted">Employee ID:</span>
                                     <span class="font-mono">{{ $user->employee_number }}</span>
                                 @endif
 

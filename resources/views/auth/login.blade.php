@@ -6,7 +6,7 @@
     <div x-data="{ forgotModalOpen: false }">
         <div class="auth-header-group">
             <h1 class="auth-heading">Welcome back</h1>
-            <p class="auth-subheading">Sign in with your email or 7-digit account number</p>
+            <p class="auth-subheading">Sign in with your email address</p>
         </div>
 
         {{-- Session status (e.g. "You have been logged out") --}}
@@ -19,23 +19,23 @@
         <form method="POST" action="{{ route('login.store') }}" id="login-form" novalidate>
             @csrf
 
-            {{-- Email or Account Number --}}
+            {{-- Email address --}}
             <div class="form-group">
-                <label for="email" class="form-label">Email address or Account Number</label>
+                <label for="email" class="form-label">Email address</label>
                 <div class="input-with-icon">
                     <span class="input-icon" aria-hidden="true">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                     </span>
                     <input
                         id="email"
-                        type="text"
+                        type="email"
                         name="email"
                         class="form-control form-control--with-icon @error('email') is-invalid @enderror"
                         value="{{ old('email') }}"
                         required
                         autocomplete="username"
                         autofocus
-                        placeholder="name@dex-pms.local or 1000001"
+                        placeholder="name@dex-pms.local"
                         aria-describedby="email-error"
                     >
                 </div>
@@ -168,21 +168,21 @@
 
                     <div class="card-body">
                         <p class="text-muted small mb-3" style="font-size: 0.8125rem; line-height: 1.5;">
-                            Enter your email address or 7-digit account number. We will send a secure password creation link directly to your registered email address.
+                            Enter your registered email address. We will send a secure password creation link directly to your inbox.
                         </p>
 
                         <div id="forgot-password-feedback" class="d-none alert mb-3" role="alert"></div>
 
                         <div class="form-group mb-0">
                             <label for="reset_email" class="form-label" style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.35rem; display: block;">
-                                Email Address or Account Number <span class="required" aria-hidden="true">*</span>
+                                Email Address <span class="required" aria-hidden="true">*</span>
                             </label>
                             <input
-                                type="text"
+                                type="email"
                                 name="email"
                                 id="reset_email"
                                 class="form-control"
-                                placeholder="name@dex-pms.local or 1000001"
+                                placeholder="name@dex-pms.local"
                                 required
                             >
                         </div>

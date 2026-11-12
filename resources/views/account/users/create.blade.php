@@ -54,37 +54,20 @@
             @csrf
             <div class="card-header">User Information</div>
             <div class="card-body">
-                {{-- Auto-generated Identifiers: Employee ID and Account Number --}}
-                <div class="personnel-form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
-                    <div class="form-group-premium">
-                        <label for="employee_number_preview" class="form-label">
-                            Employee ID 
-                            <span class="status-pill status-pill--completed" style="font-size: 0.6875rem; vertical-align: middle;">Auto-generated</span>
-                        </label>
-                        <input
-                            type="text"
-                            id="employee_number_preview"
-                            class="form-control font-mono"
-                            value="{{ $nextEmployeeNumber }}"
-                            disabled
-                            style="background: var(--color-surface-alt, #f8fafc); color: var(--color-accent, #2C5F7C); font-weight: 600;"
-                        >
-                    </div>
-
-                    <div class="form-group-premium">
-                        <label for="account_number_preview" class="form-label">
-                            Account Number (7-Digit) 
-                            <span class="status-pill status-pill--completed" style="font-size: 0.6875rem; vertical-align: middle;">Auto-generated</span>
-                        </label>
-                        <input
-                            type="text"
-                            id="account_number_preview"
-                            class="form-control font-mono"
-                            value="{{ $nextAccountNumber }}"
-                            disabled
-                            style="background: var(--color-surface-alt, #f8fafc); color: var(--color-accent, #2C5F7C); font-weight: 600;"
-                        >
-                    </div>
+                {{-- Auto-generated Identifier: Employee ID --}}
+                <div class="form-group-premium" style="max-width: 360px;">
+                    <label for="employee_number_preview" class="form-label">
+                        Employee ID 
+                        <span class="status-pill status-pill--completed" style="font-size: 0.6875rem; vertical-align: middle;">Auto-generated</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="employee_number_preview"
+                        class="form-control font-mono"
+                        value="{{ $nextEmployeeNumber }}"
+                        disabled
+                        style="background: var(--color-surface-alt, #f8fafc); color: var(--color-accent, #2C5F7C); font-weight: 600;"
+                    >
                 </div>
 
                 {{-- Name Grid: First Name, Middle Name, Last Name --}}

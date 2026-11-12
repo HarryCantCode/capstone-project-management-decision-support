@@ -209,7 +209,7 @@ class NotificationService
         $adminRecipients = User::role('Admin')->get();
         $recipients = $adminRecipients->push($user)->unique('id');
 
-        $accountLabel = $user->account_number ? "Acc: {$user->account_number}" : $user->email;
+        $accountLabel = $user->employee_number ? "ID: {$user->employee_number}" : $user->email;
 
         if ($action === 'email') {
             $title = 'Security: Email Updated';

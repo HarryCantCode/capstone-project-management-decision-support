@@ -35,14 +35,23 @@ class ProjectFile extends Model
     public const TYPE_TASK_ATTACHMENT = 'task_attachment';
     public const TYPE_GENERAL = 'general';
 
+    public const CATEGORIES = [
+        self::TYPE_PROJECT_DOCUMENT => 'Project document',
+        self::TYPE_PROJECT_TRANSACTION => 'Project transaction',
+        self::TYPE_PROJECT_INVOICE => 'Project invoice',
+        self::TYPE_PROJECT_NOTES => 'Project notes',
+        self::TYPE_PROJECT_DRAWING => 'Project drawing / blueprint',
+    ];
+
     public const CATEGORY_LABELS = [
-        self::TYPE_PROJECT_DOCUMENT => 'Project Document',
-        self::TYPE_PROJECT_TRANSACTION => 'Project Transaction',
-        self::TYPE_PROJECT_INVOICE => 'Project Invoice',
-        self::TYPE_PROJECT_NOTES => 'Project Notes',
-        self::TYPE_PROJECT_DRAWING => 'Project Drawing / Blueprint',
+        self::TYPE_PROJECT_DOCUMENT => 'Project document',
+        self::TYPE_PROJECT_TRANSACTION => 'Project transaction',
+        self::TYPE_PROJECT_INVOICE => 'Project invoice',
+        'project_invoice' => 'Project invoice',
+        self::TYPE_PROJECT_NOTES => 'Project notes',
+        self::TYPE_PROJECT_DRAWING => 'Project drawing / blueprint',
         self::TYPE_TASK_ATTACHMENT => 'Task Attachment',
-        self::TYPE_GENERAL => 'General Document',
+        self::TYPE_GENERAL => 'Project document',
     ];
 
     protected $table = 'project_files';

@@ -54,11 +54,8 @@ class LoginRequest extends FormRequest
         $password = $this->input('password');
         $remember = $this->boolean('remember');
 
-        // Determine if user entered an email address or an account number
-        $fieldType = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'account_number';
-
         // 1. Check if this account exists but is archived
-        $isArchived = User::onlyTrashed()->where($fieldType, $loginInput)->exists();
+        $isArchived = User::onlyTrashed()->where('email', $loginInput)->exists();
         if ($isArchived) {
             RateLimiter::hit($this->throttleKey());
 
@@ -67,8 +64,8 @@ class LoginRequest extends FormRequest
             ]);
         }
 
-        // 2. Check if an active account exists with this email or account number
-        $user = User::where($fieldType, $loginInput)->first();
+        // 2. Check if an active account exists with this email address
+        $user = User::where('email', $loginInput)->first();
         if (! $user) {
             $this->ensureIsNotRateLimited();
             RateLimiter::hit($this->throttleKey());

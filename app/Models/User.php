@@ -46,7 +46,6 @@ class User extends Authenticatable
         'two_factor_secret',
         'two_factor_enabled',
         'employee_number',
-        'account_number',
         'job_title',
         'failed_login_attempts',
         'locked_until',
@@ -77,9 +76,6 @@ class User extends Authenticatable
         static::creating(function (User $user) {
             if (empty($user->employee_number)) {
                 $user->employee_number = static::generateEmployeeNumber();
-            }
-            if (empty($user->account_number)) {
-                $user->account_number = static::generateAccountNumber();
             }
             if (empty($user->name) && (!empty($user->first_name) || !empty($user->last_name))) {
                 $parts = array_filter([$user->first_name, $user->middle_name, $user->last_name]);
@@ -130,28 +126,6 @@ class User extends Authenticatable
     }
 
     /**
-     * Generate the next 7-digit account number.
-     * Starts at 1000001 and increments sequentially.
-     * Uses indexed scan instead of CAST table scan.
-     */
-    public static function generateAccountNumber(): string
-    {
-        $latest = static::withTrashed()
-            ->whereNotNull('account_number')
-            ->whereRaw('LENGTH(account_number) = 7')
-            ->orderByDesc('account_number')
-            ->value('account_number');
-
-        if ($latest && is_numeric($latest)) {
-            $next = ((int) $latest) + 1;
-        } else {
-            $next = 1000001;
-        }
-
-        return str_pad((string) $next, 7, '0', STR_PAD_LEFT);
-    }
-
-    /**
      * Configure activity logging for this model.
      * Logs name and email changes for the audit trail.
      * Password changes are intentionally excluded from the log —
@@ -160,7 +134,7 @@ class User extends Authenticatable
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'first_name', 'middle_name', 'last_name', 'birthdate', 'email', 'employee_number', 'account_number', 'job_title', 'two_factor_enabled'])
+            ->logOnly(['name', 'first_name', 'middle_name', 'last_name', 'birthdate', 'email', 'employee_number', 'job_title', 'two_factor_enabled'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('user');
@@ -249,5 +223,14 @@ class User extends Authenticatable
     public function pendingActions(): HasMany
     {
         return $this->hasMany(StaffPendingAction::class, 'user_id')->orderByDesc('created_at');
+    }
+
+    /**
+     * Determine the landing route name or URL based on the user's role.
+     * Prevents unauthorized role access (e.g. Staff hitting Admin/Manager dashboard).
+     */
+    public function defaultLandingRoute(): string
+    {
+        return $this->hasRole('Staff') ? route('resources.index') : route('dashboard');
     }
 }

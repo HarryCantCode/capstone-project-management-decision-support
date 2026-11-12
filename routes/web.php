@@ -5,7 +5,13 @@ use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login');
+Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect(auth()->user()->defaultLandingRoute());
+    }
+
+    return redirect()->route('login');
+});
 
 /*
 |--------------------------------------------------------------------------

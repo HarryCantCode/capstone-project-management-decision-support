@@ -383,7 +383,7 @@
                                             <div>
                                                 <div style="font-weight: 600; color: var(--color-ink);">{{ $staffUser?->name ?? 'Unknown Staff' }}</div>
                                                 <div class="font-mono" style="font-size: 0.75rem; color: var(--color-muted);">
-                                                    {{ $staffUser?->account_number ?? $staffUser?->email ?? 'Staff' }}
+                                                    {{ $staffUser?->employee_number ?? $staffUser?->email ?? 'Staff' }}
                                                 </div>
                                             </div>
                                         </div>
@@ -581,7 +581,7 @@
                                             <div>
                                                 <div style="font-weight: 600; color: var(--color-ink);">{{ $staff->name }}</div>
                                                 <div style="font-size: 0.75rem; color: var(--color-muted);">
-                                                    {{ $staff->email }} · <span class="font-mono">{{ $staff->account_number ?? 'N/A' }}</span>
+                                                    {{ $staff->email }}
                                                 </div>
                                             </div>
                                         </div>
@@ -689,8 +689,10 @@
                                     <div style="font-weight: 700; font-size: 1.05rem; color: var(--color-ink);" x-text="selectedStaff.name + ' — Request Approvals'"></div>
                                     <div style="font-size: 0.75rem; color: var(--color-muted); font-weight: 400;">
                                         <span x-text="selectedStaff.job_title"></span> ·
-                                        <span x-text="selectedStaff.email"></span> ·
-                                        <span class="font-mono" x-text="'Acct: ' + selectedStaff.account_number"></span>
+                                        <span x-text="selectedStaff.email"></span>
+                                        <template x-if="selectedStaff.employee_number && selectedStaff.employee_number !== 'N/A'">
+                                            <span> · <span class="font-mono" x-text="'ID: ' + selectedStaff.employee_number"></span></span>
+                                        </template>
                                     </div>
                                 </div>
                             </div>
@@ -896,7 +898,7 @@
                             <div style="background: var(--color-surface-alt); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); margin-bottom: var(--space-4); font-size: 0.8125rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
                                     <span class="text-muted font-bold" style="font-size: 0.6875rem; text-transform: uppercase;">Submitted By</span>
-                                    <span class="font-bold" style="color: var(--color-ink);" x-text="selectedAction.staff_name + ' (' + selectedAction.staff_account_number + ')'"></span>
+                                    <span class="font-bold" style="color: var(--color-ink);" x-text="selectedAction.staff_name + (selectedAction.staff_employee_number && selectedAction.staff_employee_number !== 'N/A' ? ' (' + selectedAction.staff_employee_number + ')' : '')"></span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
                                     <span class="text-muted font-bold" style="font-size: 0.6875rem; text-transform: uppercase;">Project</span>

@@ -48,21 +48,6 @@ test('staff can login with correct credentials and redirects to resources', func
     $this->assertAuthenticatedAs($user);
 });
 
-test('user can login using 7-digit account number instead of email', function () {
-    $user = User::factory()->create([
-        'password' => bcrypt('password123'),
-        'account_number' => '1000099',
-    ]);
-    $user->assignRole('Admin');
-
-    $this->post(route('login.store'), [
-        'email' => '1000099', // input account number into email/account field
-        'password' => 'password123',
-    ])->assertRedirect(route('dashboard'));
-
-    $this->assertAuthenticatedAs($user);
-});
-
 // ─── Login — failure paths ────────────────────────────────────────────────────
 
 test('login fails with wrong password', function () {
@@ -194,24 +179,6 @@ test('login with archived account returns unified credentials error message', fu
 
     $response = $this->post(route('login.store'), [
         'email' => 'archived@dex-pms.local',
-        'password' => 'correctpassword',
-    ]);
-
-    $response->assertSessionHasErrors([
-        'email' => 'We could not find any credentials that match our system. Please contact your administrator for assistance..',
-    ]);
-    $this->assertGuest();
-});
-
-test('login with archived account number returns unified credentials error message', function () {
-    $user = User::factory()->create([
-        'account_number' => '1000088',
-        'password' => bcrypt('correctpassword'),
-    ]);
-    $user->delete();
-
-    $response = $this->post(route('login.store'), [
-        'email' => '1000088',
         'password' => 'correctpassword',
     ]);
 

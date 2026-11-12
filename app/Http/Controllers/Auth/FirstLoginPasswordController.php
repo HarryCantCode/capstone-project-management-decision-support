@@ -29,9 +29,7 @@ class FirstLoginPasswordController extends Controller
         $user = Auth::user();
 
         if (! $user->must_change_password) {
-            return redirect()->intended(
-                $user->hasRole('Staff') ? route('resources.index') : route('dashboard'),
-            );
+            return redirect($user->defaultLandingRoute());
         }
 
         return view('auth.first-login-password', compact('user'));
@@ -63,9 +61,12 @@ class FirstLoginPasswordController extends Controller
 
         app(\App\Services\NotificationService::class)->notifyCredentialReset($user, 'password');
 
-        $targetRoute = $user->hasRole('Staff') ? route('resources.index') : route('dashboard');
+        // Clear any intended URL that may belong to another user or unauthorized route
+        $request->session()->forget('url.intended');
 
-        return redirect()->intended($targetRoute)->with(
+        $targetRoute = $user->defaultLandingRoute();
+
+        return redirect($targetRoute)->with(
             'status',
             'Your password has been updated successfully. Welcome to Dex PMS!',
         );

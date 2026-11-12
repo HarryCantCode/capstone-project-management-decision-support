@@ -50,10 +50,9 @@ class AccountUserController extends Controller implements HasMiddleware
     {
         $roles = Role::all();
         $nextEmployeeNumber = User::generateEmployeeNumber();
-        $nextAccountNumber = User::generateAccountNumber();
         $jobTitles = self::JOB_TITLES;
 
-        return view('account.users.create', compact('roles', 'nextEmployeeNumber', 'nextAccountNumber', 'jobTitles'));
+        return view('account.users.create', compact('roles', 'nextEmployeeNumber', 'jobTitles'));
     }
 
     /**
@@ -80,9 +79,8 @@ class AccountUserController extends Controller implements HasMiddleware
             ? trim($validated['job_title_other'] ?? '')
             : $validated['job_title_choice'];
 
-        // Auto-generate employee number and 7-digit account number
+        // Auto-generate employee number
         $employeeNumber = User::generateEmployeeNumber();
-        $accountNumber = User::generateAccountNumber();
 
         $fullNameParts = array_filter([
             $validated['first_name'],
@@ -103,7 +101,6 @@ class AccountUserController extends Controller implements HasMiddleware
             'name' => $fullName,
             'email' => $validated['email'],
             'employee_number' => $employeeNumber,
-            'account_number' => $accountNumber,
             'job_title' => $jobTitle,
             'password' => Hash::make($temporarySeedPassword),
             'must_change_password' => true,
@@ -242,7 +239,7 @@ class AccountUserController extends Controller implements HasMiddleware
         }
 
         $name = $user->name;
-        $empNo = $user->employee_number ?? $user->account_number;
+        $empNo = $user->employee_number ?? $user->email;
         $user->delete();
 
         return redirect()->route('account.settings')->with('status', "User account {$name} ({$empNo}) has been archived and moved to Archived Accounts.");

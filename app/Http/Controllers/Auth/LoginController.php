@@ -61,6 +61,8 @@ class LoginController extends Controller
 
         // Staff cannot access the dashboard
         if ($user->hasRole('Staff')) {
+            $request->session()->forget('url.intended');
+
             return redirect()->route('resources.index');
         }
 

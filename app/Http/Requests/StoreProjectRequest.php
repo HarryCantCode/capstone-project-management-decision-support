@@ -100,6 +100,8 @@ class StoreProjectRequest extends FormRequest
                 'mimes:pdf,docx,jpg,jpeg,png,webp',
                 'max:20480',
             ],
+            'invoice_files' => ['nullable', 'array'],
+            'invoice_files.*' => ['file', 'mimes:pdf,docx,jpg,jpeg,png,webp', 'max:20480'],
             'start_date' => ['required', 'date', 'after_or_equal:today'],
             'target_completion_date' => [
                 'required',
@@ -157,6 +159,12 @@ class StoreProjectRequest extends FormRequest
     {
         $validator->after(function (\Illuminate\Validation\Validator $validator) {
             $hasInvoice = $this->hasFile('invoice_file');
+            if (!$hasInvoice && $this->hasFile('invoice_files')) {
+                $invFiles = $this->file('invoice_files');
+                if (is_array($invFiles) && count($invFiles) > 0) {
+                    $hasInvoice = true;
+                }
+            }
             if (!$hasInvoice && $this->hasFile('attachments')) {
                 $attachments = $this->file('attachments');
                 if (is_array($attachments)) {
@@ -170,8 +178,8 @@ class StoreProjectRequest extends FormRequest
                 }
             }
 
-            if ($this->input('payment_status') === 'Paid' && !$hasInvoice) {
-                $validator->errors()->add('invoice_file', 'An invoice attachment (PDF, DOCX, or Image) is required when payment status is Paid in full.');
+            if (!$hasInvoice) {
+                $validator->errors()->add('invoice_file', 'An invoice attachment (PDF, DOCX, or Image) is required to create a project.');
             }
 
             if ($this->has('expenses') && is_array($this->input('expenses'))) {
@@ -229,6 +237,9 @@ class StoreProjectRequest extends FormRequest
             'invoice_file.file' => 'The invoice must be a valid uploaded file.',
             'invoice_file.mimes' => 'The invoice must be a file of type: PDF, DOCX, or Image (JPG, PNG, WEBP).',
             'invoice_file.max' => 'The invoice file may not be greater than 20MB.',
+            'invoice_files.*.file' => 'Each invoice attachment must be a valid file.',
+            'invoice_files.*.mimes' => 'Invoice attachments must be of type: PDF, DOCX, or Image (JPG, PNG, WEBP).',
+            'invoice_files.*.max' => 'Each invoice file may not be greater than 20MB.',
             'start_date.required' => 'Project start date is required.',
             'start_date.after_or_equal' => 'Project start date cannot be a past date.',
             'description.max' => 'Description cannot exceed 5,000 characters.',

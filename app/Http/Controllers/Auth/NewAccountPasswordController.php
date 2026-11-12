@@ -87,13 +87,16 @@ class NewAccountPasswordController extends Controller
 
         Password::broker()->deleteToken($user);
 
-        // Complete login
+        // Log the newly password-established user in cleanly
         Auth::login($user);
         $request->session()->regenerate();
 
-        $targetRoute = $user->hasRole('Staff') ? route('resources.index') : route('dashboard');
+        // Forget any previous intended URL from an old/other session to avoid redirect conflicts
+        $request->session()->forget('url.intended');
 
-        return redirect()->intended($targetRoute)->with(
+        $targetRoute = $user->defaultLandingRoute();
+
+        return redirect($targetRoute)->with(
             'status',
             'Your password has been created successfully. Welcome to Dex International Co.!',
         );

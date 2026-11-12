@@ -521,21 +521,57 @@
 
                 <div class="form-group form-group-premium" style="margin-bottom: 0; min-width: 0;">
                     <label for="warranty_end_date" class="form-label" style="display: flex; justify-content: space-between; align-items: center; min-height: 20px;">
-                        <span>Warranty Period</span>
-                        <span class="badge" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); font-size: 0.6875rem; padding: 1px 6px; border-radius: var(--radius-pill); font-weight: 600;">1 Year</span>
+                        <span style="display: inline-flex; align-items: center; gap: 4px;">
+                            Warranty Period
+                            <button 
+                                type="button" 
+                                @click="warrantyInfoModalOpen = true" 
+                                class="btn-help-inline" 
+                                style="background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; display: inline-flex; align-items: center;" 
+                                title="Click to view warranty and maintenance inclusion terms"
+                            >
+                                <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                            </button>
+                        </span>
+                        <button
+                            type="button"
+                            @click="warrantyInfoModalOpen = true"
+                            class="badge" 
+                            style="background: var(--color-surface-alt); border: 1px solid var(--color-border); font-size: 0.6875rem; padding: 1px 6px; border-radius: var(--radius-pill); font-weight: 600; cursor: pointer; color: var(--color-ink);"
+                            title="Click to view warranty inclusion details"
+                        >
+                            1 Year · Inclusion
+                        </button>
                     </label>
-                    <input
-                        id="warranty_end_date"
-                        name="warranty_end_date"
-                        type="date"
-                        class="form-control font-mono @error('warranty_end_date') is-invalid @enderror"
-                        value="{{ old('warranty_end_date', isset($project) && $project->warranty_end_date ? $project->warranty_end_date->format('Y-m-d') : $calculatedWarrantyEnd) }}"
-                        readonly
-                        style="background: var(--color-surface-alt); cursor: default; width: 100%;"
-                        title="Calculated 1-year warranty expiration date"
-                    >
+                    <div style="position: relative;">
+                        <input
+                            id="warranty_end_date"
+                            name="warranty_end_date"
+                            type="date"
+                            class="form-control font-mono @error('warranty_end_date') is-invalid @enderror"
+                            value="{{ old('warranty_end_date', isset($project) && $project->warranty_end_date ? $project->warranty_end_date->format('Y-m-d') : $calculatedWarrantyEnd) }}"
+                            readonly
+                            @click="warrantyInfoModalOpen = true"
+                            style="background: var(--color-surface-alt); cursor: pointer; width: 100%;"
+                            title="Click to view warranty and maintenance inclusion details"
+                        >
+                    </div>
                     <input type="hidden" id="warranty_period" name="warranty_period" value="{{ old('warranty_period', $project->warranty_period ?? '1 Year') }}">
-                    <p class="form-hint" id="warranty-hint">Coverage expires on <strong id="warranty-date-label">{{ \Carbon\Carbon::parse($calculatedWarrantyEnd)->format('M j, Y') }}</strong>.</p>
+                    <p class="form-hint" id="warranty-hint" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
+                        <span>Coverage expires on <strong id="warranty-date-label" @click="warrantyInfoModalOpen = true" style="cursor: pointer; text-decoration: underline; text-decoration-style: dotted;" title="Click to view warranty inclusion details">{{ \Carbon\Carbon::parse($calculatedWarrantyEnd)->format('M j, Y') }}</strong>.</span>
+                        <button 
+                            type="button" 
+                            @click="warrantyInfoModalOpen = true" 
+                            class="table-link" 
+                            style="background: none; border: none; padding: 0; font-size: 0.75rem; cursor: pointer; text-decoration: underline;"
+                        >
+                            View inclusion &rarr;
+                        </button>
+                    </p>
                     @error('warranty_period')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                     @error('warranty_end_date')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                 </div>
@@ -1185,11 +1221,11 @@
                 attachments: [],
                 isDragging: false,
                 categories: [
-                    { key: 'project_document', label: 'Project Documents' },
-                    { key: 'project_transaction', label: 'Project Transaction' },
-                    { key: 'invoice', label: 'Project Invoice' },
-                    { key: 'project_notes', label: 'Project Notes' },
-                    { key: 'project_drawing', label: 'Project Drawing / Blueprints' }
+                    { key: 'project_document', label: 'Project document' },
+                    { key: 'project_transaction', label: 'Project transaction' },
+                    { key: 'invoice', label: 'Project invoice' },
+                    { key: 'project_notes', label: 'Project notes' },
+                    { key: 'project_drawing', label: 'Project drawing / blueprint' }
                 ],
                 formatSize(bytes) {
                     if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
@@ -1296,7 +1332,7 @@
             </div>
             <div class="card-body">
                 <p class="form-hint" style="margin-bottom: var(--space-3); margin-top: 0;">
-                    Attach files categorized into Project Documents, Transactions, Invoices, Notes, or Blueprints. Multiple files can be selected at once.
+                    Attach files categorized into Project document, Project transaction, Project invoice, Project notes, or Project drawing / blueprint. Multiple files can be selected at once.
                 </p>
 
                 {{-- Hidden input for file picker --}}
@@ -2107,34 +2143,224 @@
                 @error('payment_terms')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
             </div>
 
-            {{-- Invoice Attachment Upload --}}
+            {{-- Invoice Attachment Upload (Multiple & Removable) --}}
             @php
                 $hasExistingInvoice = isset($project) && $project->invoices()->exists();
-                $existingInvoice = $hasExistingInvoice ? $project->invoices()->first() : null;
+                $existingInvoices = $hasExistingInvoice ? $project->invoices()->get() : collect();
             @endphp
-            <div class="form-group form-group-premium" id="invoice-upload-group" style="margin-bottom: 0;">
-                <label for="invoice_file" class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>
-                        Invoice Attachment
-                        <span id="invoice-required-indicator" class="text-danger" style="{{ old('payment_status', $project->payment_status ?? 'Partial') === 'Paid' && !$hasExistingInvoice ? '' : 'display: none;' }}">*</span>
-                    </span>
+            <div 
+                class="form-group form-group-premium" 
+                id="invoice-upload-group" 
+                style="margin-bottom: 0;"
+                x-data="{
+                    invoiceFiles: [],
+                    isDragging: false,
+                    fileError: '',
+                    formatSize(bytes) {
+                        if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+                        if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                        return bytes + ' B';
+                    },
+                    getFileIcon(name) {
+                        if (!name) return '📄';
+                        const ext = name.split('.').pop().toLowerCase();
+                        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return '🖼️';
+                        if (['pdf'].includes(ext)) return '📕';
+                        if (['doc', 'docx'].includes(ext)) return '📘';
+                        return '📄';
+                    },
+                    handleFileSelect(e) {
+                        const files = e.target.files;
+                        if (!files || files.length === 0) return;
+                        this.addFiles(Array.from(files));
+                        e.target.value = '';
+                    },
+                    handleDrop(e) {
+                        this.isDragging = false;
+                        const files = e.dataTransfer ? e.dataTransfer.files : null;
+                        if (!files || files.length === 0) return;
+                        this.addFiles(Array.from(files));
+                    },
+                    addFiles(files) {
+                        this.fileError = '';
+                        const maxSize = 20 * 1024 * 1024;
+                        for (let i = 0; i < files.length; i++) {
+                            const file = files[i];
+                            if (file.size > maxSize) {
+                                this.fileError = `File '${file.name}' exceeds the 20MB limit.`;
+                                continue;
+                            }
+                            if (!this.invoiceFiles.some(f => f.name === file.name && f.size === file.size)) {
+                                this.invoiceFiles.push({
+                                    id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                                    file: file,
+                                    name: file.name,
+                                    size: file.size,
+                                    formattedSize: this.formatSize(file.size)
+                                });
+                            }
+                        }
+                        this.syncInputs();
+                    },
+                    removeFile(index) {
+                        this.invoiceFiles.splice(index, 1);
+                        this.syncInputs();
+                    },
+                    syncInputs() {
+                        const container = document.getElementById('invoice_files_container');
+                        if (!container) return;
+                        container.innerHTML = '';
+                        this.invoiceFiles.forEach((item, idx) => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.name = 'invoice_files[]';
+                            input.style.display = 'none';
+                            try {
+                                const dt = new DataTransfer();
+                                dt.items.add(item.file);
+                                input.files = dt.files;
+                            } catch (err) {
+                                console.error('DataTransfer error', err);
+                            }
+                            container.appendChild(input);
+                        });
+
+                        const primaryContainer = document.getElementById('primary_invoice_file_slot');
+                        if (primaryContainer) {
+                            primaryContainer.innerHTML = '';
+                            if (this.invoiceFiles.length > 0) {
+                                const pInput = document.createElement('input');
+                                pInput.type = 'file';
+                                pInput.name = 'invoice_file';
+                                pInput.style.display = 'none';
+                                try {
+                                    const dt = new DataTransfer();
+                                    dt.items.add(this.invoiceFiles[0].file);
+                                    pInput.files = dt.files;
+                                } catch (e) {}
+                                primaryContainer.appendChild(pInput);
+                            }
+                        }
+                    }
+                }"
+            >
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                    <label class="form-label" style="margin-bottom: 0; display: flex; align-items: center; gap: 4px;">
+                        <span>Invoice Attachment</span>
+                        @if (!$hasExistingInvoice)
+                            <span class="text-danger" title="Required">*</span>
+                        @endif
+                    </label>
                     <span class="badge" style="background: var(--color-surface-alt); font-size: 0.6875rem;">PDF, DOCX, Images</span>
-                </label>
+                </div>
+
+                {{-- Hidden dynamic inputs container --}}
+                <div id="invoice_files_container" style="display: none;"></div>
+                <div id="primary_invoice_file_slot" style="display: none;"></div>
+
+                {{-- Hidden file input triggered by buttons/dropzone --}}
                 <input
                     type="file"
-                    id="invoice_file"
-                    name="invoice_file"
-                    class="form-control @error('invoice_file') is-invalid @enderror"
+                    x-ref="invoicePicker"
+                    @change="handleFileSelect($event)"
+                    multiple
                     accept=".pdf,.doc,.docx,image/*"
+                    style="display: none;"
                 >
-                <p class="form-hint" id="invoice-hint">
+
+                {{-- If existing invoices exist on edit --}}
+                @if ($hasExistingInvoice)
+                    <div style="margin-bottom: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--color-surface-alt); border-radius: var(--radius-sm); border: 1px solid var(--color-border); font-size: 0.75rem;">
+                        <span class="text-muted" style="display: block; margin-bottom: 4px; font-weight: 600;">Current Invoices on File:</span>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            @foreach ($existingInvoices as $exInv)
+                                <a href="{{ route('projects.files.download', [$project, $exInv]) }}" target="_blank" class="table-link font-bold" style="display: inline-flex; align-items: center; gap: 4px;">
+                                    📄 {{ $exInv->file_name }} <span class="text-muted font-normal">({{ $exInv->formatted_size }})</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Attached Files List --}}
+                <template x-if="invoiceFiles.length > 0">
+                    <div style="display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-2);">
+                        <template x-for="(fileItem, index) in invoiceFiles" :key="fileItem.id">
+                            <div 
+                                style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.8125rem;"
+                            >
+                                <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1;">
+                                    <span x-text="getFileIcon(fileItem.name)" style="font-size: 1.1rem; flex-shrink: 0;"></span>
+                                    <div style="min-width: 0; flex: 1;">
+                                        <div style="font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="fileItem.name"></div>
+                                        <div class="text-muted" style="font-size: 0.6875rem;" x-text="fileItem.formattedSize"></div>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary btn-sm"
+                                    @click="removeFile(index)"
+                                    style="padding: 2px 7px; color: #ef4444; border-color: rgba(239, 68, 68, 0.3); font-weight: 700; line-height: 1; border-radius: 4px;"
+                                    title="Remove this attached file"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </template>
+
+                        <div style="display: flex; justify-content: flex-end; margin-top: 2px;">
+                            <button
+                                type="button"
+                                class="btn btn-secondary btn-sm"
+                                @click="$refs.invoicePicker.click()"
+                                style="font-size: 0.75rem; padding: 4px 10px;"
+                            >
+                                + Attach Another Invoice
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
+                {{-- Empty dropzone / upload trigger --}}
+                <template x-if="invoiceFiles.length === 0">
+                    <div 
+                        class="pms-dropzone"
+                        :class="{ 'is-dragging': isDragging }"
+                        @dragover.prevent="isDragging = true"
+                        @dragleave.prevent="isDragging = false"
+                        @drop.prevent="handleDrop($event)"
+                        @click="$refs.invoicePicker.click()"
+                        style="padding: var(--space-3); text-align: center; border: 2px dashed var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); cursor: pointer; transition: all 0.15s ease;"
+                    >
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                            <svg style="width: 24px; height: 24px; color: var(--color-accent); opacity: 0.8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <span style="font-size: 0.8125rem; font-weight: 600; color: var(--color-ink);">
+                                Click to select or drop invoice file(s)
+                            </span>
+                            <span class="text-muted" style="font-size: 0.6875rem;">
+                                PDF, DOCX, or Images up to 20MB. Multiple files supported.
+                            </span>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="fileError">
+                    <div class="form-error" style="color: #ef4444; font-size: 0.75rem; margin-top: 4px;" x-text="fileError"></div>
+                </template>
+
+                <p class="form-hint" id="invoice-hint" style="margin-top: 6px;">
                     @if($hasExistingInvoice)
-                        Current invoice on file: <a href="{{ route('projects.files.download', [$project, $existingInvoice]) }}" target="_blank" class="table-link font-bold">📄 {{ $existingInvoice->file_name }} ({{ $existingInvoice->formatted_size }})</a>. Uploading a new file will add an updated invoice.
+                        (Optional) Upload new files to add additional or updated invoices.
                     @else
-                        Required when payment status is <strong>Paid in full</strong>. Optional for Partial payment.
+                        Required official invoice, billing receipt, or payment breakdown (PDF, DOCX, Images up to 20MB).
                     @endif
                 </p>
-                @error('invoice_file')<div class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
+                @error('invoice_file')<div class="invalid-feedback" style="display: block;" role="alert">{{ $message }}</div>@enderror
+                @error('invoice_files')<div class="invalid-feedback" style="display: block;" role="alert">{{ $message }}</div>@enderror
             </div>
         </div>
     </div>
@@ -2159,8 +2385,11 @@
                     <span class="text-muted">Est. Duration</span>
                     <span class="font-mono font-bold" id="preview-duration" style="color: var(--color-accent);">8 Weeks</span>
                 </div>
-                <div class="pms-preview-row">
-                    <span class="text-muted">Warranty Limit</span>
+                <div class="pms-preview-row" @click="warrantyInfoModalOpen = true" style="cursor: pointer;" title="Click to view Warranty & Maintenance inclusion terms">
+                    <span class="text-muted" style="display: flex; align-items: center; gap: 4px;">
+                        Warranty Limit
+                        <svg style="width: 12px; height: 12px; opacity: 0.6;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    </span>
                     <span class="font-mono font-bold text-success" id="preview-warranty-end">{{ \Carbon\Carbon::parse($calculatedWarrantyEnd)->format('M j, Y') }}</span>
                 </div>
                 <div class="pms-preview-row" onclick="document.getElementById('section-location')?.scrollIntoView({ behavior: 'smooth', block: 'start' });" title="Jump to Location">
@@ -2215,7 +2444,8 @@
 
 </div>
 
-{{-- ─── Live Dynamic Preview & Synchronization Script ──────────────────── --}}
+{{-- ─── Warranty & Maintenance Information Modal ─────────────────────────────── --}}
+@include('projects.partials.warranty-modal')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const startDateInput = document.getElementById('start_date');
@@ -2342,15 +2572,7 @@
 
             previewPaymentPill.className = `status-pill status-pill--${val.toLowerCase()}`;
 
-            const invoiceRequiredIndicator = document.getElementById('invoice-required-indicator');
-            const hasExistingInvoice = @js($hasExistingInvoice);
-            if (invoiceRequiredIndicator) {
-                if (val === 'Paid' && !hasExistingInvoice) {
-                    invoiceRequiredIndicator.style.display = 'inline';
-                } else {
-                    invoiceRequiredIndicator.style.display = 'none';
-                }
-            }
+            // Invoice attachment is required on project creation regardless of payment status
         }
 
         function updateLocation() {

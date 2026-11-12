@@ -71,6 +71,8 @@ class UpdateProjectRequest extends FormRequest
                 'mimes:pdf,docx,jpg,jpeg,png,webp',
                 'max:20480', // 20 MB limit
             ],
+            'invoice_files' => ['nullable', 'array'],
+            'invoice_files.*' => ['file', 'mimes:pdf,docx,jpg,jpeg,png,webp', 'max:20480'],
             'start_date' => ['required', 'date'],
             'target_completion_date' => [
                 'required',
