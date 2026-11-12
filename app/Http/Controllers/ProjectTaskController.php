@@ -281,7 +281,7 @@ class ProjectTaskController extends Controller
 
         // Notify Admin and Manager users about the new sub task
         $notificationService = app(NotificationService::class);
-        $notificationService->notifyNewTask($project, $task, $subtask->title);
+        $notificationService->notifyNewTask($project, $task, $subtask->title, $subtask);
 
         if ($subtask->due_date && $subtask->due_date->isBetween(now()->startOfDay(), now()->addDays(2)->endOfDay())) {
             $notificationService->notifyUpcomingDueTask($project, $task, $subtask);

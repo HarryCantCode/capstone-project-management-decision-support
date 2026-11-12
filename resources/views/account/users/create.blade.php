@@ -178,9 +178,6 @@
                             <span style="color: var(--color-text-muted); font-weight: 500;">Employee ID:</span>
                             <span class="font-mono text-muted">{{ $nextEmployeeNumber }}</span>
 
-                            <span style="color: var(--color-text-muted); font-weight: 500;">Account Number:</span>
-                            <span class="font-mono text-muted">{{ $nextAccountNumber }}</span>
-
                             <span style="color: var(--color-text-muted); font-weight: 500;">Job Title:</span>
                             <span style="color: var(--color-ink);" x-text="resolvedJobTitle"></span>
 

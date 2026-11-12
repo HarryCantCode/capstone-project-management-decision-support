@@ -99,7 +99,7 @@ class PasswordResetService
 
         try {
             Mail::to($user->email)->send(new ResetPasswordLinkMail($user, $resetUrl));
-            app(\App\Services\NotificationService::class)->notifyCredentialReset($user, 'password');
+            app(\App\Services\NotificationService::class)->notifyCredentialReset($user, 'reset_link_sent');
         } catch (\Throwable $e) {
             Log::error("Failed to send password reset link email to {$user->email}: " . $e->getMessage());
 
@@ -127,7 +127,7 @@ class PasswordResetService
 
         try {
             Mail::to($user->email)->send(new ResetPasswordLinkMail($user, $resetUrl));
-            app(\App\Services\NotificationService::class)->notifyCredentialReset($user, 'password');
+            app(\App\Services\NotificationService::class)->notifyCredentialReset($user, 'reset_link_sent');
         } catch (\Throwable $e) {
             Log::error("Failed to send password reset link email to {$user->email}: " . $e->getMessage());
 

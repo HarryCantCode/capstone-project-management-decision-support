@@ -23,12 +23,23 @@ use Illuminate\Support\Facades\DB;
  */
 class NotificationService
 {
+    private static array $lowStockDispatchedInRequest = [];
+
+    public function __construct(
+        private readonly ?EmailNotificationService $emailNotificationService = null,
+    ) {
+    }
+
+    private function getEmailService(): EmailNotificationService
+    {
+        return $this->emailNotificationService ?? app(EmailNotificationService::class);
+    }
     /**
-     * Notify Admin and Manager users about a newly created project.
+     * Notify Admin, Manager, and Staff users about a newly created project.
      */
     public function notifyNewProject(Project $project): void
     {
-        $recipients = $this->getAdminAndManagerUsers();
+        $recipients = $this->getAllOperationalUsers();
         $projectCode = $project->project_code ?? 'N/A';
         $clientName = $project->client_name ?? 'Unknown';
 
@@ -43,6 +54,7 @@ class NotificationService
         ];
 
         $this->createForRecipients($recipients, 'new_project', $title, $message, $data);
+        $this->getEmailService()->sendProjectCreatedEmail($project);
     }
 
     /**
@@ -84,6 +96,20 @@ class NotificationService
         ];
 
         $this->createForRecipients($recipients, 'project_status_changed', $title, $message, $data);
+
+        // Action 5: Project Completed email notification
+        if (strtolower($toStatus) === 'completed') {
+            $this->getEmailService()->sendProjectCompletedEmail($project);
+        }
+    }
+
+    /**
+     * Notify about project completion directly.
+     */
+    public function notifyProjectCompleted(Project $project): void
+    {
+        $fromStatus = (string) ($project->getOriginal('status') ?? 'ongoing');
+        $this->notifyProjectStatusChanged($project, $fromStatus, 'completed');
     }
 
     /**
@@ -111,7 +137,7 @@ class NotificationService
     /**
      * Notify Admin, Manager, and Staff users about a new major task or specific sub task logged on a project.
      */
-    public function notifyNewTask(Project $project, ProjectTask $task, ?string $subtaskTitle = null): void
+    public function notifyNewTask(Project $project, ProjectTask $task, ?string $subtaskTitle = null, ?ProjectSubtask $subtask = null): void
     {
         $recipients = $this->getAllOperationalUsers();
         $projectCode = $project->project_code ?? 'N/A';
@@ -137,6 +163,9 @@ class NotificationService
         }
 
         $this->createForRecipients($recipients, 'new_task', $title, $message, $data);
+
+        // Action 1: Adding a major task or sub task email notification
+        $this->getEmailService()->sendTaskAddedEmail($project, $task, $subtaskTitle, $subtask);
     }
 
     /**
@@ -171,6 +200,7 @@ class NotificationService
 
         if (!$existsToday) {
             $this->createForRecipients($recipients, 'warranty_expiry', $title, $message, $data);
+            $this->getEmailService()->sendWarrantyWarningEmail($project, $daysRemaining);
         }
     }
 
@@ -206,7 +236,7 @@ class NotificationService
      */
     public function notifyCredentialReset(User $user, string $action = 'password'): void
     {
-        $adminRecipients = User::role('Admin')->get();
+        $adminRecipients = $this->getAdminAndManagerUsers();
         $recipients = $adminRecipients->push($user)->unique('id');
 
         $accountLabel = $user->employee_number ? "ID: {$user->employee_number}" : $user->email;
@@ -214,8 +244,11 @@ class NotificationService
         if ($action === 'email') {
             $title = 'Security: Email Updated';
             $message = "The email address for account {$user->name} ({$accountLabel}) was updated to {$user->email}.";
+        } elseif ($action === 'reset_link_sent') {
+            $title = 'Security: Reset Link Dispatched';
+            $message = "A password reset link was dispatched to {$user->name} ({$accountLabel}).";
         } else {
-            $title = 'Security: Password Reset';
+            $title = 'Security: Password Changed';
             $message = "The password for account {$user->name} ({$accountLabel}) was recently reset or changed.";
         }
 
@@ -227,6 +260,37 @@ class NotificationService
         ];
 
         $this->createForRecipients($recipients, 'credential_reset', $title, $message, $data);
+
+        if ($action === 'password') {
+            $this->getEmailService()->sendPasswordChangedEmail($user);
+        }
+    }
+
+    /**
+     * Notify Admin and the affected user when their password was successfully changed.
+     * Also dispatches the PasswordChangedMail to the affected user.
+     */
+    public function notifyPasswordChanged(User $user, ?string $ipAddress = null): void
+    {
+        $adminRecipients = $this->getAdminAndManagerUsers();
+        $recipients = $adminRecipients->push($user)->unique('id');
+
+        $accountLabel = $user->employee_number ? "ID: {$user->employee_number}" : $user->email;
+        $title = 'Security: Password Changed';
+        $message = "The password for account {$user->name} ({$accountLabel}) was recently changed.";
+
+        $data = [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'action' => 'password',
+            'ip_address' => $ipAddress,
+            'url' => route('account.settings'),
+        ];
+
+        $this->createForRecipients($recipients, 'credential_reset', $title, $message, $data);
+
+        // Send security alert email to the affected user
+        $this->getEmailService()->sendPasswordChangedEmail($user, $ipAddress);
     }
 
     /**
@@ -294,6 +358,7 @@ class NotificationService
 
             if (!$existsToday) {
                 $this->createForRecipients($recipients, 'task_due_soon', $title, $message, $data);
+                $this->getEmailService()->sendTaskDueSoonEmail($project, $task, $subtask);
             }
         } else {
             $dueDate = $task->end_date ? $task->end_date->format('M j, Y') : 'soon';
@@ -321,6 +386,7 @@ class NotificationService
 
             if (!$existsToday) {
                 $this->createForRecipients($recipients, 'task_due_soon', $title, $message, $data);
+                $this->getEmailService()->sendTaskDueSoonEmail($project, $task, null);
             }
         }
     }
@@ -410,6 +476,12 @@ class NotificationService
      */
     public function notifyLowStockMaterial(Resource $resource): void
     {
+        // Avoid duplicate dispatch within the same request cycle
+        if (isset(self::$lowStockDispatchedInRequest[$resource->id])) {
+            return;
+        }
+        self::$lowStockDispatchedInRequest[$resource->id] = true;
+
         $recipients = $this->getAllOperationalUsers();
         $code = $resource->resource_code ?? 'N/A';
 
@@ -424,15 +496,8 @@ class NotificationService
             'url' => route('resources.show', $resource->id),
         ];
 
-        // Avoid duplicate low stock alert today for the same material
-        $existsToday = Notification::where('type', 'low_stock')
-            ->whereDate('created_at', now()->toDateString())
-            ->whereJsonContains('data->resource_id', $resource->id)
-            ->exists();
-
-        if (!$existsToday) {
-            $this->createForRecipients($recipients, 'low_stock', $title, $message, $data);
-        }
+        $this->createForRecipients($recipients, 'low_stock', $title, $message, $data);
+        $this->getEmailService()->sendMaterialLowStockEmail($resource);
     }
 
     /**
@@ -484,6 +549,11 @@ class NotificationService
 
         // Notify Admin & Manager reviewers
         $this->createForRecipients($recipients, 'staff_action_review', $title, $message, $data);
+
+        // Action 6: Send email to manager / admin informing them of pending review (add_expense or complete_subtask)
+        if (in_array($pendingAction->action_type, ['add_expense', 'complete_subtask'], true)) {
+            $this->getEmailService()->sendStaffActionPendingReviewEmail($pendingAction);
+        }
 
         // Also notify the submitting Staff member that their action is waiting for approval
         $this->notifyStaffActionSubmitted($pendingAction);
@@ -607,6 +677,9 @@ class NotificationService
             ->update(['read_at' => now()]);
 
         $this->createForRecipients(collect([$recipient]), 'staff_action_decision', $title, $message, $data);
+
+        // Action 7: Result of the request done by a staff (for staff users only)
+        $this->getEmailService()->sendStaffActionResultEmail($pendingAction, $decision);
     }
 
     /**
@@ -616,7 +689,18 @@ class NotificationService
      */
     private function getAdminAndManagerUsers(): \Illuminate\Support\Collection
     {
-        return User::role(['Admin', 'Manager'])->get();
+        return User::query()
+            ->withoutTrashed()
+            ->where(function ($query) {
+                $query->whereNull('locked_until')
+                    ->orWhere('locked_until', '<=', now());
+            })
+            ->where(function ($q) {
+                $q->whereHas('roles', function ($rq) {
+                    $rq->whereIn('name', ['Admin', 'Manager']);
+                })->orWhereIn('job_title', ['Admin', 'Manager', 'Project Manager', 'General Manager', 'Administrator']);
+            })
+            ->get();
     }
 
     /**
@@ -627,7 +711,13 @@ class NotificationService
      */
     private function getAllOperationalUsers(): \Illuminate\Support\Collection
     {
-        return User::role(['Admin', 'Manager', 'Staff'])->get();
+        return User::query()
+            ->withoutTrashed()
+            ->where(function ($query) {
+                $query->whereNull('locked_until')
+                    ->orWhere('locked_until', '<=', now());
+            })
+            ->get();
     }
 
     /**

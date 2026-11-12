@@ -1245,22 +1245,36 @@ function staffRequestsModule() {
                 this.processingActionId = null;
                 if (res.success) {
                     this.actionModalOpen = false;
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: {
-                            type: 'success',
-                            title: decision === 'approve' ? 'Request Approved' : 'Request Rejected',
-                            message: res.message,
-                            duration: 4000
-                        }
-                    }));
+                    const toastDetail = {
+                        type: decision === 'approve' ? 'success' : 'warning',
+                        title: decision === 'approve' ? 'Request Approved' : 'Request Rejected',
+                        message: res.message || (decision === 'approve' ? 'Staff request approved successfully.' : 'Staff request rejected.'),
+                        duration: 5000
+                    };
+                    sessionStorage.setItem('dex_pending_toast', JSON.stringify(toastDetail));
+                    window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
                     setTimeout(() => window.location.reload(), 450);
                 } else {
-                    alert(res.message || 'Could not process staff request.');
+                    window.dispatchEvent(new CustomEvent('show-toast', {
+                        detail: {
+                            type: 'error',
+                            title: 'Review Error',
+                            message: res.message || 'Could not process staff request.',
+                            duration: 5000
+                        }
+                    }));
                 }
             })
             .catch(() => {
                 this.processingActionId = null;
-                alert('An error occurred while processing the staff request.');
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: {
+                        type: 'error',
+                        title: 'Network Error',
+                        message: 'An error occurred while processing the staff request.',
+                        duration: 5000
+                    }
+                }));
             });
         }
     };

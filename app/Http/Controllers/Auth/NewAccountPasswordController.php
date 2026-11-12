@@ -87,6 +87,8 @@ class NewAccountPasswordController extends Controller
 
         Password::broker()->deleteToken($user);
 
+        app(\App\Services\NotificationService::class)->notifyPasswordChanged($user, $request->ip());
+
         // Log the newly password-established user in cleanly
         Auth::login($user);
         $request->session()->regenerate();

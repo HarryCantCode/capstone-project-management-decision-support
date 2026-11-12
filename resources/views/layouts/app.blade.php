@@ -777,7 +777,11 @@
                                                         <span class="status-pill status-pill--pending" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border-color: rgba(245, 158, 11, 0.3);">Waiting For Approval</span>
                                                     </template>
                                                     <template x-if="notification.type === 'staff_action_decision'">
-                                                        <span class="status-pill" :class="notification.data?.decision === 'rejected' ? 'status-pill--danger' : 'status-pill--completed'">
+                                                        <span
+                                                            class="status-pill"
+                                                            :class="notification.data?.decision === 'rejected' ? 'status-pill--delayed status-pill--danger' : 'status-pill--completed'"
+                                                            :style="notification.data?.decision === 'rejected' ? 'background: rgba(239, 68, 68, 0.15); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.35); font-weight: 600; padding: 2px 10px; border-radius: 9999px;' : 'background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.35); font-weight: 600; padding: 2px 10px; border-radius: 9999px;'"
+                                                        >
                                                             <span x-text="notification.data?.decision === 'rejected' ? 'Action Rejected' : 'Action Approved'"></span>
                                                         </span>
                                                     </template>
@@ -1642,12 +1646,14 @@
                         let data = {};
                         try { data = await response.json(); } catch (_) {}
                         if (response.ok && data.success) {
-                            sessionStorage.setItem('dex_pending_toast', JSON.stringify({
+                            const toastDetail = {
                                 type: 'success',
-                                title: 'Action Accepted',
+                                title: 'Request Approved',
                                 message: data.message || 'Staff action accepted and applied successfully.',
                                 duration: 5000
-                            }));
+                            };
+                            sessionStorage.setItem('dex_pending_toast', JSON.stringify(toastDetail));
+                            window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
                             this.closeReviewModal();
                             window.location.reload();
                         } else {
@@ -1682,12 +1688,14 @@
                         let data = {};
                         try { data = await response.json(); } catch (_) {}
                         if (response.ok && data.success) {
-                            sessionStorage.setItem('dex_pending_toast', JSON.stringify({
+                            const toastDetail = {
                                 type: 'warning',
-                                title: 'Action Rejected',
+                                title: 'Request Rejected',
                                 message: data.message || 'Staff action rejected.',
                                 duration: 5000
-                            }));
+                            };
+                            sessionStorage.setItem('dex_pending_toast', JSON.stringify(toastDetail));
+                            window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
                             this.closeReviewModal();
                             window.location.reload();
                         } else {

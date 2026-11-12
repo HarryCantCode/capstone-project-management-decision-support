@@ -122,7 +122,7 @@ class AccountUserController extends Controller implements HasMiddleware
 
         return redirect()->route('account.settings')->with(
             'status',
-            "User account for {$fullName} ({$employeeNumber}, Acc: {$accountNumber}) created successfully. An invitation with their password creation link has been sent to {$user->email}.",
+            "User account for {$fullName} ({$employeeNumber}) created successfully. An invitation with their password creation link has been sent to {$user->email}.",
         );
     }
 

@@ -1678,7 +1678,8 @@ input::-ms-clear {
     color: var(--status-pending-text);
 }
 
-.status-pill--delayed {
+.status-pill--delayed,
+.status-pill--danger {
     background-color: #FDECEA;
     color: #C0392B;
 }
@@ -3043,7 +3044,8 @@ input::-ms-clear {
     color: #F1F5F9;
 }
 
-[data-theme="dark"] .status-pill--delayed {
+[data-theme="dark"] .status-pill--delayed,
+[data-theme="dark"] .status-pill--danger {
     background-color: rgba(239, 68, 68, 0.18);
     color: #F87171;
 }

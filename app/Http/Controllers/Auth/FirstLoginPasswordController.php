@@ -59,7 +59,7 @@ class FirstLoginPasswordController extends Controller
         $user->password_changed_at = now();
         $user->save();
 
-        app(\App\Services\NotificationService::class)->notifyCredentialReset($user, 'password');
+        app(\App\Services\NotificationService::class)->notifyPasswordChanged($user, $request->ip());
 
         // Clear any intended URL that may belong to another user or unauthorized route
         $request->session()->forget('url.intended');

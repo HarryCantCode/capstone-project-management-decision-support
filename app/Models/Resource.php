@@ -23,6 +23,15 @@ class Resource extends \Illuminate\Database\Eloquent\Model
      */
     public const LOW_STOCK_THRESHOLD = 8;
 
+    protected static function booted(): void
+    {
+        static::saved(function (Resource $resource) {
+            if ($resource->isDirty('quantity_available') && $resource->isLowStock()) {
+                app(\App\Services\NotificationService::class)->notifyLowStockMaterial($resource);
+            }
+        });
+    }
+
     /** @var list<string> */
     protected $fillable = [
         'name',
