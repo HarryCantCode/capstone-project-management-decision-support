@@ -679,7 +679,16 @@ class NotificationService
         $this->createForRecipients(collect([$recipient]), 'staff_action_decision', $title, $message, $data);
 
         // Action 7: Result of the request done by a staff (for staff users only)
-        $this->getEmailService()->sendStaffActionResultEmail($pendingAction, $decision);
+        // Send only after the review transaction commits, so a slow SMTP call never holds the
+        // row lock and a rolled-back review never emails a verdict.
+        $emailService = $this->getEmailService();
+        $actionId = $pendingAction->id;
+        \Illuminate\Support\Facades\DB::afterCommit(function () use ($emailService, $actionId, $decision) {
+            $fresh = StaffPendingAction::with(['user', 'project', 'reviewer'])->find($actionId);
+            if ($fresh) {
+                $emailService->sendStaffActionResultEmail($fresh, $decision);
+            }
+        });
     }
 
     /**
