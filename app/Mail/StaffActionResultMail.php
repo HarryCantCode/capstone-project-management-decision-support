@@ -30,10 +30,15 @@ class StaffActionResultMail extends Mailable
         $project = $this->pendingAction->project;
         $projectName = $project->name ?? 'Project';
         $label = $this->pendingAction->action_type_label ?? 'Request';
+        $item = $this->pendingAction->summary_title ?? null;
+        $ref = '#' . $this->pendingAction->id;
 
+        // Unique subject per request so mail clients (e.g. Gmail) never collapse
+        // separate verdicts into one conversation thread and hide the new message.
+        $itemPart = $item ? ": {$item}" : '';
         $subject = $this->decision === 'approved'
-            ? "[Dex PMS] Request Approved: {$label} ({$projectName})"
-            : "[Dex PMS] Request Rejected: {$label} ({$projectName})";
+            ? "[Dex PMS] Request Approved - {$label}{$itemPart} ({$projectName}) Ref {$ref}"
+            : "[Dex PMS] Request Rejected - {$label}{$itemPart} ({$projectName}) Ref {$ref}";
 
         return new Envelope(
             subject: $subject,

@@ -136,6 +136,10 @@ class EmailNotificationService
         if ($recipient->hasRole('Staff') || (!$recipient->hasRole('Admin') && !$recipient->hasRole('Manager'))) {
             try {
                 Mail::to($recipient->email)->send(new StaffActionResultMail($recipient, $pendingAction, $decision));
+                Log::info("Staff action result email sent to {$recipient->email}", [
+                    'pending_action_id' => $pendingAction->id,
+                    'decision' => $decision,
+                ]);
             } catch (\Throwable $e) {
                 Log::error("Failed sending staff action result email to {$recipient->email}: {$e->getMessage()}", [
                     'pending_action_id' => $pendingAction->id,

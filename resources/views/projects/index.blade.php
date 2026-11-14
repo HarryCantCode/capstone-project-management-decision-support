@@ -12,6 +12,12 @@
         this.archiveUrl = url;
         this.archiveProjectName = name;
         this.archiveModalOpen = true;
+    },
+    warrantyInfoModalOpen: false,
+    selectedWarrantyProject: null,
+    openWarrantyModal(project) {
+        this.selectedWarrantyProject = project;
+        this.warrantyInfoModalOpen = true;
     }
 }">
     <div class="page-header">
@@ -81,6 +87,8 @@
                         <option value="ongoing" @selected($status === 'ongoing')>Ongoing</option>
                         <option value="delayed" @selected($status === 'delayed')>Delayed</option>
                         <option value="completed" @selected($status === 'completed')>Completed</option>
+                        <option value="active_warranty" @selected($status === 'active_warranty')>Active warranty</option>
+                        <option value="no_warranty" @selected($status === 'no_warranty')>No Warranty</option>
                     </select>
 
                     <button type="submit" class="btn btn-primary btn-sm" id="btn-projects-filter" style="display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
@@ -102,11 +110,23 @@
                     <h2 class="empty-state__title">No projects found</h2>
                     <p class="empty-state__description">
                         @if (!empty($search) && !empty($status))
-                            No projects match "{{ $search }}" with status "{{ ucfirst($status) }}".
+                            @if ($status === 'active_warranty')
+                                No projects match "{{ $search }}" with active warranty.
+                            @elseif ($status === 'no_warranty')
+                                No projects match "{{ $search }}" with no warranty.
+                            @else
+                                No projects match "{{ $search }}" with status "{{ ucfirst($status) }}".
+                            @endif
                         @elseif (!empty($search))
                             No projects match "{{ $search }}".
                         @elseif (!empty($status))
-                            No projects match this status filter.
+                            @if ($status === 'active_warranty')
+                                No projects found with active warranty.
+                            @elseif ($status === 'no_warranty')
+                                No projects found without warranty.
+                            @else
+                                No projects match this status filter.
+                            @endif
                         @elseif ($tab === 'archived')
                             No archived projects found in the repository.
                         @else
@@ -194,5 +214,8 @@
             </form>
         </div>
     </div>
+
+    {{-- ─── Warranty & Coverage Details Modal ───────────────────────────── --}}
+    @include('projects.partials.warranty-modal')
 </div>
 @endsection

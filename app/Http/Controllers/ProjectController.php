@@ -57,7 +57,15 @@ class ProjectController extends Controller
                         });
                 });
             })
-            ->when($status, fn ($q) => $q->where('status', $status))
+            ->when($status, function ($q) use ($status) {
+                if ($status === 'active_warranty') {
+                    $q->activeWarranty();
+                } elseif ($status === 'no_warranty') {
+                    $q->noWarranty();
+                } else {
+                    $q->where('status', $status);
+                }
+            })
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();

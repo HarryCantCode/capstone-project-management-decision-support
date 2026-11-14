@@ -194,6 +194,26 @@ class Project extends \Illuminate\Database\Eloquent\Model
         return 'On Track';
     }
 
+    /**
+     * Determine if the project is currently covered under active warranty.
+     */
+    public function getHasActiveWarrantyAttribute(): bool
+    {
+        return $this->warranty_end_date !== null && $this->warranty_end_date->startOfDay()->gte(now()->startOfDay());
+    }
+
+    /**
+     * Get the remaining active warranty days.
+     */
+    public function getWarrantyDaysRemainingAttribute(): int
+    {
+        if (! $this->has_active_warranty) {
+            return 0;
+        }
+
+        return (int) now()->startOfDay()->diffInDays($this->warranty_end_date->startOfDay());
+    }
+
     // ─── Relationships ────────────────────────────────────────────────────────
 
     /**
@@ -297,6 +317,30 @@ class Project extends \Illuminate\Database\Eloquent\Model
     public function scopeCompleted(\Illuminate\Database\Eloquent\Builder $query): void
     {
         $query->where('status', 'completed');
+    }
+
+    /**
+     * Scope projects currently under active warranty.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder<Project> $query
+     */
+    public function scopeActiveWarranty(\Illuminate\Database\Eloquent\Builder $query): void
+    {
+        $query->whereNotNull('warranty_end_date')
+            ->whereDate('warranty_end_date', '>=', now()->toDateString());
+    }
+
+    /**
+     * Scope projects with no active warranty (either no date set, or expired).
+     *
+     * @param \Illuminate\Database\Eloquent\Builder<Project> $query
+     */
+    public function scopeNoWarranty(\Illuminate\Database\Eloquent\Builder $query): void
+    {
+        $query->where(function ($q) {
+            $q->whereNull('warranty_end_date')
+                ->orWhereDate('warranty_end_date', '<', now()->toDateString());
+        });
     }
 
     /**

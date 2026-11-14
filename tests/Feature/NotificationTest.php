@@ -52,9 +52,10 @@ test('admin and manager accounts are notified when a new project is created', fu
     expect($managerNotification)->not->toBeNull();
     expect($managerNotification->title)->toBe('New Project Created');
 
-    // Staff should not receive the notification
-    $staffNotification = Notification::where('user_id', $staff->id)->first();
-    expect($staffNotification)->toBeNull();
+    // Staff users also receive the new project notification
+    $staffNotification = Notification::where('user_id', $staff->id)->where('type', 'new_project')->first();
+    expect($staffNotification)->not->toBeNull();
+    expect($staffNotification->title)->toBe('New Project Created');
 });
 
 test('admin and manager accounts are notified when a new major task is logged on a project', function () {

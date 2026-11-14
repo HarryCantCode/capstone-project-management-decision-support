@@ -17,6 +17,29 @@
         @else
             <span class="text-muted">—</span>
         @endif
+        @if ($project->has_active_warranty)
+            <div style="margin-top: 4px;">
+                <button
+                    type="button"
+                    class="warranty-status-pill"
+                    @click="openWarrantyModal({{ json_encode([
+                        'id' => $project->id,
+                        'name' => $project->name,
+                        'code' => $project->project_code,
+                        'period' => $project->warranty_period ?? '12 Months',
+                        'end_date' => $project->warranty_end_date?->format('M j, Y'),
+                        'days_remaining' => $project->warranty_days_remaining,
+                    ]) }})"
+                    title="Click to view warranty coverage & remaining days"
+                    aria-label="Warranty coverage for {{ $project->name }}"
+                >
+                    <svg style="width: 12px; height: 12px; flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                    <span>Warranty</span>
+                </button>
+            </div>
+        @endif
     </td>
     <td class="cell-numeric text-success">
         <div>₱{{ number_format($project->contract_price, 2) }}</div>

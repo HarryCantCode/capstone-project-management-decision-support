@@ -11,13 +11,13 @@
                 Good {{ now()->format('g:i A') }} — here's what's happening today.
             </p>
         </div>
-        <div class="page-actions">
+        <div class="page-actions" data-tour="page-actions">
             <a href="{{ route('projects.create') }}" class="btn btn-primary">+ New Project</a>
         </div>
     </div>
 
     {{-- Retained Status summary cards (Clickable to Projects module with optional status filter) --}}
-    <div class="costing-kpi-grid dashboard-stats-grid mb-6" x-data="dashboardStats({{ json_encode($stats) }})">
+    <div class="costing-kpi-grid dashboard-stats-grid mb-6" data-tour="dashboard-kpis" x-data="dashboardStats({{ json_encode($stats) }})">
         {{-- Card 1: Total Projects --}}
         <a href="{{ route('projects.index') }}" class="costing-kpi-card costing-kpi-card--interactive costing-kpi-card--contract" title="View all projects">
             {{-- Background Watermark Icon --}}
@@ -187,7 +187,7 @@
     <div class="dashboard-grid">
         
         {{-- Section 1: Task Overview with Graphical Milestone Organizer --}}
-        <div class="card card-glass dashboard-panel">
+        <div class="card card-glass dashboard-panel" data-tour="task-overview">
             <div class="card-header">
                 <div>
                     <h2 class="card-header__title">Task Overview</h2>
@@ -277,7 +277,7 @@
         </div>
 
         {{-- Section 2: Manpower Statistics with Graphical Radial & Distribution Organizer --}}
-        <div class="card card-glass dashboard-panel">
+        <div class="card card-glass dashboard-panel" data-tour="manpower-stats">
             <div class="card-header">
                 <div>
                     <h2 class="card-header__title">Manpower Statistics</h2>
@@ -360,7 +360,7 @@
         </div>
 
         {{-- Section 3: Recent Projects & Progression (At the bottom, spanning full width) --}}
-        <div class="card card-glass dashboard-panel dashboard-panel--projects">
+        <div class="card card-glass dashboard-panel dashboard-panel--projects" data-tour="recent-projects">
             <div class="card-header">
                 <div>
                     <h2 class="card-header__title">Recent Projects &amp; Progression</h2>

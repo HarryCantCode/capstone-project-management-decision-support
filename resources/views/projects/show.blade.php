@@ -193,9 +193,16 @@
                     <dd class="font-mono">
                         <button 
                             type="button" 
-                            @click="warrantyInfoModalOpen = true" 
+                            @click="selectedWarrantyProject = {{ json_encode([
+                                'id' => $project->id,
+                                'name' => $project->name,
+                                'code' => $project->project_code,
+                                'period' => $project->warranty_period ?? '1 Year',
+                                'end_date' => $project->warranty_end_date?->format('M j, Y') ?? 'N/A',
+                                'days_remaining' => $project->warranty_days_remaining,
+                            ]) }}; warrantyInfoModalOpen = true" 
                             style="background: none; border: none; padding: 0; font-family: inherit; font-size: inherit; color: var(--color-ink); cursor: pointer; display: inline-flex; flex-direction: row; align-items: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; text-align: left;"
-                            title="Click to view Warranty & Maintenance inclusion terms"
+                            title="Click to view Warranty & Maintenance coverage details"
                         >
                             <span>{{ $project->warranty_period ?? '1 Year' }}</span>
                             @if($project->warranty_end_date)
@@ -4038,6 +4045,7 @@ function projectDetail() {
         editSubtaskModalOpen: false,
         markCompletedModalOpen: false,
         warrantyInfoModalOpen: false,
+        selectedWarrantyProject: null,
         uploadFileModalOpen: false,
         uploadModalDefaultCategory: 'project_document',
         uploadModalFiles: [],

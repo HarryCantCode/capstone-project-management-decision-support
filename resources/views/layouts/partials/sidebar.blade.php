@@ -23,6 +23,7 @@
             <li>
                 <a href="{{ route('dashboard') }}"
                    class="nav-link {{ request()->routeIs('dashboard') ? 'nav-link--active' : '' }}"
+                   data-tour-nav="dashboard"
                    aria-current="{{ request()->routeIs('dashboard') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M2 11l8-8 8 8v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-9z"/>
@@ -42,6 +43,7 @@
             <li>
                 <a href="{{ route('projects.index') }}"
                    class="nav-link {{ request()->routeIs('projects.*') ? 'nav-link--active' : '' }}"
+                   data-tour-nav="projects"
                    aria-current="{{ request()->routeIs('projects.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M6 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7l-5-5H6zm5 1v4h4l-4-4z" clip-rule="evenodd"/>
@@ -52,6 +54,7 @@
             <li>
                 <a href="{{ route('costing.index') }}"
                    class="nav-link {{ request()->routeIs('costing.*') ? 'nav-link--active' : '' }}"
+                   data-tour-nav="costing"
                    aria-current="{{ request()->routeIs('costing.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 0 1-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 0 1-.567.267z"/>
@@ -69,6 +72,7 @@
             <li>
                 <a href="{{ \Illuminate\Support\Facades\Route::has('pending-actions.index') ? route('pending-actions.index') : url('/pending-actions') }}"
                    class="nav-link {{ request()->routeIs('pending-actions.*') || request()->is('pending-actions*') ? 'nav-link--active' : '' }}"
+                   data-tour-nav="pending-actions"
                    aria-current="{{ request()->routeIs('pending-actions.*') || request()->is('pending-actions*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M9 2a1 1 0 0 0 0 2h2a1 1 0 1 0 0-2H9z"/>
@@ -92,6 +96,7 @@
             <li>
                 <a href="{{ \Illuminate\Support\Facades\Route::has('approval-list.index') ? route('approval-list.index') : url('/approval-list') }}"
                    class="nav-link {{ request()->routeIs('approval-list.*') || request()->is('approval-list*') ? 'nav-link--active' : '' }}"
+                   data-tour-nav="approval-list"
                    aria-current="{{ request()->routeIs('approval-list.*') || request()->is('approval-list*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M10 2a1 1 0 0 1 1 1v1.07A7.002 7.002 0 0 1 17 11v3.586l1.707 1.707A1 1 0 0 1 18 18H2a1 1 0 0 1-.707-1.707L3 14.586V11a7.002 7.002 0 0 1 6-6.93V3a1 1 0 0 1 1-1zm0 18a3 3 0 0 1-3-3h6a3 3 0 0 1-3 3z" clip-rule="evenodd"/>
@@ -117,6 +122,7 @@
             <li>
                 <a href="{{ route('resources.index') }}"
                    class="nav-link {{ request()->routeIs('resources.*') ? 'nav-link--active' : '' }}"
+                   data-tour-nav="resources"
                    aria-current="{{ request()->routeIs('resources.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M4 3a2 2 0 1 0 0 4h12a2 2 0 1 0 0-4H4zm0 6a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2H4zm2 3h8v3H6v-3z"/>
@@ -136,6 +142,7 @@
             <li>
                 <a href="{{ route('scheduling.index') }}"
                    class="nav-link {{ request()->routeIs('scheduling.*') ? 'nav-link--active' : '' }}"
+                   data-tour-nav="scheduling"
                    aria-current="{{ request()->routeIs('scheduling.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M9 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM17 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 0 0-1.5-4.33A5 5 0 0 1 19 16v1h-6.07zM6 11a5 5 0 0 1 5 5v1H1v-1a5 5 0 0 1 5-5z"/>
@@ -155,6 +162,7 @@
             <li>
                 <a href="{{ route('reports.index') }}"
                    class="nav-link {{ request()->routeIs('reports.*') ? 'nav-link--active' : '' }}"
+                   data-tour-nav="reports"
                    aria-current="{{ request()->routeIs('reports.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M6 2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.414A2 2 0 0 0 15.414 7L11 2.586A2 2 0 0 0 9.586 2H6zm2 10a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H8zm0-4a1 1 0 1 0 0 2h4a1 1 0 1 0 0-2H8z" clip-rule="evenodd"/>
@@ -165,6 +173,7 @@
             <li>
                 <a href="{{ route('decision-support.index') }}"
                    class="nav-link {{ request()->routeIs('decision-support.*') ? 'nav-link--active' : '' }}"
+                   data-tour-nav="decision-support"
                    aria-current="{{ request()->routeIs('decision-support.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path d="M11 3a1 1 0 1 0-2 0v1a1 1 0 1 0 2 0V3zM15.657 5.757a1 1 0 0 0-1.414-1.414l-.707.707a1 1 0 0 0 1.414 1.414l.707-.707zM18 10a1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM5.05 6.464A1 1 0 1 0 6.464 5.05l-.707-.707a1 1 0 0 0-1.414 1.414l.707.707zM5 10a1 1 0 0 1-1 1H3a1 1 0 1 1 0-2h1a1 1 0 0 1 1 1zM8 16v-1h4v1a2 2 0 1 1-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 1 0-4.954 0c.27.213.462.519.476.859h4.001z"/>
@@ -184,6 +193,7 @@
             <li>
                 <a href="{{ route('account.settings') }}"
                    class="nav-link {{ request()->routeIs('account.settings') || request()->routeIs('account.users.*') ? 'nav-link--active' : '' }}"
+                   data-tour-nav="account"
                    aria-current="{{ request()->routeIs('account.settings') || request()->routeIs('account.users.*') ? 'page' : 'false' }}">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-7 9a7 7 0 1 1 14 0H3z" clip-rule="evenodd"/>

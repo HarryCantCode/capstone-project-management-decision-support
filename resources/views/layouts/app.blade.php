@@ -254,6 +254,7 @@
         <aside
             id="sidebar"
             class="app-sidebar"
+            data-tour="sidebar"
             :class="{ 'sidebar-open': sidebarOpen }"
             aria-label="Main navigation"
         >
@@ -633,6 +634,24 @@
 
                 {{-- User dropdown (Right-aligned) --}}
                 <div class="topbar-right-group" style="margin-left: auto; display: flex; align-items: center; gap: var(--space-3);">
+
+                    {{-- Onboarding Tutorial Trigger Button (Placed beside Notification Bell at left side of bell) --}}
+                    <div class="tour-trigger-wrap">
+                        <button
+                            type="button"
+                            id="dex-tour-trigger-btn"
+                            class="tour-trigger-btn"
+                            onclick="window.startOnboardingTour ? window.startOnboardingTour() : null"
+                            aria-label="Show tutorial"
+                            title="Show tutorial"
+                        >
+                            <svg class="tour-trigger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            </svg>
+                        </button>
+                    </div>
 
                     {{-- Notification Bell --}}
                     @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
@@ -1848,6 +1867,7 @@
     </script>
 
     <script src="{{ asset('js/philippine-address.js') }}"></script>
+    @include('layouts.partials.onboarding-tour')
     @stack('scripts')
 </body>
 </html>
