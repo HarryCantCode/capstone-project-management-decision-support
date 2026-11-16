@@ -196,6 +196,8 @@ class RuleEngineService
                 'spend_percentage' => (float) $project->spend_percentage,
                 'start_date' => $project->start_date ? $project->start_date->format('M j, Y') : 'Not set',
                 'target_date' => $project->target_completion_date ? $project->target_completion_date->format('M j, Y') : 'Not set',
+                'start_date_iso' => $project->start_date?->format('Y-m-d') ?: ($project->created_at?->format('Y-m-d') ?: date('Y-m-d')),
+                'target_date_iso' => $project->target_completion_date?->format('Y-m-d') ?: date('Y-m-d', strtotime('+60 days')),
                 'specs' => [
                     'project_type' => $project->project_type ?: 'Passenger Elevator',
                     'rated_capacity' => $project->rated_capacity ?: '1000 kg',

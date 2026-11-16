@@ -234,13 +234,41 @@
         delayProjectId: {{ $selectedProject ? (int) $selectedProject->id : ($matrix[0]['id'] ?? 'null') }},
         delaySlipDays: 14,
 
+        delayProjectPalette: [
+            { bg: '#2563EB', border: '#1D4ED8', text: '#FFFFFF', name: 'Sapphire' },
+            { bg: '#0D9488', border: '#0F766E', text: '#FFFFFF', name: 'Teal' },
+            { bg: '#7C3AED', border: '#6D28D9', text: '#FFFFFF', name: 'Purple' },
+            { bg: '#059669', border: '#047857', text: '#FFFFFF', name: 'Emerald' },
+            { bg: '#D97706', border: '#B45309', text: '#FFFFFF', name: 'Amber' },
+            { bg: '#E11D48', border: '#BE123C', text: '#FFFFFF', name: 'Rose' },
+            { bg: '#4F46E5', border: '#4338CA', text: '#FFFFFF', name: 'Indigo' },
+            { bg: '#0891B2', border: '#0E7490', text: '#FFFFFF', name: 'Cyan' },
+            { bg: '#475569', border: '#334155', text: '#FFFFFF', name: 'Slate' }
+        ],
+
+        getProjectColor(projId, index = 0) {
+            const num = Math.abs(Number(projId) || index || 0);
+            return this.delayProjectPalette[num % this.delayProjectPalette.length];
+        },
+
+        parseDateToMs(val, fallbackDaysOffset = 0) {
+            if (!val || val === 'Not set') {
+                return Date.now() + fallbackDaysOffset * 86400000;
+            }
+            const ms = Date.parse(val);
+            if (isNaN(ms)) {
+                return Date.now() + fallbackDaysOffset * 86400000;
+            }
+            return ms;
+        },
+
         get delaySimResult() {
             const proj = this.matrix.find(p => Number(p.id) === Number(this.delayProjectId)) || this.matrix[0] || null;
             if (!proj) return null;
 
             const slip = Math.max(0, Math.min(365, parseInt(this.delaySlipDays || 0, 10)));
-            const origDateStr = proj.schedule?.target_completion_date || proj.target_date;
-            const origDateMs = Date.parse(origDateStr) || Date.now();
+            const origDateStr = proj.target_date_iso || proj.schedule?.target_completion_date || proj.target_date;
+            const origDateMs = this.parseDateToMs(origDateStr, 60);
             const origDateFormatted = new Date(origDateMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             const newDateObj = new Date(origDateMs + slip * 86400000);
             const newDateFormatted = newDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -255,10 +283,10 @@
             const lockedRoles = [...new Set(assignedCrew.map(c => c.expertise))];
 
             const downstream = [];
-            this.matrix.forEach(other => {
+            this.matrix.forEach((other, oIdx) => {
                 if (Number(other.id) === Number(proj.id) || other.project_status === 'completed') return;
-                const oStartMs = Date.parse(other.start_date) || Date.now();
-                const oEndMs = Date.parse(other.target_date) || (oStartMs + 86400000 * 60);
+                const oStartMs = this.parseDateToMs(other.start_date_iso || other.start_date, 0);
+                const oEndMs = this.parseDateToMs(other.target_date_iso || other.target_date, 60);
 
                 if (oStartMs <= newDateObj.getTime() && oEndMs >= origDateMs) {
                     const overlapStart = Math.max(oStartMs, origDateMs);
@@ -266,14 +294,16 @@
                     const overlapDays = Math.max(1, Math.round((overlapEnd - overlapStart) / 86400000));
 
                     downstream.push({
+                        id: other.id,
                         project_code: other.project_code,
                         name: other.name,
                         status: other.project_status,
                         start_date: other.start_date,
                         target_date: other.target_date,
+                        color: this.getProjectColor(other.id, oIdx),
                         overlap_days: Math.min(slip, overlapDays),
                         overlap_pct: slip > 0 ? Math.min(100, Math.round((Math.min(slip, overlapDays) / slip) * 100)) : 0,
-                        competing_roles: lockedRoles.length > 0 ? lockedRoles.slice(0, 3).join(', ') : 'General Field Crew',
+                        competing_roles: lockedRoles.length > 0 ? lockedRoles.slice(0, 3).join(', ') : '',
                         impact_status: other.project_status === 'pending' ? 'warning' : 'critical'
                     });
                 }
@@ -294,6 +324,140 @@
                 downstreamProjects: downstream,
                 status,
                 formula: `New Target Date = ${origDateStr} + ${slip} day(s) = ${newDateFormatted} · ${assignedCrew.length} crew member(s) held`
+            };
+        },
+
+        get calendarSchedule() {
+            if (!this.matrix || this.matrix.length === 0) return null;
+
+            const selectedProj = this.matrix.find(p => Number(p.id) === Number(this.delayProjectId)) || this.matrix[0];
+            const slip = Math.max(0, Math.min(365, parseInt(this.delaySlipDays || 0, 10)));
+
+            const rawProjects = this.matrix.map((p, idx) => {
+                const color = this.getProjectColor(p.id, idx);
+                const sMs = this.parseDateToMs(p.start_date_iso || p.start_date, 0);
+                let eMs = this.parseDateToMs(p.target_date_iso || p.schedule?.target_completion_date || p.target_date, 60);
+                if (eMs <= sMs) eMs = sMs + 86400000 * 30;
+
+                const isSelected = selectedProj && Number(p.id) === Number(selectedProj.id);
+                const delayedEndMs = isSelected ? (eMs + slip * 86400000) : eMs;
+
+                return {
+                    id: p.id,
+                    project_code: p.project_code,
+                    name: p.name,
+                    status: p.project_status,
+                    color: color,
+                    startMs: sMs,
+                    endMs: eMs,
+                    delayedEndMs: delayedEndMs,
+                    startDateFormatted: new Date(sMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    endDateFormatted: new Date(eMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    delayedEndDateFormatted: new Date(delayedEndMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    isSelected: isSelected,
+                    assignedCrew: p.manpower?.assigned_crew || []
+                };
+            });
+
+            // Timeline Bounds with Padding (7 days before, 14 days after)
+            const earliestMs = Math.min(...rawProjects.map(p => p.startMs));
+            const latestMs = Math.max(...rawProjects.map(p => p.delayedEndMs));
+            const padStartMs = 7 * 86400000;
+            const padEndMs = 14 * 86400000;
+            const timelineStartMs = earliestMs - padStartMs;
+            const timelineEndMs = latestMs + padEndMs;
+            const totalTimelineMs = Math.max(86400000 * 30, timelineEndMs - timelineStartMs);
+
+            const selectedItem = rawProjects.find(p => p.isSelected);
+            const origTargetMs = selectedItem ? selectedItem.endMs : 0;
+            const newTargetMs = selectedItem ? selectedItem.delayedEndMs : 0;
+
+            const plottedProjects = rawProjects.map(p => {
+                const leftPct = Math.max(0, Math.min(100, ((p.startMs - timelineStartMs) / totalTimelineMs) * 100));
+                const origWidthPct = Math.max(1.5, Math.min(100 - leftPct, ((p.endMs - p.startMs) / totalTimelineMs) * 100));
+
+                let slipWidthPct = 0;
+                let slipLeftPct = 0;
+                let isRunOver = false;
+                let runOverDays = 0;
+                let runOverLeftPct = 0;
+                let runOverWidthPct = 0;
+
+                if (p.isSelected && slip > 0) {
+                    slipLeftPct = leftPct + origWidthPct;
+                    slipWidthPct = Math.max(0.75, Math.min(100 - slipLeftPct, ((newTargetMs - origTargetMs) / totalTimelineMs) * 100));
+                } else if (!p.isSelected && slip > 0 && selectedItem) {
+                    if (p.startMs <= newTargetMs && p.endMs >= origTargetMs) {
+                        isRunOver = true;
+                        const overlapStart = Math.max(p.startMs, origTargetMs);
+                        const overlapEnd = Math.min(p.endMs, newTargetMs);
+                        runOverDays = Math.max(1, Math.round((overlapEnd - overlapStart) / 86400000));
+                        runOverLeftPct = Math.max(0, Math.min(100, ((overlapStart - timelineStartMs) / totalTimelineMs) * 100));
+                        runOverWidthPct = Math.max(1.5, Math.min(100 - runOverLeftPct, ((overlapEnd - overlapStart) / totalTimelineMs) * 100));
+                    }
+                }
+
+                return {
+                    ...p,
+                    leftPct: Number(leftPct.toFixed(2)),
+                    origWidthPct: Number(origWidthPct.toFixed(2)),
+                    slipLeftPct: Number(slipLeftPct.toFixed(2)),
+                    slipWidthPct: Number(slipWidthPct.toFixed(2)),
+                    isRunOver: isRunOver,
+                    runOverDays: Math.min(slip, runOverDays),
+                    runOverLeftPct: Number(runOverLeftPct.toFixed(2)),
+                    runOverWidthPct: Number(runOverWidthPct.toFixed(2))
+                };
+            });
+
+            // Month Columns
+            const months = [];
+            const curDate = new Date(timelineStartMs);
+            curDate.setDate(1);
+            curDate.setHours(0, 0, 0, 0);
+            const endLimit = new Date(timelineEndMs);
+
+            while (curDate <= endLimit) {
+                const mStart = curDate.getTime();
+                const nextMonth = new Date(curDate.getFullYear(), curDate.getMonth() + 1, 1);
+                const mEnd = nextMonth.getTime();
+
+                const clampedStart = Math.max(timelineStartMs, mStart);
+                const clampedEnd = Math.min(timelineEndMs, mEnd);
+
+                if (clampedEnd > clampedStart) {
+                    const leftPct = ((clampedStart - timelineStartMs) / totalTimelineMs) * 100;
+                    const widthPct = ((clampedEnd - clampedStart) / totalTimelineMs) * 100;
+                    months.push({
+                        label: curDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                        shortMonth: curDate.toLocaleDateString('en-US', { month: 'short' }),
+                        leftPct: Number(leftPct.toFixed(2)),
+                        widthPct: Number(widthPct.toFixed(2)),
+                    });
+                }
+                curDate.setMonth(curDate.getMonth() + 1);
+            }
+
+            // Today line
+            const todayMs = Date.now();
+            let todayPct = null;
+            if (todayMs >= timelineStartMs && todayMs <= timelineEndMs) {
+                todayPct = Number((((todayMs - timelineStartMs) / totalTimelineMs) * 100).toFixed(2));
+            }
+
+            const totalRunOverCount = plottedProjects.filter(p => p.isRunOver).length;
+
+            return {
+                projects: plottedProjects,
+                months: months,
+                todayPct: todayPct,
+                selectedProject: selectedItem,
+                slipDays: slip,
+                totalRunOverCount: totalRunOverCount,
+                origDateFormatted: selectedItem ? selectedItem.endDateFormatted : '—',
+                newDateFormatted: selectedItem ? selectedItem.delayedEndDateFormatted : '—',
+                timelineStartFormatted: new Date(timelineStartMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                timelineEndFormatted: new Date(timelineEndMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
             };
         },
 
@@ -2282,6 +2446,453 @@
             pointer-events: none;
             box-sizing: border-box;
         }
+
+        /* ── Interactive Calendar & Project Delay Simulator (Modern Minimalist & Dark Mode Adaptive) ── */
+        .dss-delay-calendar-container {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        [data-theme="dark"] .dss-delay-calendar-container,
+        .dark .dss-delay-calendar-container {
+            background: #0E1522;
+            border-color: #243042;
+        }
+
+        .dss-delay-calendar-scroll {
+            overflow-x: auto;
+            position: relative;
+            scrollbar-width: thin;
+        }
+        .dss-delay-calendar-grid {
+            min-width: 960px;
+            position: relative;
+        }
+        .dss-delay-calendar-header {
+            display: flex;
+            border-bottom: 1px solid var(--color-border);
+            background: var(--color-surface-alt);
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: var(--color-ink);
+        }
+        [data-theme="dark"] .dss-delay-calendar-header,
+        .dark .dss-delay-calendar-header {
+            background: #141C2B;
+            border-color: #243042;
+            color: #F1F5F9;
+        }
+
+        .dss-delay-cal-left-header {
+            width: 250px;
+            min-width: 250px;
+            padding: 0.75rem 1.1rem;
+            border-right: 1px solid var(--color-border);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: sticky;
+            left: 0;
+            background: var(--color-surface-alt);
+            z-index: 4;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: var(--color-ink);
+        }
+        [data-theme="dark"] .dss-delay-cal-left-header,
+        .dark .dss-delay-cal-left-header {
+            background: #141C2B;
+            border-color: #243042;
+            color: #F1F5F9;
+        }
+
+        .dss-delay-cal-timeline-header {
+            flex: 1;
+            position: relative;
+            height: 42px;
+        }
+        .dss-delay-cal-month-col {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            border-right: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            padding: 0 0.75rem;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            font-weight: 700;
+            font-size: 0.825rem;
+            color: var(--color-ink);
+        }
+        [data-theme="dark"] .dss-delay-cal-month-col,
+        .dark .dss-delay-cal-month-col {
+            border-color: #243042;
+            color: #F1F5F9;
+        }
+
+        .dss-delay-cal-body {
+            position: relative;
+        }
+        .dss-delay-cal-row {
+            display: flex;
+            border-bottom: 1px solid var(--color-border);
+            min-height: 58px;
+            transition: background 0.15s ease;
+            align-items: stretch;
+            cursor: pointer;
+        }
+        .dss-delay-cal-row:last-child {
+            border-bottom: none;
+        }
+        .dss-delay-cal-row:hover {
+            background: rgba(0, 0, 0, 0.02);
+        }
+        [data-theme="dark"] .dss-delay-cal-row:hover,
+        .dark .dss-delay-cal-row:hover {
+            background: rgba(255, 255, 255, 0.025);
+        }
+        .dss-delay-cal-row.is-selected {
+            background: rgba(37, 99, 235, 0.04);
+        }
+        [data-theme="dark"] .dss-delay-cal-row.is-selected,
+        .dark .dss-delay-cal-row.is-selected {
+            background: rgba(56, 189, 248, 0.06);
+        }
+        .dss-delay-cal-row.is-run-over {
+            background: rgba(217, 119, 6, 0.04);
+        }
+        [data-theme="dark"] .dss-delay-cal-row.is-run-over,
+        .dark .dss-delay-cal-row.is-run-over {
+            background: rgba(245, 158, 11, 0.06);
+        }
+
+        .dss-delay-cal-left-cell {
+            width: 250px;
+            min-width: 250px;
+            padding: 0.75rem 1.1rem;
+            border-right: 1px solid var(--color-border);
+            position: sticky;
+            left: 0;
+            background: var(--color-surface);
+            z-index: 3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 3px;
+        }
+        [data-theme="dark"] .dss-delay-cal-left-cell,
+        .dark .dss-delay-cal-left-cell {
+            background: #0E1522;
+            border-color: #243042;
+        }
+        .dss-delay-cal-row:hover .dss-delay-cal-left-cell {
+            background: var(--color-surface-alt);
+        }
+        [data-theme="dark"] .dss-delay-cal-row:hover .dss-delay-cal-left-cell,
+        .dark .dss-delay-cal-row:hover .dss-delay-cal-left-cell {
+            background: #141C2B;
+        }
+
+        .dss-delay-cal-track-cell {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            min-height: 58px;
+            overflow: hidden;
+        }
+        .dss-delay-grid-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            border-right: 1px solid var(--color-border);
+            opacity: 0.5;
+            pointer-events: none;
+            z-index: 0;
+        }
+        [data-theme="dark"] .dss-delay-grid-line,
+        .dark .dss-delay-grid-line {
+            border-color: rgba(255, 255, 255, 0.08);
+            opacity: 1;
+        }
+
+        .dss-delay-today-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            border-right: 2px dashed var(--color-muted);
+            opacity: 0.85;
+            pointer-events: none;
+            z-index: 2;
+        }
+        [data-theme="dark"] .dss-delay-today-line,
+        .dark .dss-delay-today-line {
+            border-color: #94A3B8;
+        }
+
+        .dss-delay-today-label {
+            position: absolute;
+            top: 3px;
+            transform: translateX(-50%);
+            font-size: 0.72rem;
+            font-weight: 700;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--color-ink);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            z-index: 5;
+            white-space: nowrap;
+        }
+        [data-theme="dark"] .dss-delay-today-label,
+        .dark .dss-delay-today-label {
+            background: #162030;
+            border-color: #2E3C52;
+            color: #F1F5F9;
+        }
+
+        .dss-cal-bar-scheduled {
+            position: absolute;
+            height: 28px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: #FFFFFF;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+            z-index: 1;
+            transition: width 0.2s ease, left 0.2s ease;
+        }
+        [data-theme="dark"] .dss-cal-bar-scheduled,
+        .dark .dss-cal-bar-scheduled {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .dss-cal-bar-slip {
+            position: absolute;
+            height: 28px;
+            border-radius: 0 4px 4px 0;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--color-ink);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(217, 119, 6, 0.15),
+                rgba(217, 119, 6, 0.15) 6px,
+                rgba(217, 119, 6, 0.3) 6px,
+                rgba(217, 119, 6, 0.3) 12px
+            );
+            border: 1.5px dashed #D97706;
+            border-left: none;
+            z-index: 2;
+            transition: width 0.2s ease, left 0.2s ease;
+        }
+        [data-theme="dark"] .dss-cal-bar-slip,
+        .dark .dss-cal-bar-slip {
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(245, 158, 11, 0.22),
+                rgba(245, 158, 11, 0.22) 6px,
+                rgba(245, 158, 11, 0.38) 6px,
+                rgba(245, 158, 11, 0.38) 12px
+            );
+            border-color: #F59E0B;
+            color: #F1F5F9;
+        }
+
+        .dss-cal-bar-runover {
+            position: absolute;
+            height: 34px;
+            border-radius: 4px;
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(220, 38, 38, 0.12),
+                rgba(220, 38, 38, 0.12) 6px,
+                rgba(220, 38, 38, 0.24) 6px,
+                rgba(220, 38, 38, 0.24) 12px
+            );
+            border: 1.5px dashed #DC2626;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 8px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--color-ink);
+            z-index: 3;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        [data-theme="dark"] .dss-cal-bar-runover,
+        .dark .dss-cal-bar-runover {
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(239, 68, 68, 0.2),
+                rgba(239, 68, 68, 0.2) 6px,
+                rgba(239, 68, 68, 0.35) 6px,
+                rgba(239, 68, 68, 0.35) 12px
+            );
+            border-color: #EF4444;
+            color: #F1F5F9;
+        }
+
+        /* ── Project Color Legend & Calendar Key (Dark Mode Adaptive) ── */
+        .dss-legend-container {
+            background: var(--color-surface-alt);
+            border-top: 1px solid var(--color-border);
+            padding: 1rem 1.25rem;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        [data-theme="dark"] .dss-legend-container,
+        .dark .dss-legend-container {
+            background: #111A28;
+            border-color: #243042;
+        }
+
+        .dss-legend-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 0.5rem 0.85rem;
+            font-size: 0.8125rem;
+            cursor: pointer;
+            text-align: left;
+            transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+        }
+        .dss-legend-chip:hover {
+            border-color: var(--color-accent);
+            background: var(--color-surface-alt);
+        }
+        .dss-legend-chip.is-active {
+            border-color: var(--color-ink);
+            box-shadow: 0 0 0 1px var(--color-ink);
+        }
+        [data-theme="dark"] .dss-legend-chip,
+        .dark .dss-legend-chip {
+            background: #162030;
+            border-color: #2A384E;
+            color: #F1F5F9;
+        }
+        [data-theme="dark"] .dss-legend-chip:hover,
+        .dark .dss-legend-chip:hover {
+            background: #1E2D44;
+            border-color: #38BDF8;
+        }
+        [data-theme="dark"] .dss-legend-chip.is-active,
+        .dark .dss-legend-chip.is-active {
+            background: #1E2D44;
+            border-color: #38BDF8;
+            box-shadow: 0 0 0 1.5px #38BDF8;
+        }
+
+        .dss-legend-tag {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            padding: 2px 6px;
+            color: var(--color-ink);
+            background: var(--color-surface);
+        }
+        [data-theme="dark"] .dss-legend-tag,
+        .dark .dss-legend-tag {
+            background: #0E1522;
+            border-color: #2E3C52;
+            color: #F1F5F9;
+        }
+
+        .dss-legend-key-sample {
+            width: 16px;
+            height: 12px;
+            border-radius: 2px;
+            flex-shrink: 0;
+            display: inline-block;
+        }
+        .dss-legend-key-scheduled {
+            background: #2563EB;
+        }
+        [data-theme="dark"] .dss-legend-key-scheduled,
+        .dark .dss-legend-key-scheduled {
+            background: #38BDF8;
+        }
+        .dss-legend-key-delay {
+            background: repeating-linear-gradient(-45deg, #D97706 0, #D97706 2px, transparent 2px, transparent 5px);
+            border: 1.5px dashed #D97706;
+        }
+        [data-theme="dark"] .dss-legend-key-delay,
+        .dark .dss-legend-key-delay {
+            background: repeating-linear-gradient(-45deg, #F59E0B 0, #F59E0B 2px, rgba(245, 158, 11, 0.2) 2px, rgba(245, 158, 11, 0.2) 5px);
+            border-color: #F59E0B;
+        }
+        .dss-legend-key-runover {
+            background: repeating-linear-gradient(45deg, #DC2626 0, #DC2626 2px, transparent 2px, transparent 5px);
+            border: 1.5px dashed #DC2626;
+        }
+        [data-theme="dark"] .dss-legend-key-runover,
+        .dark .dss-legend-key-runover {
+            background: repeating-linear-gradient(45deg, #EF4444 0, #EF4444 2px, rgba(239, 68, 68, 0.2) 2px, rgba(239, 68, 68, 0.2) 5px);
+            border-color: #EF4444;
+        }
+        .dss-legend-key-today {
+            width: 10px;
+            height: 12px;
+            border-right: 2px dashed var(--color-muted);
+            display: inline-block;
+        }
+        [data-theme="dark"] .dss-legend-key-today,
+        .dark .dss-legend-key-today {
+            border-right-color: #94A3B8;
+        }
+
+        /* ── Dark Mode Adaptability for Impact Cards ── */
+        .dss-delay-card-alt {
+            background: var(--color-surface-alt);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: 1.25rem 1.35rem;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        [data-theme="dark"] .dss-delay-card-alt,
+        .dark .dss-delay-card-alt {
+            background: #111A28;
+            border-color: #243042;
+        }
+
+        .dss-delay-item-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 0.85rem 1rem;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        [data-theme="dark"] .dss-delay-item-card,
+        .dark .dss-delay-item-card {
+            background: #162030;
+            border-color: #2A384E;
+        }
     </style>
 
     {{-- Page Header --}}
@@ -2528,89 +3139,356 @@
              SIMULATOR 2: DELAY PROPAGATION (Visual Timeline Shift Chart)
              ───────────────────────────────────────────────────────────────────── --}}
         <div x-show="simMode === 'delay'" x-cloak id="sim-panel-delay">
-            <template x-if="delaySimResult">
-                <div class="card card-glass mb-6">
-                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                        <div>
-                            <h2 class="card-header__title" style="margin: 0; font-size: 1rem;">Project delay simulation</h2>
-                            <span class="card-header__subtitle" style="display: block; font-size: 0.8125rem; color: var(--color-muted); margin-top: 2px;">
-                                Drag or adjust the slip days to visualize how schedule delays lock crew and impact downstream projects.
-                            </span>
+            <template x-if="delaySimResult && calendarSchedule">
+                <div>
+                    {{-- Control Bar Card --}}
+                    <div class="card card-glass mb-4" style="margin-bottom: 1rem;">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding: 1rem 1.35rem;">
+                            <div>
+                                <h2 class="card-header__title" style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--color-ink);">Project delay simulation</h2>
+                                <span class="card-header__subtitle" style="display: block; font-size: 0.85rem; color: var(--color-muted); margin-top: 3px;">
+                                    Interactive schedule calendar: adjust delay days to simulate timeline slip and detect run-over conflicts with downstream projects.
+                                </span>
+                            </div>
+
                         </div>
-                        <span class="dss-risk-pill" :style="badgeStyle(delaySimResult.status)" x-text="`+${delaySimResult.slipDays} Days Slip Impact`"></span>
+
+                        <div class="card-body" style="padding: 1.15rem 1.35rem;">
+                            <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 1.25rem; flex-wrap: wrap;">
+                                {{-- Target Project Selector --}}
+                                <div style="display: flex; flex-direction: column; gap: 6px; min-width: 260px; flex: 1 1 260px;">
+                                    <label for="sim-delay-project" style="font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink);">
+                                        Target Project to Delay
+                                    </label>
+                                    <select
+                                        id="sim-delay-project"
+                                        x-model="delayProjectId"
+                                        class="form-control form-control--compact dss-select"
+                                        style="width: 100% !important; max-width: 100%; min-width: 250px; height: 38px; font-size: 0.875rem;"
+                                        aria-label="Select project to delay"
+                                    >
+                                        <template x-for="p in matrix" :key="'d-proj-' + p.id">
+                                            <option :value="p.id" x-text="`${p.project_code} — ${p.name}`"></option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                {{-- Slider Control for Slip Days --}}
+                                <div style="display: flex; flex-direction: column; gap: 6px; flex: 2 1 340px; min-width: 270px;">
+                                    <div style="font-size: 0.8125rem;">
+                                        <span style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink);">
+                                            Simulated Delay Duration
+                                        </span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.85rem;">
+                                        <input
+                                            type="range"
+                                            x-model.number="delaySlipDays"
+                                            min="0"
+                                            max="90"
+                                            step="1"
+                                            style="flex: 1; accent-color: var(--color-accent); height: 7px; cursor: pointer;"
+                                            aria-label="Slip days slider"
+                                        >
+                                        <input
+                                            type="number"
+                                            id="sim-delay-days"
+                                            x-model.number="delaySlipDays"
+                                            min="0"
+                                            max="365"
+                                            class="form-control font-mono"
+                                            style="width: 78px !important; height: 38px; font-size: 0.925rem; font-weight: 700; text-align: center;"
+                                            aria-label="Slip days input"
+                                        >
+                                    </div>
+                                </div>
+
+                                {{-- Quick Preset Buttons --}}
+                                <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-secondary btn-sm dss-btn" style="height: 38px; font-size: 0.8125rem; font-weight: 600; padding: 0 0.85rem;" @click="delaySlipDays = 0">Reset</button>
+                                    <button type="button" class="btn btn-secondary btn-sm dss-btn" style="height: 38px; font-size: 0.8125rem; font-weight: 600; padding: 0 0.85rem;" @click="delaySlipDays = 7">+7d</button>
+                                    <button type="button" class="btn btn-secondary btn-sm dss-btn" style="height: 38px; font-size: 0.8125rem; font-weight: 600; padding: 0 0.85rem;" @click="delaySlipDays = 14">+14d</button>
+                                    <button type="button" class="btn btn-secondary btn-sm dss-btn" style="height: 38px; font-size: 0.8125rem; font-weight: 600; padding: 0 0.85rem;" @click="delaySlipDays = 30">+30d</button>
+                                    <button type="button" class="btn btn-secondary btn-sm dss-btn" style="height: 38px; font-size: 0.8125rem; font-weight: 600; padding: 0 0.85rem;" @click="delaySlipDays = 60">+60d</button>
+                                </div>
+                            </div>
+
+                            {{-- Schedule Shift Summary Row --}}
+                            <div class="dss-delay-card-alt" style="padding: 0.75rem 1.1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; font-size: 0.875rem; margin-top: 1rem;">
+                                <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                                    <span style="color: var(--color-muted); font-weight: 500;">Completion Window:</span>
+                                    <span class="font-mono" style="font-size: 0.95rem; font-weight: 800; color: var(--color-ink);" x-text="calendarSchedule.origDateFormatted"></span>
+                                    <span style="color: var(--color-muted); font-weight: 700;">&rarr;</span>
+                                    <span class="font-mono" style="font-size: 0.95rem; font-weight: 800; color: var(--color-ink);" x-text="calendarSchedule.newDateFormatted"></span>
+                                    <template x-if="delaySlipDays > 0">
+                                        <span class="dss-legend-tag" style="font-size: 0.78rem; font-weight: 700; padding: 2px 8px;" x-text="`+${delaySlipDays}d Extension`"></span>
+                                    </template>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.85rem; font-size: 0.85rem; color: var(--color-muted);">
+                                    <span>Run-over projects: <strong class="font-mono font-bold" style="color: var(--color-ink); font-size: 0.925rem;" x-text="calendarSchedule.totalRunOverCount"></strong></span>
+                                    <span>&middot;</span>
+                                    <span>Locked crew: <strong class="font-mono font-bold" style="color: var(--color-ink); font-size: 0.925rem;" x-text="delaySimResult.affectedCrew.length"></strong></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="card-body" style="padding: var(--space-5) var(--space-6);">
-                        <div class="dss-toolbar-row" style="margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border);">
-                            <div class="dss-filter-group">
-                                <select id="sim-delay-project" x-model="delayProjectId" class="form-control form-control--compact dss-select" style="min-width: 230px;" aria-label="Select project to delay">
-                                    <template x-for="p in matrix" :key="'d-proj-' + p.id">
-                                        <option :value="p.id" x-text="`${p.project_code} — ${p.name}`"></option>
-                                    </template>
-                                </select>
-
-                                <input type="range" x-model.number="delaySlipDays" min="0" max="90" step="1" style="width: 140px; accent-color: var(--color-accent);" aria-label="Slip days slider">
-                                <input type="number" id="sim-delay-days" x-model.number="delaySlipDays" min="0" max="365" class="form-control font-mono" style="width: 80px !important; height: 36px; font-size: 0.8125rem;" aria-label="Slip days input">
-
-                                <button type="button" class="btn btn-secondary btn-sm dss-btn" @click="delaySlipDays = 7">+7d</button>
-                                <button type="button" class="btn btn-secondary btn-sm dss-btn" @click="delaySlipDays = 14">+14d</button>
-                                <button type="button" class="btn btn-secondary btn-sm dss-btn" @click="delaySlipDays = 30">+30d</button>
+                    {{-- Interactive Calendar Schedule View --}}
+                    <div class="card card-glass mb-4" style="margin-bottom: 1rem; overflow: hidden;">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.85rem 1.35rem;">
+                            <div>
+                                <h3 class="card-header__title" style="margin: 0; font-size: 0.975rem; font-weight: 700; color: var(--color-ink);">Portfolio Schedule Calendar</h3>
+                                <span class="card-header__subtitle" style="display: block; font-size: 0.825rem; color: var(--color-muted); margin-top: 2px;">
+                                    Plotted timeline: inspect project duration, simulated delay extension, and calendar run-overs.
+                                </span>
                             </div>
+                            <span style="font-size: 0.8125rem; color: var(--color-muted); font-weight: 500;">
+                                Click any project row to simulate its delay
+                            </span>
                         </div>
 
-                        {{-- Visual Gantt-Style Timeline Shift Bar --}}
-                        <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-bottom: 1.25rem;">
-                            <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 6px;">
-                                <strong x-text="`${delaySimResult.project.project_code} Schedule Window + Simulated Slip`"></strong>
-                                <span class="font-mono font-bold text-danger" x-text="`+${delaySimResult.slipDays}d Extension (New End: ${delaySimResult.newTargetDate} | Previous end date: ${delaySimResult.origTargetDate})`"></span>
-                            </div>
-                            <div style="display: flex; width: 100%; height: 18px; border-radius: 999px; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border);">
-                                <div :style="{ width: (100 - delaySimResult.slipRatioPct) + '%', background: '#2563EB' }" title="Original Planned Duration"></div>
-                                <div :style="{ width: delaySimResult.slipRatioPct + '%', background: 'repeating-linear-gradient(45deg, #DC2626, #DC2626 6px, #F87171 6px, #F87171 12px)' }" title="Simulated Delay Slip Window"></div>
-                            </div>
-                            <div x-show="showFormulas" class="dss-formula-box" style="margin-top: 0.65rem;" x-text="delaySimResult.formula"></div>
-                        </div>
-
-                        {{-- Visual Cards for Held Crew & Downstream Overlaps --}}
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;">
-                            <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem;">
-                                <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 0.65rem;">
-                                    Held Personnel (<span x-text="delaySimResult.affectedCrew.length"></span> locked until <span class="font-mono" x-text="delaySimResult.newTargetDate"></span>)
-                                </div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                                    <template x-if="delaySimResult.affectedCrew.length === 0">
-                                        <span class="text-muted" style="font-size: 0.78rem;">No personnel currently assigned to this project.</span>
-                                    </template>
-                                    <template x-for="ac in delaySimResult.affectedCrew" :key="'ac-chip-' + ac.employee_id">
-                                        <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.45rem 0.7rem; font-size: 0.76rem;">
-                                            <span class="font-mono font-bold text-accent" x-text="ac.employee_id"></span> ·
-                                            <strong x-text="ac.full_name"></strong>
-                                            <span class="text-muted" x-text="`(${ac.expertise})`"></span>
+                        <div class="dss-delay-calendar-container" style="border: none; border-radius: 0;">
+                            <div class="dss-delay-calendar-scroll">
+                                <div class="dss-delay-calendar-grid">
+                                    {{-- Calendar Month Header Row --}}
+                                    <div class="dss-delay-calendar-header">
+                                        <div class="dss-delay-cal-left-header">
+                                            <span>Project</span>
+                                            <span style="font-size: 0.72rem; color: var(--color-muted); text-transform: none; font-weight: 600;">Status</span>
                                         </div>
-                                    </template>
+                                        <div class="dss-delay-cal-timeline-header">
+                                            <template x-for="(m, mIdx) in calendarSchedule.months" :key="'cal-m-' + mIdx">
+                                                <div
+                                                    class="dss-delay-cal-month-col"
+                                                    :style="{ left: m.leftPct + '%', width: m.widthPct + '%' }"
+                                                    x-text="m.label"
+                                                ></div>
+                                            </template>
+                                            <template x-if="calendarSchedule.todayPct !== null">
+                                                <span class="dss-delay-today-label" :style="{ left: calendarSchedule.todayPct + '%' }">Today</span>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    {{-- Calendar Project Rows --}}
+                                    <div class="dss-delay-cal-body">
+                                        <template x-for="p in calendarSchedule.projects" :key="'cal-row-' + p.id">
+                                            <div
+                                                class="dss-delay-cal-row"
+                                                :class="{ 'is-selected': p.isSelected, 'is-run-over': p.isRunOver }"
+                                                @click="delayProjectId = p.id"
+                                                :title="`Click to simulate delay for ${p.project_code}`"
+                                            >
+                                                {{-- Sticky Left Info Cell --}}
+                                                <div class="dss-delay-cal-left-cell">
+                                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                                                        <div style="display: flex; align-items: center; gap: 0.45rem; overflow: hidden;">
+                                                            <span :style="{ background: p.color.bg }" style="width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; display: inline-block;"></span>
+                                                            <strong class="font-mono" style="font-size: 0.95rem; font-weight: 800; color: var(--color-ink);" x-text="p.project_code"></strong>
+                                                        </div>
+                                                        <template x-if="p.isSelected">
+                                                            <span class="dss-legend-tag" style="font-size: 0.75rem; font-weight: 700; padding: 2px 6px;" x-text="delaySlipDays > 0 ? `+${delaySlipDays}d Slip` : 'Delayed'"></span>
+                                                        </template>
+                                                        <template x-if="!p.isSelected && p.isRunOver">
+                                                            <span class="dss-legend-tag" style="font-size: 0.75rem; font-weight: 700; padding: 2px 6px;" x-text="`Run Over · ${p.runOverDays}d`"></span>
+                                                        </template>
+                                                        <template x-if="!p.isSelected && !p.isRunOver">
+                                                            <span style="font-size: 0.75rem; color: var(--color-muted); text-transform: uppercase; font-weight: 600;" x-text="p.status"></span>
+                                                        </template>
+                                                    </div>
+                                                    <div style="font-size: 0.85rem; color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;" x-text="p.name"></div>
+                                                    <div style="font-size: 0.78rem; color: var(--color-muted); font-family: monospace; font-weight: 600;" x-text="`${p.startDateFormatted} – ${p.endDateFormatted}`"></div>
+                                                </div>
+
+                                                {{-- Timeline Track Cell --}}
+                                                <div class="dss-delay-cal-track-cell">
+                                                    {{-- Background Month Grid Lines --}}
+                                                    <template x-for="(m, mIdx) in calendarSchedule.months" :key="'grid-m-' + mIdx">
+                                                        <div class="dss-delay-grid-line" :style="{ left: m.leftPct + '%' }"></div>
+                                                    </template>
+
+                                                    {{-- Today Line Marker --}}
+                                                    <template x-if="calendarSchedule.todayPct !== null">
+                                                        <div class="dss-delay-today-line" :style="{ left: calendarSchedule.todayPct + '%' }"></div>
+                                                    </template>
+
+                                                    {{-- Scheduled Baseline Duration Bar --}}
+                                                    <div
+                                                        class="dss-cal-bar-scheduled"
+                                                        :style="{
+                                                            left: p.leftPct + '%',
+                                                            width: p.origWidthPct + '%',
+                                                            background: p.color.bg,
+                                                            border: `1px solid ${p.color.border}`
+                                                        }"
+                                                        :title="`${p.project_code}: ${p.startDateFormatted} – ${p.endDateFormatted}`"
+                                                    >
+                                                        <span class="font-mono font-bold" x-text="p.project_code"></span>
+                                                    </div>
+
+                                                    {{-- Simulated Delay Extension Bar (Selected Project Only) --}}
+                                                    <template x-if="p.isSelected && delaySlipDays > 0">
+                                                        <div
+                                                            class="dss-cal-bar-slip"
+                                                            :style="{
+                                                                left: p.slipLeftPct + '%',
+                                                                width: p.slipWidthPct + '%'
+                                                            }"
+                                                            :title="`Simulated Delay Extension: +${delaySlipDays} days (New End: ${p.delayedEndDateFormatted})`"
+                                                        >
+                                                            <span class="font-mono" x-text="`+${delaySlipDays}d delay`"></span>
+                                                        </div>
+                                                    </template>
+
+                                                    {{-- Run-Over Overlap Collision Zone (Downstream Projects Only) --}}
+                                                    <template x-if="!p.isSelected && p.isRunOver">
+                                                        <div
+                                                            class="dss-cal-bar-runover"
+                                                            :style="{
+                                                                left: p.runOverLeftPct + '%',
+                                                                width: p.runOverWidthPct + '%'
+                                                            }"
+                                                            :title="`Run Over: ${p.runOverDays} days overlap with delayed ${calendarSchedule.selectedProject ? calendarSchedule.selectedProject.project_code : 'project'}`"
+                                                        >
+                                                            <span class="font-mono" x-text="`⚠ Run Over: ${p.runOverDays}d`"></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Project Color Legend & Timeline Key (Dark Mode Adaptive) --}}
+                        <div class="dss-legend-container">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.75rem;">
+                                <span style="font-size: 0.875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink);">
+                                    Project Color Legend &amp; Calendar Key
+                                </span>
+                                <div style="display: flex; align-items: center; gap: 1.25rem; font-size: 0.85rem; color: var(--color-muted); flex-wrap: wrap;">
+                                    <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                        <span class="dss-legend-key-sample dss-legend-key-scheduled"></span>
+                                        <span style="font-weight: 600; color: var(--color-ink);">Scheduled Duration</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                        <span class="dss-legend-key-sample dss-legend-key-delay"></span>
+                                        <span style="font-weight: 600; color: var(--color-ink);">Simulated Delay (+X days)</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                        <span class="dss-legend-key-sample dss-legend-key-runover"></span>
+                                        <span style="font-weight: 600; color: var(--color-ink);">Run-Over Overlap Zone</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                        <span class="dss-legend-key-today"></span>
+                                        <span style="font-weight: 600; color: var(--color-ink);">Today</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem;">
-                                <div style="font-size: 0.8rem; font-weight: 700; margin-bottom: 0.65rem;">
-                                    Downstream Overlapping Projects (<span x-text="delaySimResult.downstreamProjects.length"></span>)
+                            {{-- Project Color Chips in Legend --}}
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.65rem;">
+                                <template x-for="p in calendarSchedule.projects" :key="'leg-p-' + p.id">
+                                    <button
+                                        type="button"
+                                        class="dss-legend-chip"
+                                        :class="{ 'is-active': p.isSelected }"
+                                        @click="delayProjectId = p.id"
+                                        :title="`Click to simulate delay on ${p.project_code}`"
+                                    >
+                                        <span :style="{ background: p.color.bg }" style="width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; display: inline-block;"></span>
+                                        <span class="font-mono" style="font-size: 0.925rem; font-weight: 800; color: var(--color-ink);" x-text="p.project_code"></span>
+                                        <span style="color: var(--color-muted); font-size: 0.85rem; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;" x-text="p.name"></span>
+                                        <template x-if="p.isSelected">
+                                            <span class="dss-legend-tag" x-text="delaySlipDays > 0 ? `+${delaySlipDays}d` : 'Delayed'"></span>
+                                        </template>
+                                        <template x-if="!p.isSelected && p.isRunOver">
+                                            <span class="dss-legend-tag" x-text="`Run Over · ${p.runOverDays}d`"></span>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Bottom Impact Breakdown Grid (Minimalist & Professional & Dark Mode Adaptive) --}}
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.25rem;">
+                        {{-- Left Card: Projects Run Over by Schedule Slip --}}
+                        <div class="dss-delay-card-alt">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.95rem;">
+                                <div>
+                                    <strong style="font-size: 0.95rem; font-weight: 700; color: var(--color-ink); display: block;">Projects Run Over by Schedule Slip</strong>
+                                    <span style="font-size: 0.825rem; color: var(--color-muted);">Downstream projects with timeline overlap during delay window</span>
                                 </div>
-                                <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-                                    <template x-if="delaySimResult.downstreamProjects.length === 0">
-                                        <span class="text-muted" style="font-size: 0.78rem;">No downstream projects overlap with this slip window.</span>
-                                    </template>
-                                    <template x-for="dp in delaySimResult.downstreamProjects" :key="'dp-bar-' + dp.project_code">
+                                <span class="dss-legend-tag" style="font-size: 0.8125rem; font-weight: 700; padding: 3px 10px;" x-text="`${delaySimResult.downstreamProjects.length} Project(s)`"></span>
+                            </div>
+
+                            <template x-if="delaySimResult.downstreamProjects.length === 0">
+                                <div style="text-align: center; padding: 1.75rem 1rem; color: var(--color-muted); font-size: 0.85rem; border: 1px dashed var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface);">
+                                    <span>No downstream projects are run over by this schedule extension.</span>
+                                </div>
+                            </template>
+
+                            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                <template x-for="dp in delaySimResult.downstreamProjects" :key="'runover-' + dp.project_code">
+                                    <div class="dss-delay-item-card">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.45rem;">
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span :style="{ background: dp.color?.bg || 'var(--color-muted)' }" style="width: 10px; height: 10px; border-radius: 2px; display: inline-block;"></span>
+                                                <span class="font-mono" style="font-size: 0.925rem; font-weight: 800; color: var(--color-ink);" x-text="dp.project_code"></span>
+                                                <span style="color: var(--color-muted); font-size: 0.85rem; font-weight: 500;" x-text="dp.name"></span>
+                                            </div>
+                                            <span class="dss-legend-tag" style="font-size: 0.8125rem; font-weight: 700; padding: 3px 8px; white-space: nowrap;" x-text="`${dp.overlap_days} days run over`"></span>
+                                        </div>
+
+                                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--color-muted); margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--color-border); flex-wrap: wrap;">
+                                            <div>
+                                                <span style="font-weight: 500;">Scheduled Window: </span>
+                                                <span class="font-mono font-bold" style="color: var(--color-ink);" x-text="`${dp.start_date} – ${dp.target_date}`"></span>
+                                            </div>
+                                            <div>
+                                                <span style="font-weight: 500;">Conflict Duration: </span>
+                                                <span class="font-mono font-bold" style="color: var(--color-ink);" x-text="`${dp.overlap_days} day(s) overlap`"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        {{-- Right Card: Held Field Personnel --}}
+                        <div class="dss-delay-card-alt">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.95rem;">
+                                <div>
+                                    <strong style="font-size: 0.95rem; font-weight: 700; color: var(--color-ink); display: block;">Held Field Personnel</strong>
+                                    <span style="font-size: 0.825rem; color: var(--color-muted);">Crew members locked until new target completion</span>
+                                </div>
+                                <span class="dss-legend-tag" style="font-size: 0.8125rem; font-weight: 700; padding: 3px 10px;" x-text="`${delaySimResult.affectedCrew.length} Assigned`"></span>
+                            </div>
+
+                            <template x-if="delaySimResult.affectedCrew.length === 0">
+                                <div style="text-align: center; padding: 1.75rem 1rem; color: var(--color-muted); font-size: 0.85rem; border: 1px dashed var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface);">
+                                    <span>No personnel currently assigned to this project.</span>
+                                </div>
+                            </template>
+
+                            <div style="display: flex; flex-direction: column; gap: 0.65rem; max-height: 300px; overflow-y: auto;">
+                                <template x-for="ac in delaySimResult.affectedCrew" :key="'held-ac-' + ac.employee_id">
+                                    <div class="dss-delay-item-card" style="display: flex; justify-content: space-between; align-items: center; gap: 0.65rem;">
                                         <div>
-                                            <div style="display: flex; justify-content: space-between; font-size: 0.76rem; margin-bottom: 3px;">
-                                                <span><strong class="font-mono text-accent" x-text="dp.project_code"></strong> <span x-text="dp.name"></span></span>
-                                                <span class="font-mono text-danger font-bold" x-text="`${dp.overlap_days}d overlap`"></span>
+                                            <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                                <span class="font-mono font-bold" style="font-size: 0.875rem; color: var(--color-ink);" x-text="ac.employee_id"></span>
+                                                <strong style="font-size: 0.875rem; color: var(--color-ink);" x-text="ac.full_name"></strong>
                                             </div>
-                                            <div class="dss-mini-meter-track">
-                                                <div class="dss-mini-meter-fill" :style="{ width: dp.overlap_pct + '%', background: '#DC2626' }"></div>
-                                            </div>
+                                            <span style="font-size: 0.8125rem; color: var(--color-muted);" x-text="ac.expertise"></span>
                                         </div>
-                                    </template>
-                                </div>
+                                        <div style="text-align: right; font-size: 0.8125rem; color: var(--color-muted);">
+                                            <span>Locked until </span>
+                                            <span class="font-mono font-bold" style="font-size: 0.875rem; color: var(--color-ink);" x-text="ac.delayed_release"></span>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </div>

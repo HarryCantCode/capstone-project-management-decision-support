@@ -450,6 +450,38 @@ class NotificationService
     }
 
     /**
+     * Notify an assigned staff user about a task assignment.
+     */
+    public function notifyTaskAssigned(Project $project, ProjectTask $task, ProjectSubtask $subtask, User $staffUser): void
+    {
+        $projectCode = $project->project_code ?? 'N/A';
+        $title = 'Task Assigned';
+        $message = "You have been assigned to task \"{$subtask->title}\" under \"{$task->task_name}\" in project \"{$project->name}\" ({$projectCode}).";
+
+        $data = [
+            'project_id' => $project->id,
+            'project_code' => $projectCode,
+            'project_name' => $project->name,
+            'task_id' => $task->id,
+            'task_name' => $task->task_name,
+            'subtask_id' => $subtask->id,
+            'subtask_title' => $subtask->title,
+            'assigned_to' => $staffUser->id,
+            'url' => route('projects.show', $project->id),
+        ];
+
+        Notification::create([
+            'user_id' => $staffUser->id,
+            'type' => 'task_assigned',
+            'title' => $title,
+            'message' => $message,
+            'data' => $data,
+        ]);
+
+        $this->getEmailService()->sendTaskAssignedEmail($project, $task, $subtask, $staffUser);
+    }
+
+    /**
      * Notify Admin and Manager users about a new material added to the catalog.
      */
     public function notifyNewMaterial(Resource $resource): void

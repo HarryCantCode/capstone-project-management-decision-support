@@ -37,7 +37,7 @@ class StaffApprovalListController extends Controller implements HasMiddleware
 
         $data = $this->staffPendingActionService->getStaffApprovalListData(
             $request->user(),
-            $request->only(['search', 'status', 'recency', 'action_type']),
+            $request->only(['search', 'status', 'recency', 'action_type', 'tab']),
         );
 
         return view('approval-list.index', $data);

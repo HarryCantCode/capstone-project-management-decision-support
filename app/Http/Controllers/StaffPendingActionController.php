@@ -57,11 +57,13 @@ class StaffPendingActionController extends Controller implements HasMiddleware
 
         $pendingAction->load(['user', 'project', 'reviewer']);
 
-        return response()->json([
+        $formatted = $this->staffPendingActionService->formatActionForModal($pendingAction);
+
+        return response()->json(array_merge($formatted, [
             'success' => true,
             'action' => $pendingAction,
-            'formatted_action' => $this->staffPendingActionService->formatActionForModal($pendingAction),
-        ]);
+            'formatted_action' => $formatted,
+        ]));
     }
 
     /**

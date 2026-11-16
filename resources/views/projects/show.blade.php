@@ -33,8 +33,10 @@
     $initialSubtaskLocks = [];
     $initialSubtaskCompleted = [];
     $initialSubtaskPending = [];
+    $initialSubtaskAssignees = [];
     $pendingSubtaskIdSet = array_flip($pendingSubtaskIds ?? []);
     $isStaffViewer = Auth::user()->hasRole('Staff');
+    $isManagerViewer = Auth::user()->hasRole('Manager');
     $foundFirstUncompleted = false;
     $totalOrderedSubtasks = $orderedSubtasks->count();
     $isProjectReadOnly = $project->trashed() || $project->status === 'completed';
@@ -43,6 +45,13 @@
         $isPendingReview = isset($pendingSubtaskIdSet[$st->id]) && ! $st->is_completed;
         $initialSubtaskCompleted[$st->id] = (bool) $st->is_completed;
         $initialSubtaskPending[$st->id] = $isPendingReview;
+        $initialSubtaskAssignees[$st->id] = ($st->assigned_to && $st->assignedTo) ? [
+            'id' => $st->assignedTo->id,
+            'name' => $st->assignedTo->name,
+            'email' => $st->assignedTo->email,
+            'employee_number' => $st->assignedTo->employee_number,
+            'job_title' => $st->assignedTo->job_title,
+        ] : null;
 
         if ($st->is_completed) {
             $hasCompletedAfter = false;
@@ -56,6 +65,7 @@
         } elseif ($isPendingReview) {
             // Task has been submitted and is pending review: strictly lock this task from further actions
             $initialSubtaskLocks[$st->id] = true;
+            $foundFirstUncompleted = true;
         } else {
             if (!$foundFirstUncompleted) {
                 $initialSubtaskLocks[$st->id] = false;
@@ -175,20 +185,20 @@
     <div class="project-detail-grid mb-6">
         
         {{-- Overview Card --}}
-        <section class="card card-glass" aria-labelledby="project-overview-heading">
+        <section class="card card-glass" aria-labelledby="project-overview-heading" data-tour="project-overview-card">
             <div class="card-header">
                 <h2 id="project-overview-heading">Overview</h2>
                 <x-status-pill :status="$project->status" id="project-overview-status-pill" />
             </div>
             <div class="card-body detail-list">
-                <div><dt>Client</dt><dd>{{ $project->client_name }}</dd></div>
-                <div><dt>Project Code</dt><dd class="font-mono">{{ $project->project_code }}</dd></div>
+                <div data-tour="overview-client"><dt>Client</dt><dd>{{ $project->client_name }}</dd></div>
+                <div data-tour="overview-project-code"><dt>Project Code</dt><dd class="font-mono">{{ $project->project_code }}</dd></div>
                 <div><dt>Project Type</dt><dd><span class="badge" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-sm);">{{ $project->project_type ?: 'General' }}</span></dd></div>
                 <div><dt>Payment Status</dt><dd><span class="status-pill status-pill--{{ strtolower($project->payment_status ?? 'partial') }}">{{ $project->payment_status ?: 'Partial' }}</span></dd></div>
                 <div class="detail-list__full"><dt>Site Location</dt><dd>{{ $project->full_address ?: 'Not specified' }}</dd></div>
                 <div><dt>Start Date</dt><dd class="font-mono">{{ $project->start_date ? $project->start_date->format('M j, Y') : ($project->created_at->format('M j, Y')) }}</dd></div>
                 <div><dt>Target Completion</dt><dd class="font-mono font-bold" style="color: var(--color-accent);">{{ $project->target_completion_date ? $project->target_completion_date->format('M j, Y') : 'Not set' }}</dd></div>
-                <div>
+                <div data-tour="overview-warranty">
                     <dt>Warranty Period</dt>
                     <dd class="font-mono">
                         <button 
@@ -224,7 +234,7 @@
 
         {{-- Financials & Budget Tracking Card --}}
         <div style="display: flex; flex-direction: column; gap: var(--space-6);">
-        <section class="card card-glass" aria-labelledby="project-costing-heading">
+        <section class="card card-glass" aria-labelledby="project-costing-heading" data-tour="project-financials-card">
             <div class="card-header">
                 <h2 id="project-costing-heading">Financials & Budget</h2>
                 @if($project->payment_status)
@@ -235,19 +245,19 @@
             </div>
             <div class="card-body" style="display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-4);">
                 <div class="financial-stats-grid">
-                    <div class="financial-stat-card">
+                    <div class="financial-stat-card" data-tour="financial-allocated-budget">
                         <span class="financial-stat-card__label" title="Allocated Budget">Allocated Budget</span>
                         <div class="financial-stat-card__value text-success" title="₱{{ number_format($project->contract_price, 2) }}">
                             ₱{{ number_format($project->contract_price, 2) }}
                         </div>
                     </div>
-                    <div class="financial-stat-card">
+                    <div class="financial-stat-card" data-tour="financial-actual-spend">
                         <span class="financial-stat-card__label" title="Actual Spend">Actual Spend</span>
                         <div class="financial-stat-card__value" style="color: var(--color-ink);" title="₱{{ number_format($project->actual_spend, 2) }}">
                             ₱{{ number_format($project->actual_spend, 2) }}
                         </div>
                     </div>
-                    <div class="financial-stat-card">
+                    <div class="financial-stat-card" data-tour="financial-remaining-budget">
                         <span class="financial-stat-card__label" title="Remaining Budget">Remaining</span>
                         <div class="financial-stat-card__value {{ $project->remaining_budget >= 0 ? 'text-success' : 'text-danger' }}" title="₱{{ number_format($project->remaining_budget, 2) }}">
                             ₱{{ number_format($project->remaining_budget, 2) }}
@@ -278,6 +288,7 @@
                 class="card card-glass" 
                 aria-labelledby="project-files-heading" 
                 id="project-files-card"
+                data-tour="project-files-card"
                 x-data="{
                     fileCategory: 'all',
                     fileSearch: '',
@@ -341,11 +352,11 @@
 
                         @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
                             @if ($isProjectReadOnly)
-                                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; white-space: nowrap; font-size: 0.8125rem; padding: 0 14px; height: 34px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center;" title="{{ $project->trashed() ? 'Cannot upload files to an archived project' : 'Cannot upload files to a completed project unless reactivated' }}">
+                                <button type="button" class="btn btn-secondary btn-sm" disabled data-tour="project-files-upload" style="opacity: 0.6; cursor: not-allowed; white-space: nowrap; font-size: 0.8125rem; padding: 0 14px; height: 34px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center;" title="{{ $project->trashed() ? 'Cannot upload files to an archived project' : 'Cannot upload files to a completed project unless reactivated' }}">
                                     + Upload File
                                 </button>
                             @else
-                                <button type="button" class="btn btn-primary btn-sm" @click="openUploadProjectFileModal(fileCategory === 'all' ? 'project_document' : fileCategory)" style="white-space: nowrap; font-size: 0.8125rem; padding: 0 14px; height: 34px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center;">
+                                <button type="button" class="btn btn-primary btn-sm" data-tour="project-files-upload" @click="openUploadProjectFileModal(fileCategory === 'all' ? 'project_document' : fileCategory)" style="white-space: nowrap; font-size: 0.8125rem; padding: 0 14px; height: 34px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center;">
                                     + Upload File
                                 </button>
                             @endif
@@ -353,7 +364,7 @@
                     </div>
                 </div>
 
-                <div class="card-body" style="padding: var(--space-4);">
+                <div class="card-body" style="padding: var(--space-4);" data-tour="project-files-list">
                     @if ($allProjectFiles->isEmpty())
                         <div style="text-align: center; padding: var(--space-5) var(--space-3); color: var(--color-muted);">
                             <svg style="width: 36px; height: 36px; margin: 0 auto var(--space-2); opacity: 0.4;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -610,7 +621,7 @@
     </div>
 
     {{-- ─── Elevator Technical Specifications ───────────────────────────────────── --}}
-    <section class="card card-glass mb-6" aria-labelledby="elevator-specs-heading">
+    <section class="card card-glass mb-6" aria-labelledby="elevator-specs-heading" data-tour="elevator-specs-card">
         <div class="card-header">
             <h2 id="elevator-specs-heading" style="margin: 0; font-size: 1.0625rem; font-weight: 700;">Elevator Technical Specifications</h2>
         </div>
@@ -659,7 +670,7 @@
     </section>
 
     {{-- ─── Dynamic Project Progress Timeline (Major Tasks & Sub Tasks) ──────────── --}}
-    <section class="card card-glass mb-6" aria-labelledby="project-timeline-heading">
+    <section class="card card-glass mb-6" aria-labelledby="project-timeline-heading" data-tour="project-timeline-card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);">
             <div>
                 <h2 id="project-timeline-heading" style="display: inline-block; margin-right: var(--space-3); margin-bottom: 0;">Project Progress Timeline</h2>
@@ -700,6 +711,7 @@
                             style="opacity: 0.6; cursor: not-allowed;"
                             title="{{ $project->trashed() ? 'Cannot add major tasks to an archived project' : 'Cannot add major tasks to a completed project unless reactivated' }}"
                             id="btn-add-major-task"
+                            data-tour="timeline-add-major-task"
                         >
                             + Add Major Task
                         </button>
@@ -709,6 +721,7 @@
                             class="btn btn-primary btn-sm"
                             @click="createMajorTaskModalOpen = true"
                             id="btn-add-major-task"
+                            data-tour="timeline-add-major-task"
                         >
                             + Add Major Task
                         </button>
@@ -784,7 +797,11 @@
                 <div x-show="timelineMode === 'minimized'" x-transition>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2);">
                         <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0;">
-                            Weekly milestones timeline. Click any card to select it, inspect specific sub tasks, and tick checkboxes below.
+                            @if ($isManagerViewer)
+                                Weekly milestones timeline. Click any card to select it, oversee specific sub tasks, and view completion details below.
+                            @else
+                                Weekly milestones timeline. Click any card to select it, inspect specific sub tasks, and tick checkboxes below.
+                            @endif
                         </p>
                         @if ($tasks->count() > 3)
                             <div style="display: flex; gap: var(--space-1); align-items: center;">
@@ -816,6 +833,7 @@
                                     @click="activeTaskId = {{ $task->id }}; checklistMinimized = false"
                                     style="cursor: pointer;"
                                     id="card-task-{{ $task->id }}"
+                                    @if ($loop->first) data-tour="timeline-major-task-first" @endif
                                 >
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
                                         <span class="badge" style="background: var(--color-accent-light); color: var(--color-accent); font-weight: 700; font-size: 0.75rem;">
@@ -923,13 +941,18 @@
                             @endif
 
                             {{-- Sub Tasks / Specific Tasks Checklist --}}
-                            <div>
+                            <div data-tour="timeline-specific-tasks">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
                                     <h4 style="font-size: 0.9375rem; font-weight: 700; color: var(--color-ink); margin: 0;">
                                         Specific Tasks / Sub Tasks Checklist
                                     </h4>
                                     <span class="text-muted" style="font-size: 0.75rem;">
-                                        Tick checkboxes to record granular task completion
+                                        @if ($isManagerViewer)
+                                            <span class="badge" style="background: rgba(100, 116, 139, 0.16); color: #94A3B8; border: 1px solid rgba(100, 116, 139, 0.3); font-size: 0.6875rem; margin-right: 4px;">Oversee Only</span>
+                                            Checkboxes are view-only for Managers
+                                        @else
+                                            Tick checkboxes to record granular task completion
+                                        @endif
                                     </span>
                                 </div>
 
@@ -993,39 +1016,49 @@
                                             >
                                                 {{-- Floating Brand-Orange Tooltip on Hover when untickable --}}
                                                 <div 
-                                                    x-show="showLockedTooltip && (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}])"
+                                                    x-show="showLockedTooltip && ({{ $isManagerViewer ? 'true' : '!!subtaskLocks[' . $subtask->id . '] || !!pendingSubtasks[' . $subtask->id . ']' }})"
                                                     x-cloak
                                                     class="dex-tooltip-bubble"
                                                 >
-                                                    <span x-text="pendingSubtasks[{{ $subtask->id }}] ? 'This task is awaiting review by a Manager or Admin.' : (subtaskCompleted[{{ $subtask->id }}] ? 'You cannot uncheck your previous task unless you uncheck the task that comes after it.' : 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task.')"></span>
+                                                    @if ($isManagerViewer)
+                                                        <span>Managers have oversee-only access and cannot toggle timeline progress checkboxes.</span>
+                                                    @else
+                                                        <span x-text="pendingSubtasks[{{ $subtask->id }}] ? 'This task is awaiting review by a Manager or Admin.' : (subtaskCompleted[{{ $subtask->id }}] ? 'You cannot uncheck your previous task unless you uncheck the task that comes after it.' : 'You cannot mark this as done when a previous task before your assigned task is not yet done')"></span>
+                                                    @endif
                                                 </div>
 
                                                 <label 
-                                                    style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending) ? 'not-allowed' : 'pointer' }};"
-                                                    :style="(subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) ? 'cursor: not-allowed !important;' : ''"
-                                                    @mouseenter="if (subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) showLockedTooltip = true"
-                                                    @click="if (subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) showLockedTooltip = true"
+                                                    style="display: flex; align-items: center; gap: var(--space-3); flex: 1; margin-bottom: 0; cursor: {{ ($isProjectReadOnly || $isManagerViewer || $isSubtaskLocked || $isSubtaskPending) ? 'not-allowed' : 'pointer' }};"
+                                                    :style="{{ $isManagerViewer ? "'cursor: not-allowed !important;'" : "((subtaskLocks[" . $subtask->id . "] || pendingSubtasks[" . $subtask->id . "]) ? 'cursor: not-allowed !important;' : '')" }}"
+                                                    @mouseenter="{{ $isManagerViewer ? 'showLockedTooltip = true' : 'if (subtaskLocks[' . $subtask->id . '] || pendingSubtasks[' . $subtask->id . ']) showLockedTooltip = true' }}"
+                                                    @click="{{ $isManagerViewer ? 'showLockedTooltip = true' : 'if (subtaskLocks[' . $subtask->id . '] || pendingSubtasks[' . $subtask->id . ']) showLockedTooltip = true' }}"
                                                 >
                                                     <input 
                                                         type="checkbox" 
-                                                        class="subtask-checkbox subtask-check-{{ $subtask->id }}"
+                                                        class="subtask-checkbox subtask-check-{{ $subtask->id }} {{ $isManagerViewer ? 'is-manager-view' : '' }}"
                                                         :class="{
-                                                            'is-forward-locked': (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}],
-                                                            'is-reverse-locked': !!subtaskLocks[{{ $subtask->id }}] && !!subtaskCompleted[{{ $subtask->id }}]
+                                                            'is-forward-locked': !{{ $isManagerViewer ? 'true' : 'false' }} && (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}],
+                                                            'is-reverse-locked': !{{ $isManagerViewer ? 'true' : 'false' }} && !!subtaskLocks[{{ $subtask->id }}] && !!subtaskCompleted[{{ $subtask->id }}],
+                                                            'is-manager-view': {{ $isManagerViewer ? 'true' : 'false' }}
                                                         }"
                                                         id="subtask-check-{{ $subtask->id }}"
                                                         {{ $subtask->is_completed ? 'checked' : '' }}
-                                                        {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'disabled' : '' }}
-                                                        :disabled="{{ ($isProjectReadOnly || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'true' : '!!subtaskLocks[' . $subtask->id . '] || !!pendingSubtasks[' . $subtask->id . ']' }}"
-                                                        @change="onSubtaskCheckboxClick({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($task->task_name) }}', '{{ addslashes($subtask->title) }}', $el)"
-                                                        style="width: 18px; height: 18px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'not-allowed' : 'pointer' }};"
-                                                        :style="(subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}] || {{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'true' : 'false' }}) ? 'cursor: not-allowed !important;' : ''"
-                                                        title="{{ $isSubtaskPending ? 'This task is awaiting review by a Manager or Admin' : (($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'Staff users cannot uncheck completed tasks' : '') }}"
+                                                        {{ ($isProjectReadOnly || $isManagerViewer || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && $isStaffViewer)) ? 'disabled' : '' }}
+                                                        :disabled="{{ ($isProjectReadOnly || $isManagerViewer || ($subtask->is_completed && $isStaffViewer)) ? 'true' : '!!subtaskLocks[' . $subtask->id . '] || !!pendingSubtasks[' . $subtask->id . ']' }}"
+                                                        @change="{{ $isManagerViewer ? '' : 'onSubtaskCheckboxClick(' . $project->id . ', ' . $task->id . ', ' . $subtask->id . ', \'' . addslashes($task->task_name) . '\', \'' . addslashes($subtask->title) . '\', $el)' }}"
+                                                        style="width: 18px; height: 18px; {{ $isManagerViewer ? 'accent-color: #64748B; cursor: not-allowed; opacity: 0.45; filter: grayscale(100%); pointer-events: none;' : 'accent-color: var(--color-success); cursor: ' . (($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && $isStaffViewer)) ? 'not-allowed' : 'pointer') . ';' }}"
+                                                        :style="{{ $isManagerViewer ? "'cursor: not-allowed !important; opacity: 0.45 !important; filter: grayscale(100%) !important; pointer-events: none;'" : "((subtaskLocks[" . $subtask->id . "] || pendingSubtasks[" . $subtask->id . "] || " . (($subtask->is_completed && $isStaffViewer) ? 'true' : 'false') . ") ? 'cursor: not-allowed !important;' : '')" }}"
+                                                        title="{{ $isManagerViewer ? 'Managers have oversee-only access to progress timeline checkboxes' : ($isSubtaskPending ? 'This task is awaiting review by a Manager or Admin' : (($subtask->is_completed && $isStaffViewer) ? 'Staff users cannot uncheck completed tasks' : '')) }}"
                                                     >
                                                     <span 
                                                         class="subtask-title-{{ $subtask->id }}"
                                                         style="font-size: 0.875rem; {{ $subtask->is_completed ? 'text-decoration: line-through; color: var(--color-muted);' : 'color: var(--color-ink); font-weight: 500;' }}"
                                                         :style="((subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}]) ? 'color: var(--color-muted) !important;' : ''"
+                                                        @if (Auth::user()->hasAnyRole(['Admin', 'Manager']))
+                                                            @click.prevent.stop="openAssignStaffModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', subtaskAssignees[{{ $subtask->id }}]?.id)"
+                                                            style="cursor: pointer;"
+                                                            title="Click to view task assignment"
+                                                        @endif
                                                     >
                                                         {{ $subtask->title }}
                                                     </span>
@@ -1041,6 +1074,20 @@
                                                 </label>
 
                                                 <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
+                                                    {{-- Assigned Staff Indicator (Visible to all users) --}}
+                                                    <span
+                                                        x-show="!!subtaskAssignees[{{ $subtask->id }}]"
+                                                        x-cloak
+                                                        class="badge"
+                                                        style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.6875rem; font-weight: 600; padding: 2px 8px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;"
+                                                        :title="'Assigned to: ' + (subtaskAssignees[{{ $subtask->id }}]?.name || '')"
+                                                    >
+                                                        <svg style="width: 11px; height: 11px;" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                                                        </svg>
+                                                        <span x-text="subtaskAssignees[{{ $subtask->id }}]?.name"></span>
+                                                    </span>
+
                                                     @if ($subtask->due_date)
                                                         <span class="badge font-mono" style="background: var(--color-surface-alt); color: var(--color-ink); font-size: 0.75rem; padding: 2px 8px; border: 1px solid var(--color-border);" title="Target Date">
                                                             📅 {{ $subtask->due_date->format('M j, Y') }}
@@ -1066,6 +1113,25 @@
                                                             </button>
                                                         @endif
                                                     </div>
+
+                                                    {{-- Assign Staff Icon Button (For Manager / Admin) --}}
+                                                    @if (Auth::user()->hasAnyRole(['Admin', 'Manager']))
+                                                        <button 
+                                                            type="button" 
+                                                            class="btn-icon" 
+                                                            id="btn-assign-subtask-{{ $subtask->id }}"
+                                                            :disabled="subtaskCompleted[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}] || {{ $isProjectReadOnly ? 'true' : 'false' }}"
+                                                            :style="(subtaskCompleted[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}] || {{ $isProjectReadOnly ? 'true' : 'false' }}) 
+                                                                ? 'opacity: 0.35; cursor: not-allowed; filter: grayscale(100%); background: none; border: none; padding: 4px; border-radius: var(--radius-sm);' 
+                                                                : 'background: none; border: none; cursor: pointer; color: var(--color-accent); padding: 4px; border-radius: var(--radius-sm);'"
+                                                            :title="subtaskCompleted[{{ $subtask->id }}] ? 'Cannot assign: Task is already completed' : (pendingSubtasks[{{ $subtask->id }}] ? 'Cannot assign: Task is awaiting review' : (subtaskAssignees[{{ $subtask->id }}] ? 'Reassign Staff Member (Currently: ' + subtaskAssignees[{{ $subtask->id }}].name + ')' : 'Assign Staff Member'))"
+                                                            @click="if (!subtaskCompleted[{{ $subtask->id }}] && !pendingSubtasks[{{ $subtask->id }}] && !{{ $isProjectReadOnly ? 'true' : 'false' }}) openAssignStaffModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', subtaskAssignees[{{ $subtask->id }}]?.id)"
+                                                        >
+                                                            <svg style="width: 16px; height: 16px;" viewBox="0 0 20 20" fill="currentColor">
+                                                                <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                                                            </svg>
+                                                        </button>
+                                                    @endif
 
                                                     @can('update', $project)
                                                         @if (!$isProjectReadOnly)
@@ -1130,7 +1196,8 @@
                                         <form 
                                             method="POST" 
                                             action="{{ route('projects.tasks.subtasks.store', [$project, $task]) }}" 
-                                            style="display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap;"
+                                            style="display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap; align-items: center;"
+                                            x-data="{ quickStaffId: '', quickStaffName: '', quickStaffOpen: false, quickStaffSearch: '' }"
                                         >
                                             @csrf
                                             <input 
@@ -1139,21 +1206,88 @@
                                                 placeholder="+ Add a specific sub task for Week {{ $taskIndex + 1 }}..." 
                                                 required 
                                                 class="form-control form-control--compact" 
-                                                style="flex: 2; min-width: 220px;"
+                                                style="flex: 2; min-width: 200px;"
                                             >
                                             <div style="display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap;">
-                                                <label class="form-hint" style="margin-bottom: 0; font-size: 0.75rem; white-space: nowrap;">Target Date (Week: {{ $task->start_date->format('M j') }}–{{ $task->end_date->format('M j') }}):</label>
+                                                <label class="form-hint" style="margin-bottom: 0; font-size: 0.75rem; white-space: nowrap;">Target Date:</label>
                                                 <input 
                                                     type="date" 
                                                     name="due_date" 
                                                     class="form-control form-control--compact" 
-                                                    style="width: 150px;"
+                                                    style="width: 140px;"
                                                     value="{{ $task->start_date->format('Y-m-d') }}"
                                                     min="{{ $task->start_date->format('Y-m-d') }}"
                                                     max="{{ $task->end_date->format('Y-m-d') }}"
                                                     title="Allowed dates: {{ $task->start_date->format('M j, Y') }} to {{ $task->end_date->format('M j, Y') }}"
                                                 >
                                             </div>
+
+                                            {{-- Assign Staff Picker with Icon --}}
+                                            <div style="position: relative; display: inline-flex; align-items: center;" @click.away="quickStaffOpen = false">
+                                                <input type="hidden" name="assigned_to" :value="quickStaffId">
+                                                <button 
+                                                    type="button" 
+                                                    class="btn btn-secondary btn-sm" 
+                                                    @click="quickStaffOpen = !quickStaffOpen"
+                                                    style="display: inline-flex; align-items: center; gap: 5px; height: 31px; padding: 0 10px; border-radius: var(--radius-sm);"
+                                                    :style="quickStaffId ? 'border-color: var(--color-accent); color: var(--color-accent); background: rgba(56, 189, 248, 0.12);' : 'color: var(--color-muted); border-color: var(--color-border);'"
+                                                    :title="quickStaffName ? 'Assigned to: ' + quickStaffName : 'Assign a staff member upon creation'"
+                                                >
+                                                    <svg style="width: 14px; height: 14px; flex-shrink: 0;" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                                                    </svg>
+                                                    <span x-text="quickStaffName ? quickStaffName : 'Assign Staff'" style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem;"></span>
+                                                    <span x-show="quickStaffId" @click.stop="quickStaffId = ''; quickStaffName = '';" style="cursor: pointer; margin-left: 2px; font-weight: bold; font-size: 0.8125rem; color: var(--color-muted);" title="Clear assignment">&times;</span>
+                                                </button>
+
+                                                {{-- Dropdown list with search --}}
+                                                <div 
+                                                    x-show="quickStaffOpen" 
+                                                    x-cloak 
+                                                    class="card shadow-lg"
+                                                    style="position: absolute; bottom: 100%; right: 0; margin-bottom: 6px; width: 260px; max-height: 280px; z-index: 50; padding: var(--space-2); display: flex; flex-direction: column; gap: 6px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);"
+                                                >
+                                                    <div style="font-size: 0.75rem; font-weight: 600; color: var(--color-ink); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-border); padding-bottom: 4px;">
+                                                        <span>Assign Staff Member</span>
+                                                        <span @click="quickStaffOpen = false" style="cursor: pointer; color: var(--color-muted); font-size: 1rem; line-height: 1;">&times;</span>
+                                                    </div>
+                                                    <input 
+                                                        type="text" 
+                                                        x-model="quickStaffSearch" 
+                                                        placeholder="Search staff..." 
+                                                        class="form-control form-control--compact" 
+                                                        style="font-size: 0.75rem; padding: 4px 8px;"
+                                                        @click.stop
+                                                    >
+                                                    <div style="overflow-y: auto; max-height: 180px; display: flex; flex-direction: column; gap: 2px;">
+                                                        <div 
+                                                            @click="quickStaffId = ''; quickStaffName = ''; quickStaffOpen = false"
+                                                            style="padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.75rem; color: var(--color-muted); display: flex; align-items: center; gap: 6px;"
+                                                            onmouseover="this.style.background='var(--color-surface-alt)'"
+                                                            onmouseout="this.style.background='transparent'"
+                                                        >
+                                                            <span>🚫 Unassigned</span>
+                                                        </div>
+                                                        @foreach ($staffUsers as $staff)
+                                                            <div 
+                                                                x-show="!quickStaffSearch || '{{ strtolower(addslashes($staff->name . ' ' . $staff->employee_number . ' ' . $staff->email)) }}'.includes(quickStaffSearch.toLowerCase())"
+                                                                @click="quickStaffId = '{{ $staff->id }}'; quickStaffName = '{{ addslashes($staff->name) }}'; quickStaffOpen = false"
+                                                                style="padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.75rem; display: flex; align-items: center; justify-content: space-between;"
+                                                                :style="quickStaffId == '{{ $staff->id }}' ? 'background: rgba(56, 189, 248, 0.15); color: var(--color-accent); font-weight: 600;' : 'color: var(--color-ink);'"
+                                                                onmouseover="this.style.background='var(--color-surface-alt)'"
+                                                                onmouseout="this.style.background='transparent'"
+                                                            >
+                                                                <div style="display: flex; flex-direction: column; overflow: hidden;">
+                                                                    <span style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ $staff->name }}</span>
+                                                                    <span style="font-size: 0.6875rem; color: var(--color-muted);">{{ $staff->employee_number ?: $staff->email }}</span>
+                                                                </div>
+                                                                <span x-show="quickStaffId == '{{ $staff->id }}'" style="color: var(--color-accent); font-weight: bold;">✓</span>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <button type="submit" class="btn btn-primary btn-sm">
                                                 + Add Sub Task
                                             </button>
@@ -1289,39 +1423,49 @@
                                                         >
                                                             {{-- Floating Brand-Orange Tooltip on Hover when untickable --}}
                                                             <div 
-                                                                x-show="showExpandedLockedTooltip && (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}])"
+                                                                x-show="showExpandedLockedTooltip && ({{ $isManagerViewer ? 'true' : '!!subtaskLocks[' . $subtask->id . '] || !!pendingSubtasks[' . $subtask->id . ']' }})"
                                                                 x-cloak
                                                                 class="dex-tooltip-bubble"
                                                             >
-                                                                <span x-text="pendingSubtasks[{{ $subtask->id }}] ? 'This task is awaiting review by a Manager or Admin.' : (subtaskCompleted[{{ $subtask->id }}] ? 'You cannot uncheck your previous task unless you uncheck the task that comes after it.' : 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task.')"></span>
+                                                                @if ($isManagerViewer)
+                                                                    <span>Managers have oversee-only access and cannot toggle timeline progress checkboxes.</span>
+                                                                @else
+                                                                    <span x-text="pendingSubtasks[{{ $subtask->id }}] ? 'This task is awaiting review by a Manager or Admin.' : (subtaskCompleted[{{ $subtask->id }}] ? 'You cannot uncheck your previous task unless you uncheck the task that comes after it.' : 'You cannot mark this as done when a previous task before your assigned task is not yet done')"></span>
+                                                                @endif
                                                             </div>
 
                                                             <label 
-                                                                style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending) ? 'not-allowed' : 'pointer' }}; flex: 1;"
-                                                                :style="(subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) ? 'cursor: not-allowed !important;' : ''"
-                                                                @mouseenter="if (subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) showExpandedLockedTooltip = true"
-                                                                @click="if (subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) showExpandedLockedTooltip = true"
+                                                                style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: 0; cursor: {{ ($isProjectReadOnly || $isManagerViewer || $isSubtaskLocked || $isSubtaskPending) ? 'not-allowed' : 'pointer' }}; flex: 1;"
+                                                                :style="{{ $isManagerViewer ? "'cursor: not-allowed !important;'" : "((subtaskLocks[" . $subtask->id . "] || pendingSubtasks[" . $subtask->id . "]) ? 'cursor: not-allowed !important;' : '')" }}"
+                                                                @mouseenter="{{ $isManagerViewer ? 'showExpandedLockedTooltip = true' : 'if (subtaskLocks[' . $subtask->id . '] || pendingSubtasks[' . $subtask->id . ']) showExpandedLockedTooltip = true' }}"
+                                                                @click="{{ $isManagerViewer ? 'showExpandedLockedTooltip = true' : 'if (subtaskLocks[' . $subtask->id . '] || pendingSubtasks[' . $subtask->id . ']) showExpandedLockedTooltip = true' }}"
                                                             >
                                                                 <input 
                                                                     type="checkbox" 
-                                                                    class="subtask-checkbox subtask-check-{{ $subtask->id }}"
+                                                                    class="subtask-checkbox subtask-check-{{ $subtask->id }} {{ $isManagerViewer ? 'is-manager-view' : '' }}"
                                                                     :class="{
-                                                                        'is-forward-locked': (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}],
-                                                                        'is-reverse-locked': !!subtaskLocks[{{ $subtask->id }}] && !!subtaskCompleted[{{ $subtask->id }}]
+                                                                        'is-forward-locked': !{{ $isManagerViewer ? 'true' : 'false' }} && (!!subtaskLocks[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}],
+                                                                        'is-reverse-locked': !{{ $isManagerViewer ? 'true' : 'false' }} && !!subtaskLocks[{{ $subtask->id }}] && !!subtaskCompleted[{{ $subtask->id }}],
+                                                                        'is-manager-view': {{ $isManagerViewer ? 'true' : 'false' }}
                                                                     }"
                                                                     id="expanded-subtask-check-{{ $subtask->id }}"
                                                                     {{ $subtask->is_completed ? 'checked' : '' }}
-                                                                    {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'disabled' : '' }}
-                                                                    :disabled="{{ ($isProjectReadOnly || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'true' : '!!subtaskLocks[' . $subtask->id . '] || !!pendingSubtasks[' . $subtask->id . ']' }}"
-                                                                    @change="onSubtaskCheckboxClick({{ $project->id }}, {{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($task->task_name) }}', '{{ addslashes($subtask->title) }}', $el)"
-                                                                    style="width: 15px; height: 15px; accent-color: var(--color-success); cursor: {{ ($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && Auth::user()->hasRole('Staff'))) ? 'not-allowed' : 'pointer' }};"
-                                                                    :style="(subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}] || {{ ($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'true' : 'false' }}) ? 'cursor: not-allowed !important;' : ''"
-                                                                    title="{{ $isSubtaskPending ? 'This task is awaiting review by a Manager or Admin' : (($subtask->is_completed && Auth::user()->hasRole('Staff')) ? 'Staff users cannot uncheck completed tasks' : '') }}"
+                                                                    {{ ($isProjectReadOnly || $isManagerViewer || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && $isStaffViewer)) ? 'disabled' : '' }}
+                                                                    :disabled="{{ ($isProjectReadOnly || $isManagerViewer || ($subtask->is_completed && $isStaffViewer)) ? 'true' : '!!subtaskLocks[' . $subtask->id . '] || !!pendingSubtasks[' . $subtask->id . ']' }}"
+                                                                    @change="{{ $isManagerViewer ? '' : 'onSubtaskCheckboxClick(' . $project->id . ', ' . $task->id . ', ' . $subtask->id . ', \'' . addslashes($task->task_name) . '\', \'' . addslashes($subtask->title) . '\', $el)' }}"
+                                                                    style="width: 15px; height: 15px; {{ $isManagerViewer ? 'accent-color: #64748B; cursor: not-allowed; opacity: 0.45; filter: grayscale(100%); pointer-events: none;' : 'accent-color: var(--color-success); cursor: ' . (($isProjectReadOnly || $isSubtaskLocked || $isSubtaskPending || ($subtask->is_completed && $isStaffViewer)) ? 'not-allowed' : 'pointer') . ';' }}"
+                                                                    :style="{{ $isManagerViewer ? "'cursor: not-allowed !important; opacity: 0.45 !important; filter: grayscale(100%) !important; pointer-events: none;'" : "((subtaskLocks[" . $subtask->id . "] || pendingSubtasks[" . $subtask->id . "] || " . (($subtask->is_completed && $isStaffViewer) ? 'true' : 'false') . ") ? 'cursor: not-allowed !important;' : '')" }}"
+                                                                    title="{{ $isManagerViewer ? 'Managers have oversee-only access to progress timeline checkboxes' : ($isSubtaskPending ? 'This task is awaiting review by a Manager or Admin' : (($subtask->is_completed && $isStaffViewer) ? 'Staff users cannot uncheck completed tasks' : '')) }}"
                                                                 >
                                                                 <span 
                                                                     class="subtask-title-{{ $subtask->id }}"
                                                                     style="{{ $subtask->is_completed ? 'text-decoration: line-through; color: var(--color-muted);' : 'color: var(--color-ink);' }}"
                                                                     :style="((subtaskLocks[{{ $subtask->id }}] || pendingSubtasks[{{ $subtask->id }}]) && !subtaskCompleted[{{ $subtask->id }}]) ? 'color: var(--color-muted) !important;' : ''"
+                                                                    @if (Auth::user()->hasAnyRole(['Admin', 'Manager']))
+                                                                        @click.prevent.stop="openAssignStaffModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', subtaskAssignees[{{ $subtask->id }}]?.id)"
+                                                                        style="cursor: pointer;"
+                                                                        title="Click to view task assignment"
+                                                                    @endif
                                                                 >
                                                                     {{ $subtask->title }}
                                                                 </span>
@@ -1336,6 +1480,20 @@
                                                                 </span>
                                                             </label>
                                                             <div style="display: flex; align-items: center; gap: var(--space-2);">
+                                                                {{-- Assigned Staff Indicator (Visible to all users) --}}
+                                                                <span
+                                                                    x-show="!!subtaskAssignees[{{ $subtask->id }}]"
+                                                                    x-cloak
+                                                                    class="badge"
+                                                                    style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 3px;"
+                                                                    :title="'Assigned to: ' + (subtaskAssignees[{{ $subtask->id }}]?.name || '')"
+                                                                >
+                                                                    <svg style="width: 10px; height: 10px;" viewBox="0 0 20 20" fill="currentColor">
+                                                                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                                                                    </svg>
+                                                                    <span x-text="subtaskAssignees[{{ $subtask->id }}]?.name"></span>
+                                                                </span>
+
                                                                 @if ($subtask->due_date)
                                                                     <span class="badge font-mono" style="background: var(--color-surface-alt); color: var(--color-muted); font-size: 0.6875rem;">
                                                                         📅 {{ $subtask->due_date->format('M j') }}
@@ -1361,6 +1519,25 @@
                                                                         </button>
                                                                     @endif
                                                                 </div>
+
+                                                                {{-- Assign Staff Icon Button (For Manager / Admin) --}}
+                                                                @if (Auth::user()->hasAnyRole(['Admin', 'Manager']))
+                                                                    <button 
+                                                                        type="button" 
+                                                                        class="btn-icon" 
+                                                                        id="btn-expanded-assign-subtask-{{ $subtask->id }}"
+                                                                        :disabled="subtaskCompleted[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}] || {{ $isProjectReadOnly ? 'true' : 'false' }}"
+                                                                        :style="(subtaskCompleted[{{ $subtask->id }}] || !!pendingSubtasks[{{ $subtask->id }}] || {{ $isProjectReadOnly ? 'true' : 'false' }}) 
+                                                                            ? 'opacity: 0.35; cursor: not-allowed; filter: grayscale(100%); background: none; border: none; padding: 2px;' 
+                                                                            : 'background: none; border: none; cursor: pointer; color: var(--color-accent); padding: 2px;'"
+                                                                        :title="subtaskCompleted[{{ $subtask->id }}] ? 'Cannot assign: Task is already completed' : (pendingSubtasks[{{ $subtask->id }}] ? 'Cannot assign: Task is awaiting review' : (subtaskAssignees[{{ $subtask->id }}] ? 'Reassign Staff Member (Currently: ' + subtaskAssignees[{{ $subtask->id }}].name + ')' : 'Assign Staff Member'))"
+                                                                        @click="if (!subtaskCompleted[{{ $subtask->id }}] && !pendingSubtasks[{{ $subtask->id }}] && !{{ $isProjectReadOnly ? 'true' : 'false' }}) openAssignStaffModal({{ $task->id }}, {{ $subtask->id }}, '{{ addslashes($subtask->title) }}', subtaskAssignees[{{ $subtask->id }}]?.id)"
+                                                                    >
+                                                                        <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor">
+                                                                            <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                                                                        </svg>
+                                                                    </button>
+                                                                @endif
                                                             </div>
                                                         </li>
                                                     @endforeach
@@ -1378,7 +1555,7 @@
     </section>
 
     {{-- ─── Expenditures Table (3 Recent Entries Shortcut) ────────────────────── --}}
-    <section class="card card-glass mb-6" aria-labelledby="project-expenditures-heading">
+    <section class="card card-glass mb-6" aria-labelledby="project-expenditures-heading" data-tour="project-expenditures-card">
         <div
             class="card-header"
             style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);"
@@ -1625,7 +1802,7 @@
     </section>
 
     {{-- ─── Assigned Manpower / Project Personnel (Active & Archived Records) ─── --}}
-    <section class="card card-glass mb-6" aria-labelledby="assigned-manpower-heading">
+    <section class="card card-glass mb-6" aria-labelledby="assigned-manpower-heading" data-tour="assigned-manpower-card">
         <div
             class="card-header"
             style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);"
@@ -1826,7 +2003,7 @@
 
     {{-- ─── Status & Activity Audit Trail History ──────────────────────────── --}}
     <div class="project-detail-grid">
-        <section class="card card-glass" aria-labelledby="status-history-heading" style="grid-column: 1 / -1;">
+        <section class="card card-glass" aria-labelledby="status-history-heading" data-tour="audit-trail-card" style="grid-column: 1 / -1;">
             <div
                 class="card-header"
                 style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3);"
@@ -2563,6 +2740,138 @@
         </div>
     </div>
 
+    {{-- ─── Modal 5B: Assign Staff to Sub Task ──────────────────────────── --}}
+    <div class="reassign-modal-overlay" style="display: none;" x-show="assignStaffModalOpen" x-cloak>
+        <div class="reassign-modal-backdrop" @click="assignStaffModalOpen = false"></div>
+        <div class="reassign-modal-content card" x-show="assignStaffModalOpen" x-transition style="max-width: 520px;">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(56, 189, 248, 0.15); display: flex; align-items: center; justify-content: center; color: var(--color-accent);">
+                        <svg style="width: 18px; height: 18px;" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <span style="font-weight: 700; font-size: 1rem; color: var(--color-ink);">Assign Task to Staff</span>
+                        <p class="text-muted" style="font-size: 0.75rem; margin-bottom: 0;">Select a staff member responsible for executing this task.</p>
+                    </div>
+                </div>
+                
+            </div>
+            <div class="card-body" style="padding: var(--space-4);">
+                {{-- Task Target Summary --}}
+                <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3);">
+                    <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); font-weight: 600;">Target Task</div>
+                    <div style="font-size: 0.9375rem; font-weight: 600; color: var(--color-ink); margin-top: 2px;" x-text="assignModalSubtaskTitle"></div>
+                </div>
+
+                {{-- Currently Assigned Banner (Always visible to Manager/Admin) --}}
+                <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); font-weight: 600;">Current Assignment</span>
+                        <template x-if="isAssignModalReadOnly">
+                            <span class="badge" style="background: rgba(100, 116, 139, 0.18); color: var(--color-muted); font-size: 0.6875rem;" x-text="assignModalReadOnlyReason"></span>
+                        </template>
+                    </div>
+                    <template x-if="currentAssignee">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
+                            <div style="width: 34px; height: 34px; border-radius: 50%; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.8125rem; font-weight: 700; color: var(--color-accent);" x-text="currentAssignee.name ? currentAssignee.name.substring(0, 2).toUpperCase() : 'NA'"></div>
+                            <div>
+                                <div style="font-size: 0.875rem; font-weight: 600; color: var(--color-ink);" x-text="currentAssignee.name"></div>
+                                <div style="font-size: 0.75rem; color: var(--color-muted);" x-text="(currentAssignee.employee_number ? currentAssignee.employee_number + ' · ' : '') + currentAssignee.email"></div>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="!currentAssignee">
+                        <div style="display: flex; align-items: center; gap: 8px; color: var(--color-muted); font-size: 0.8125rem; margin-top: 4px;">
+                            <span>🚫 Not currently assigned to any staff member</span>
+                        </div>
+                    </template>
+                </div>
+
+                {{-- When Read-Only: Notice --}}
+                <div x-show="isAssignModalReadOnly" class="alert alert-info" style="font-size: 0.8125rem; margin-bottom: 0; padding: 8px 12px; display: flex; align-items: center; gap: 8px;">
+                    <span>ℹ️</span>
+                    <span>This task is completed or awaiting review. Assignment cannot be modified.</span>
+                </div>
+
+                {{-- When Editable: Staff Search and Selection --}}
+                <div x-show="!isAssignModalReadOnly">
+                    {{-- Live Search Input --}}
+                    <div class="form-group form-group-premium" style="margin-bottom: var(--space-3);">
+                        <label class="form-label" style="font-size: 0.8125rem;">Search Staff Member</label>
+                        <div style="position: relative;">
+                            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-muted); pointer-events: none;">
+                                <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                                </svg>
+                            </span>
+                            <input
+                                type="text"
+                                class="form-control"
+                                x-model="staffSearch"
+                                placeholder="Type to filter by name, email, or employee number..."
+                                style="padding-left: 32px;"
+                            >
+                        </div>
+                    </div>
+
+                    {{-- Staff Selection List --}}
+                    <div style="font-size: 0.8125rem; font-weight: 600; color: var(--color-muted); margin-bottom: var(--space-2); display: flex; justify-content: space-between; align-items: center;">
+                        <span>Available Staff (<span x-text="filteredStaffList.length"></span>)</span>
+                        <button 
+                            type="button" 
+                            x-show="assignModalSelectedStaffId !== null" 
+                            @click="assignModalSelectedStaffId = null"
+                            style="font-size: 0.75rem; color: var(--color-danger); text-decoration: none; cursor: pointer; background: none; border: none; padding: 0;"
+                        >
+                            ✕ Set Unassigned
+                        </button>
+                    </div>
+
+                    <div class="assign-staff-scroll-list">
+                        {{-- Staff items --}}
+                        <template x-for="staff in filteredStaffList" :key="staff.id">
+                            <label 
+                                class="assign-staff-option"
+                                :class="{ 'is-selected': assignModalSelectedStaffId === staff.id }"
+                                @click="assignModalSelectedStaffId = staff.id"
+                            >
+                                <span class="assign-staff-radio-wrap">
+                                    <input 
+                                        type="radio" 
+                                        name="modal_staff_radio" 
+                                        :checked="assignModalSelectedStaffId === staff.id" 
+                                        class="assign-staff-radio"
+                                    >
+                                </span>
+                                <div class="assign-staff-avatar" x-text="staff.name.substring(0, 2).toUpperCase()"></div>
+                                <div class="assign-staff-info">
+                                    <div class="assign-staff-name" x-text="staff.name"></div>
+                                    <div class="assign-staff-meta" x-text="(staff.employee_number ? staff.employee_number + ' · ' : '') + staff.email"></div>
+                                </div>
+                                <template x-if="assignModalSelectedStaffId === staff.id">
+                                    <span class="badge font-mono" style="background: rgba(56, 189, 248, 0.15); color: var(--color-accent); font-size: 0.6875rem; font-weight: 600; padding: 2px 8px; border-radius: 9999px; flex-shrink: 0;">Selected</span>
+                                </template>
+                            </label>
+                        </template>
+
+                        <div x-show="filteredStaffList.length === 0" style="padding: 24px; text-align: center; color: var(--color-muted); font-size: 0.875rem;">
+                            No staff members found matching "<span x-text="staffSearch"></span>"
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn btn-secondary" @click="assignStaffModalOpen = false" :disabled="assignStaffSubmitting" x-text="isAssignModalReadOnly ? 'Close' : 'Cancel'"></button>
+                <button x-show="!isAssignModalReadOnly" type="button" class="btn btn-primary" @click="submitAssignStaff()" :disabled="assignStaffSubmitting" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <span x-show="assignStaffSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span x-text="assignStaffSubmitting ? 'Saving...' : 'Confirm Assignment'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     {{-- ─── Modal 6: Mark Project as Completed Confirmation ───────────── --}}
     <div class="reassign-modal-overlay" style="display: none;" x-show="markCompletedModalOpen" x-cloak>
         <div class="reassign-modal-backdrop" @click="markCompletedModalOpen = false"></div>
@@ -2648,7 +2957,7 @@
     <div class="reassign-modal-overlay" style="display: none;" x-show="uploadFileModalOpen" x-cloak>
         <div class="reassign-modal-backdrop" @click="closeUploadProjectFileModal()"></div>
         <div class="reassign-modal-content card" x-show="uploadFileModalOpen" x-transition style="max-width: 540px; width: 100%;">
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="card-header" style="display: flex; align-items: center;">
                 <div style="display: flex; align-items: center; gap: var(--space-2);">
                     <svg style="width: 18px; height: 18px; color: var(--color-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -2657,31 +2966,12 @@
                     </svg>
                     <span style="font-weight: 700; font-size: 1rem;">Upload Project Files</span>
                 </div>
-                <button type="button" class="flash-close" @click="closeUploadProjectFileModal()" aria-label="Close modal">&times;</button>
             </div>
             <form id="project-upload-files-form" action="{{ route('projects.files.store', $project) }}" method="POST" enctype="multipart/form-data" @submit.prevent="submitModalUploadForm($event.target)">
                 @csrf
-                <div class="card-body">
-                    {{-- Default File Type Category Selector --}}
-                    <div class="form-group form-group-premium" style="margin-bottom: var(--space-3);">
-                        <label for="project_file_default_category" class="form-label">File Type Category <span class="required">*</span></label>
-                        <select 
-                            id="project_file_default_category" 
-                            name="file_type" 
-                            class="form-control" 
-                            x-model="uploadModalDefaultCategory"
-                            @change="uploadModalFiles.forEach(f => f.category = uploadModalDefaultCategory); syncModalUploadInputs();"
-                            required
-                        >
-                            <option value="project_document">Project document</option>
-                            <option value="project_transaction">Project transaction</option>
-                            <option value="invoice">Project invoice</option>
-                            <option value="project_notes">Project notes</option>
-                            <option value="project_drawing">Project drawing / blueprint</option>
-                        </select>
-                        <p class="form-hint" style="margin-top: 3px;">Select category for your upload. You can also customize categories per file below.</p>
-                    </div>
+                <input type="hidden" name="file_type" :value="uploadModalDefaultCategory">
 
+                <div class="card-body">
                     {{-- Hidden synchronized inputs for form submission --}}
                     <div id="modal_project_files_inputs" style="display: none;"></div>
                     <div id="modal_single_file_slot" style="display: none;"></div>
@@ -2700,67 +2990,70 @@
                     <template x-if="uploadModalFiles.length > 0">
                         <div style="margin-bottom: var(--space-3);">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
-                                <span style="font-size: 0.8125rem; font-weight: 700; color: var(--color-ink);">
+                                <span style="font-size: 0.875rem; font-weight: 700; color: var(--color-ink);">
                                     Attached Files (<span x-text="uploadModalFiles.length"></span>)
                                 </span>
                                 <button
                                     type="button"
                                     class="btn btn-secondary btn-sm"
                                     @click="$refs.modalProjectFilesInput.click()"
-                                    style="padding: 2px 10px; font-size: 0.75rem;"
+                                    style="padding: 3px 12px; font-size: 0.8125rem; font-weight: 600;"
                                 >
                                     + Attach Another File
                                 </button>
                             </div>
 
                             {{-- Scrollable staging list to prevent modal scroll fatigue --}}
-                            <div style="display: flex; flex-direction: column; gap: var(--space-2); max-height: 230px; overflow-y: auto; padding-right: 2px;">
+                            <div style="display: flex; flex-direction: column; gap: var(--space-3); max-height: 280px; overflow-y: auto; padding-right: 4px;">
                                 <template x-for="(fileItem, index) in uploadModalFiles" :key="fileItem.id">
                                     <div 
-                                        style="display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) var(--space-3); background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.8125rem;"
+                                        style="display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md);"
                                     >
+                                        {{-- Row 1: File icon, name, size, category selector, remove button --}}
                                         <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);">
-                                            <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1;">
-                                                <span x-text="getFileIcon(fileItem.name)" style="font-size: 1.1rem; flex-shrink: 0;"></span>
+                                            <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+                                                <span x-text="getFileIcon(fileItem.name)" style="font-size: 1.25rem; flex-shrink: 0;"></span>
                                                 <div style="min-width: 0; flex: 1;">
-                                                    <div style="font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="fileItem.name"></div>
-                                                    <div class="text-muted" style="font-size: 0.6875rem;" x-text="fileItem.formattedSize"></div>
+                                                    <div style="font-weight: 600; font-size: 0.875rem; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="fileItem.name"></div>
+                                                    <div class="text-muted font-mono" style="font-size: 0.75rem;" x-text="fileItem.formattedSize"></div>
                                                 </div>
                                             </div>
-                                            <button
-                                                type="button"
-                                                class="btn btn-secondary btn-sm"
-                                                @click="removeModalUploadFile(index)"
-                                                style="padding: 2px 7px; color: #ef4444; border-color: rgba(239, 68, 68, 0.3); font-weight: 700; line-height: 1; border-radius: 4px;"
-                                                title="Remove this attached file"
-                                            >
-                                                ✕
-                                            </button>
+                                            <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                                                <select 
+                                                    x-model="fileItem.category" 
+                                                    @change="syncModalUploadInputs()"
+                                                    class="form-control"
+                                                    style="padding: 4px 8px; font-size: 0.8125rem; height: 32px; width: 165px; border-radius: var(--radius-sm);"
+                                                    title="Select category for this file"
+                                                >
+                                                    <option value="project_document">Project document</option>
+                                                    <option value="project_transaction">Project transaction</option>
+                                                    <option value="invoice">Project invoice</option>
+                                                    <option value="project_notes">Project notes</option>
+                                                    <option value="project_drawing">Project drawing / blueprint</option>
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-secondary btn-sm"
+                                                    @click="removeModalUploadFile(index)"
+                                                    style="width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: #ef4444; border-color: rgba(239, 68, 68, 0.3); font-weight: 700; border-radius: var(--radius-sm);"
+                                                    title="Remove this attached file"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        {{-- Inline Category & Description for this specific file --}}
-                                        <div style="display: flex; gap: var(--space-2); align-items: center; margin-top: 2px;">
-                                            <select 
-                                                x-model="fileItem.category" 
-                                                @change="syncModalUploadInputs()"
-                                                class="form-control"
-                                                style="padding: 2px 6px; font-size: 0.75rem; height: 26px; width: 175px; flex-shrink: 0;"
-                                                title="Select category for this file"
-                                            >
-                                                <option value="project_document">Project document</option>
-                                                <option value="project_transaction">Project transaction</option>
-                                                <option value="invoice">Project invoice</option>
-                                                <option value="project_notes">Project notes</option>
-                                                <option value="project_drawing">Project drawing / blueprint</option>
-                                            </select>
+                                        {{-- Row 2: Optional notes (Enlarged, comfortable full-width input) --}}
+                                        <div>
                                             <input 
                                                 type="text" 
                                                 x-model="fileItem.description"
                                                 @input="syncModalUploadInputs()"
                                                 class="form-control"
-                                                placeholder="Optional notes..."
+                                                placeholder="Optional notes or description for this file..."
                                                 maxlength="255"
-                                                style="padding: 2px 8px; font-size: 0.75rem; height: 26px; flex: 1;"
+                                                style="width: 100%; height: 38px; font-size: 0.875rem; padding: 6px 12px; border-radius: var(--radius-sm);"
                                             >
                                         </div>
                                     </div>
@@ -2769,7 +3062,7 @@
                         </div>
                     </template>
 
-                    {{-- Empty Dropzone State --}}
+                    {{-- Empty Dropzone State (Fit to Modal) --}}
                     <template x-if="uploadModalFiles.length === 0">
                         <div 
                             class="pms-dropzone"
@@ -2778,21 +3071,23 @@
                             @dragleave.prevent="isDraggingModal = false"
                             @drop.prevent="isDraggingModal = false; handleModalFilesDropped($event)"
                             @click="$refs.modalProjectFilesInput.click()"
-                            style="padding: var(--space-4); text-align: center; border: 2px dashed var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); cursor: pointer; transition: all 0.15s ease;"
+                            style="min-height: 220px; display: flex; align-items: center; justify-content: center; padding: var(--space-6) var(--space-4); text-align: center; border: 2px dashed var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); cursor: pointer; transition: all 0.15s ease;"
                         >
-                            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
-                                <svg style="width: 28px; height: 28px; color: var(--color-accent); opacity: 0.85;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="17 8 12 3 7 8"></polyline>
-                                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                                </svg>
-                                <span style="font-size: 0.875rem; font-weight: 600; color: var(--color-ink);">
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--color-surface-alt); border: 1px solid var(--color-border); display: flex; align-items: center; justify-content: center; margin-bottom: 2px;">
+                                    <svg style="width: 28px; height: 28px; color: var(--color-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                </div>
+                                <span style="font-size: 1rem; font-weight: 600; color: var(--color-ink);">
                                     Click to select or drop file(s)
                                 </span>
-                                <span class="text-muted" style="font-size: 0.75rem;">
+                                <span class="text-muted" style="font-size: 0.8125rem;">
                                     PDF, DOCX, or Images up to 20MB. Multiple files supported.
                                 </span>
-                                <button type="button" class="btn btn-primary btn-sm" style="margin-top: 4px; pointer-events: none;">
+                                <button type="button" class="btn btn-primary btn-sm" style="margin-top: 6px; pointer-events: none; padding: 6px 16px; font-weight: 600;">
                                     + Attach Files
                                 </button>
                             </div>
@@ -3191,7 +3486,8 @@
         </div>
     </div>
 
-    {{-- ─── Modal 10: Task Completion Confirmation & Proof Upload Modal ─── --}}
+    {{-- ─── Modal 10: Task Completion Request & Proof Upload Modal (Staff Only) ─── --}}
+    @if($isStaffViewer)
     <div class="reassign-modal-overlay" style="display: none;" x-show="confirmCompletionModalOpen" x-cloak>
         <div class="reassign-modal-backdrop" @click="cancelTaskCompletion()"></div>
         <div class="reassign-modal-content card" x-show="confirmCompletionModalOpen" x-transition style="max-width: 540px; border-top: 4px solid var(--color-accent);">
@@ -3202,7 +3498,7 @@
                         <polyline points="22 4 12 14.01 9 11.01"></polyline>
                     </svg>
                     <span style="font-weight: 700; font-size: 0.9375rem;">
-                        {{ Auth::user()->hasRole('Staff') ? 'Submit Task Completion Request' : 'Confirm Task Completion' }}
+                        Submit Task Completion Request
                     </span>
                 </div>
                 <button type="button" class="flash-close" @click="cancelTaskCompletion()" aria-label="Close modal">&times;</button>
@@ -3224,11 +3520,9 @@
                     </div>
                 </div>
 
-                @if(Auth::user()->hasRole('Staff'))
-                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid #f59e0b; padding: var(--space-3); border-radius: var(--radius-sm); margin-bottom: var(--space-4); font-size: 0.8125rem; color: var(--color-ink);">
-                        <strong style="color: #f59e0b;">Staff Submission Notice:</strong> <span style="color: var(--color-muted);">Your remarks and proof attachment will be submitted to the project manager or administrator for review and approval before this task is marked as finished.</span>
-                    </div>
-                @endif
+                <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid #f59e0b; padding: var(--space-3); border-radius: var(--radius-sm); margin-bottom: var(--space-4); font-size: 0.8125rem; color: var(--color-ink);">
+                    <strong style="color: #f59e0b;">Staff Submission Notice:</strong> <span style="color: var(--color-muted);">Your remarks and proof attachment will be submitted to the project manager or administrator for review and approval before this task is marked as finished.</span>
+                </div>
 
                 {{-- Remarks & Notes Field (Multi-line) --}}
                 <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
@@ -3359,11 +3653,12 @@
                     style="display: inline-flex; align-items: center; gap: 6px;"
                 >
                     <span x-show="completionSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span x-text="completionSubmitting ? 'Submitting...' : '{{ Auth::user()->hasRole('Staff') ? 'Submit Completion Request' : 'Confirm & Complete Task' }}'"></span>
+                    <span x-text="completionSubmitting ? 'Submitting...' : 'Submit Completion Request'"></span>
                 </button>
             </div>
         </div>
     </div>
+    @endif
 
     {{-- Hidden form for cost deletion --}}
     <form id="project-delete-cost-form" method="POST" style="display: none;">
@@ -3850,9 +4145,120 @@
     white-space: nowrap !important;
 }
 
+/* ─── Assign Staff Modal List Layout & Alignment ─────────────────────── */
+.assign-staff-scroll-list {
+    max-height: 250px !important;
+    overflow-y: auto !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-md) !important;
+    padding: 8px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    background: var(--color-surface) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.assign-staff-option {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 10px 14px !important;
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--color-border) !important;
+    background: transparent !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    margin: 0 !important;
+}
+
+.assign-staff-option:hover {
+    background: var(--color-surface-alt) !important;
+    border-color: var(--color-accent) !important;
+}
+
+.assign-staff-option.is-selected {
+    background: rgba(56, 189, 248, 0.12) !important;
+    border-color: rgba(56, 189, 248, 0.45) !important;
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25) !important;
+}
+
+.assign-staff-radio-wrap {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    width: 20px !important;
+    height: 20px !important;
+    margin: 0 !important;
+}
+
+.assign-staff-radio {
+    width: 18px !important;
+    height: 18px !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+    accent-color: var(--color-accent) !important;
+    flex-shrink: 0 !important;
+}
+
+.assign-staff-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    background: rgba(56, 189, 248, 0.15) !important;
+    border: 1px solid rgba(56, 189, 248, 0.3) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0.8125rem !important;
+    font-weight: 700 !important;
+    color: var(--color-accent) !important;
+    flex-shrink: 0 !important;
+}
+
+.assign-staff-info {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+}
+
+.assign-staff-name {
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+    color: var(--color-ink) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.assign-staff-meta {
+    font-size: 0.75rem !important;
+    color: var(--color-muted) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
 /* ─── Disabled / Locked Subtask Styles ───────────────────────────────── */
 .subtask-checkbox:disabled {
     cursor: not-allowed !important;
+}
+
+/* Manager oversee-only view: strictly grayed out & unclickable */
+.subtask-checkbox.is-manager-view,
+.subtask-checkbox.is-manager-view:disabled {
+    cursor: not-allowed !important;
+    opacity: 0.45 !important;
+    filter: grayscale(100%) !important;
+    accent-color: #64748b !important;
+    pointer-events: none !important;
 }
 
 /* Only gray out uncompleted locked tasks (forward lock) */
@@ -4326,6 +4732,124 @@ function projectDetail() {
         subtaskLocks: @js($initialSubtaskLocks),
         subtaskCompleted: @js($initialSubtaskCompleted),
         pendingSubtasks: @js($initialSubtaskPending),
+        subtaskAssignees: @js($initialSubtaskAssignees),
+        staffUsersList: [
+            @foreach ($staffUsers as $su)
+            {
+                id: {{ $su->id }},
+                name: @js($su->name),
+                email: @js($su->email),
+                employee_number: @js($su->employee_number ?? ''),
+                job_title: @js($su->job_title ?? ''),
+            },
+            @endforeach
+        ],
+        assignStaffModalOpen: false,
+        assignStaffSubmitting: false,
+        assignModalTaskId: null,
+        assignModalSubtaskId: null,
+        assignModalSubtaskTitle: '',
+        assignModalSelectedStaffId: null,
+        staffSearch: '',
+        get filteredStaffList() {
+            if (!this.staffSearch.trim()) return this.staffUsersList;
+            const query = this.staffSearch.toLowerCase();
+            return this.staffUsersList.filter(s =>
+                (s.name && s.name.toLowerCase().includes(query)) ||
+                (s.email && s.email.toLowerCase().includes(query)) ||
+                (s.employee_number && s.employee_number.toLowerCase().includes(query)) ||
+                (s.job_title && s.job_title.toLowerCase().includes(query))
+            );
+        },
+        get currentAssignee() {
+            if (!this.assignModalSubtaskId || !this.subtaskAssignees) return null;
+            return this.subtaskAssignees[this.assignModalSubtaskId] || null;
+        },
+        get isAssignModalReadOnly() {
+            if (!this.assignModalSubtaskId) return false;
+            return !!(this.subtaskCompleted && this.subtaskCompleted[this.assignModalSubtaskId]) ||
+                   !!(this.pendingSubtasks && this.pendingSubtasks[this.assignModalSubtaskId]);
+        },
+        get assignModalReadOnlyReason() {
+            if (!this.assignModalSubtaskId) return '';
+            if (this.subtaskCompleted && this.subtaskCompleted[this.assignModalSubtaskId]) return 'Completed (Locked)';
+            if (this.pendingSubtasks && this.pendingSubtasks[this.assignModalSubtaskId]) return 'Pending Review (Locked)';
+            return 'Read-Only';
+        },
+        openAssignStaffModal(taskId, subtaskId, subtaskTitle, currentAssignedId = null) {
+            this.assignModalTaskId = taskId;
+            this.assignModalSubtaskId = subtaskId;
+            this.assignModalSubtaskTitle = subtaskTitle;
+            this.assignModalSelectedStaffId = currentAssignedId ? parseInt(currentAssignedId, 10) : null;
+            this.staffSearch = '';
+            this.assignStaffModalOpen = true;
+        },
+        submitAssignStaff() {
+            if (!this.assignModalTaskId || !this.assignModalSubtaskId) return;
+            this.assignStaffSubmitting = true;
+            const subtaskId = this.assignModalSubtaskId;
+            const taskId = this.assignModalTaskId;
+            const url = `/projects/{{ $project->id }}/tasks/${taskId}/subtasks/${subtaskId}/assign`;
+            
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    _method: 'PATCH',
+                    assigned_to: this.assignModalSelectedStaffId || null
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                this.assignStaffSubmitting = false;
+                if (data.success) {
+                    this.subtaskAssignees[subtaskId] = data.assigned_user;
+                    this.assignStaffModalOpen = false;
+                    const toastDetail = {
+                        type: 'success',
+                        title: 'Task Assignment Updated',
+                        message: data.message,
+                        duration: 5000
+                    };
+                    if (window.showToast) {
+                        window.showToast(toastDetail);
+                    } else {
+                        window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
+                    }
+                } else {
+                    const toastDetail = {
+                        type: 'error',
+                        title: 'Assignment Failed',
+                        message: data.message || 'Unable to update task assignment.',
+                        duration: 5000
+                    };
+                    if (window.showToast) {
+                        window.showToast(toastDetail);
+                    } else {
+                        window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
+                    }
+                }
+            })
+            .catch(err => {
+                this.assignStaffSubmitting = false;
+                const toastDetail = {
+                    type: 'error',
+                    title: 'Error',
+                    message: 'A network error occurred while updating assignment.',
+                    duration: 5000
+                };
+                if (window.showToast) {
+                    window.showToast(toastDetail);
+                } else {
+                    window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
+                }
+            });
+        },
         initialSubtasks: [{ title: '', due_date: '{{ $defaultStartDate->format('Y-m-d') }}' }],
         editingTask: {
             id: null,
@@ -4411,6 +4935,19 @@ function projectDetail() {
             }
         },
         onSubtaskCheckboxClick(projectId, taskId, subtaskId, taskName, subtaskTitle, checkboxEl) {
+            @if ($isManagerViewer)
+                if (checkboxEl) checkboxEl.checked = !checkboxEl.checked;
+                if (window.showToast) {
+                    window.showToast({
+                        type: 'warning',
+                        title: 'Oversee-Only Access',
+                        message: 'Managers have view and oversee-only access for timeline progress checkboxes.',
+                        duration: 5000
+                    });
+                }
+                return;
+            @endif
+
             if (this.pendingSubtasks && this.pendingSubtasks[subtaskId]) {
                 checkboxEl.checked = false;
                 if (window.showToast) {
@@ -4430,23 +4967,28 @@ function projectDetail() {
             }
 
             if (checkboxEl.checked) {
-                // Keep visually unchecked while confirmation modal is open
-                checkboxEl.checked = false;
-                this.completingSubtask = {
-                    projectId: projectId,
-                    taskId: taskId,
-                    subtaskId: subtaskId,
-                    taskName: taskName,
-                    subtaskTitle: subtaskTitle,
-                    checkboxEl: checkboxEl
-                };
-                this.completionNotes = '';
-                this.completionFiles = [];
-                this.completionFileError = '';
-                this.completionSubmitting = false;
-                this.confirmCompletionModalOpen = true;
+                @if ($isStaffViewer)
+                    // Staff user: requires submitting a request approval with proof & remarks
+                    checkboxEl.checked = false;
+                    this.completingSubtask = {
+                        projectId: projectId,
+                        taskId: taskId,
+                        subtaskId: subtaskId,
+                        taskName: taskName,
+                        subtaskTitle: subtaskTitle,
+                        checkboxEl: checkboxEl
+                    };
+                    this.completionNotes = '';
+                    this.completionFiles = [];
+                    this.completionFileError = '';
+                    this.completionSubmitting = false;
+                    this.confirmCompletionModalOpen = true;
+                @else
+                    // Admin: direct completion without submitting a request approval
+                    this.executeToggleSubtask(projectId, taskId, subtaskId, checkboxEl, true);
+                @endif
             } else {
-                // Unchecking an already completed task (Admin/Manager only)
+                // Unchecking an already completed task (Admin only)
                 if (!confirm('Are you sure you want to uncheck this task and mark it as incomplete?')) {
                     checkboxEl.checked = true;
                     return;
@@ -4709,28 +5251,64 @@ function projectDetail() {
                         }
                     });
 
+                    window.__proofModalData = window.__proofModalData || {};
+                    if (data.proof_modal_data) {
+                        window.__proofModalData[subtaskId] = data.proof_modal_data;
+                    }
+                    const proofContainers = [
+                        document.getElementById(`subtask-proof-container-${subtaskId}`),
+                        document.getElementById(`expanded-subtask-proof-container-${subtaskId}`)
+                    ];
+                    proofContainers.forEach(container => {
+                        if (container) {
+                            if (data.is_completed) {
+                                container.style.display = 'inline-flex';
+                                container.innerHTML = `
+                                    <button type="button" onclick="window.__openProofModal(${subtaskId})" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px; border-color: var(--color-border); color: var(--color-ink);" title="View">
+                                        <svg style="width: 13px; height: 13px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                        <span>View</span>
+                                    </button>
+                                `;
+                            } else {
+                                container.style.display = 'none';
+                                container.innerHTML = '';
+                            }
+                        }
+                    });
+
                     this.applySubtaskResponseUI(taskId, subtaskId, data);
 
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: {
-                            type: 'info',
-                            title: 'Task Incomplete',
-                            message: 'Task marked as incomplete.',
-                            duration: 4000
-                        }
-                    }));
+                    const toastDetail = {
+                        type: data.is_completed ? 'success' : 'info',
+                        title: data.is_completed ? 'Task Completed' : 'Task Incomplete',
+                        message: data.is_completed 
+                            ? 'Task marked as completed.' 
+                            : 'Task marked as incomplete and progress updated.',
+                        duration: 5000
+                    };
+                    if (window.showToast) {
+                        window.showToast(toastDetail);
+                    } else {
+                        window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
+                    }
                 } else if (data.message) {
                     if (checkboxEl) {
                         checkboxEl.checked = !newCompleted;
                     }
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: {
-                            type: 'warning',
-                            title: 'Sequential Task Progression',
-                            message: data.message,
-                            duration: 5000
-                        }
-                    }));
+                    const warningDetail = {
+                        type: 'warning',
+                        title: 'Sequential Task Progression',
+                        message: data.message,
+                        duration: 5000
+                    };
+                    if (window.showToast) {
+                        window.showToast(warningDetail);
+                    } else {
+                        window.dispatchEvent(new CustomEvent('show-toast', { detail: warningDetail }));
+                    }
                 }
             })
             .catch(err => {

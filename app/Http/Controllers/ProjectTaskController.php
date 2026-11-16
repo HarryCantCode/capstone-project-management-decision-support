@@ -239,6 +239,7 @@ class ProjectTaskController extends Controller
                 'after_or_equal:' . $startDateStr,
                 'before_or_equal:' . $endDateStr,
             ],
+            'assigned_to' => ['nullable', 'exists:users,id'],
         ], [
             'due_date.after_or_equal' => "Sub task date must be within this Major Task's scheduled week ({$task->start_date->format('M j, Y')} to {$task->end_date->format('M j, Y')}).",
             'due_date.before_or_equal' => "Sub task date must be within this Major Task's scheduled week ({$task->start_date->format('M j, Y')} to {$task->end_date->format('M j, Y')}).",
@@ -249,12 +250,16 @@ class ProjectTaskController extends Controller
         $subtask = $task->subtasks()->create([
             'title' => trim($validated['title']),
             'due_date' => $validated['due_date'] ?? null,
+            'assigned_to' => $validated['assigned_to'] ?? null,
             'is_completed' => false,
             'sort_order' => $nextOrder,
         ]);
+        $subtask->load('assignedTo');
 
+        $assignedUser = $subtask->assignedTo;
+        $assignedNote = $assignedUser ? " (Assigned to: {$assignedUser->name})" : '';
         $dueDateNote = $subtask->due_date ? ' (Due: ' . $subtask->due_date->format('M j, Y') . ')' : '';
-        $minorTaskNote = "Created minor task: '{$subtask->title}'{$dueDateNote} under '{$task->task_name}'";
+        $minorTaskNote = "Created minor task: '{$subtask->title}'{$dueDateNote}{$assignedNote} under '{$task->task_name}'";
 
         $history = ProjectStatusHistory::create([
             'project_id'  => $project->id,
@@ -275,6 +280,7 @@ class ProjectTaskController extends Controller
                     'subtask_id' => $subtask->id,
                     'subtask_title' => $subtask->title,
                     'due_date' => $subtask->due_date?->toDateString(),
+                    'assigned_to' => $subtask->assigned_to,
                 ])
                 ->log($minorTaskNote);
         }
@@ -282,6 +288,10 @@ class ProjectTaskController extends Controller
         // Notify Admin and Manager users about the new sub task
         $notificationService = app(NotificationService::class);
         $notificationService->notifyNewTask($project, $task, $subtask->title, $subtask);
+
+        if ($assignedUser) {
+            $notificationService->notifyTaskAssigned($project, $task, $subtask, $assignedUser);
+        }
 
         if ($subtask->due_date && $subtask->due_date->isBetween(now()->startOfDay(), now()->addDays(2)->endOfDay())) {
             $notificationService->notifyUpcomingDueTask($project, $task, $subtask);
@@ -317,8 +327,22 @@ class ProjectTaskController extends Controller
         abort_unless(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']), 403);
         abort_if($task->project_id !== $project->id || $subtask->project_task_id !== $task->id, 404);
 
+        // Manager users have oversee / view-only access and cannot toggle timeline checkboxes
+        if (Auth::user()->hasRole('Manager')) {
+            $msg = 'Managers have view and oversee-only access to progress timeline checkboxes.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $msg,
+                ], 403);
+            }
+
+            return back()->withErrors(['subtask' => $msg]);
+        }
+
         // Staff cannot uncheck already checked subtasks
-        if (Auth::user()->hasRole('Staff') && $subtask->is_completed) {
+        $isStaffUser = Auth::user()->hasRole('Staff');
+        if ($isStaffUser && $subtask->is_completed) {
             $msg = 'Staff users cannot uncheck completed tasks.';
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
@@ -337,41 +361,59 @@ class ProjectTaskController extends Controller
                 $request->merge(['notes' => $request->input('remarks')]);
             }
 
-            $validated = $request->validate([
-                'notes' => ['required', 'string', 'min:3', 'max:2000'],
-                'proof_file' => ['nullable', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
-                'proof_files' => ['nullable', 'array'],
-                'proof_files.*' => ['file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
-            ], [
-                'notes.required' => 'Completion remarks and notes are required before marking this task as done.',
-                'notes.min' => 'Remarks and notes must be at least 3 characters.',
-                'notes.max' => 'Remarks and notes may not exceed 2000 characters.',
-                'proof_file.file' => 'The proof must be a valid uploaded file.',
-                'proof_file.mimes' => 'The proof file must be a PDF, DOCX, or Image (JPG, JPEG, PNG, WEBP).',
-                'proof_file.max' => 'The proof file may not exceed 20MB.',
-                'proof_files.*.file' => 'Each proof file must be a valid uploaded file.',
-                'proof_files.*.mimes' => 'Each proof file must be a PDF, DOCX, or Image (JPG, JPEG, PNG, WEBP).',
-                'proof_files.*.max' => 'Each proof file may not exceed 20MB.',
-            ]);
+            if ($isStaffUser) {
+                // Staff users MUST provide remarks and proof attachment when submitting for approval
+                $validated = $request->validate([
+                    'notes' => ['required', 'string', 'min:3', 'max:2000'],
+                    'proof_file' => ['nullable', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
+                    'proof_files' => ['nullable', 'array'],
+                    'proof_files.*' => ['file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
+                ], [
+                    'notes.required' => 'Completion remarks and notes are required before submitting this task for review.',
+                    'notes.min' => 'Remarks and notes must be at least 3 characters.',
+                    'notes.max' => 'Remarks and notes may not exceed 2000 characters.',
+                    'proof_file.file' => 'The proof must be a valid uploaded file.',
+                    'proof_file.mimes' => 'The proof file must be a PDF, DOCX, or Image (JPG, JPEG, PNG, WEBP).',
+                    'proof_file.max' => 'The proof file may not exceed 20MB.',
+                    'proof_files.*.file' => 'Each proof file must be a valid uploaded file.',
+                    'proof_files.*.mimes' => 'Each proof file must be a PDF, DOCX, or Image (JPG, JPEG, PNG, WEBP).',
+                    'proof_files.*.max' => 'Each proof file may not exceed 20MB.',
+                ]);
 
-            $proofFilesList = [];
-            if ($request->hasFile('proof_files')) {
-                $proofFilesList = (array) $request->file('proof_files');
-            } elseif ($request->hasFile('proof_file')) {
-                $proofFilesList = [$request->file('proof_file')];
-            }
-
-            if (empty($proofFilesList)) {
-                $msg = 'A proof file attachment is required before marking this task as done.';
-                if ($request->wantsJson() || $request->ajax()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => $msg,
-                        'errors' => ['proof_file' => [$msg]],
-                    ], 422);
+                $proofFilesList = [];
+                if ($request->hasFile('proof_files')) {
+                    $proofFilesList = (array) $request->file('proof_files');
+                } elseif ($request->hasFile('proof_file')) {
+                    $proofFilesList = [$request->file('proof_file')];
                 }
 
-                return back()->withErrors(['proof_file' => $msg]);
+                if (empty($proofFilesList)) {
+                    $msg = 'A proof file attachment is required before submitting this task for review.';
+                    if ($request->wantsJson() || $request->ajax()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => $msg,
+                            'errors' => ['proof_file' => [$msg]],
+                        ], 422);
+                    }
+
+                    return back()->withErrors(['proof_file' => $msg]);
+                }
+            } else {
+                // Admin users directly mark completion: notes and proof attachments are optional
+                $validated = $request->validate([
+                    'notes' => ['nullable', 'string', 'max:2000'],
+                    'proof_file' => ['nullable', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
+                    'proof_files' => ['nullable', 'array'],
+                    'proof_files.*' => ['file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
+                ]);
+
+                $proofFilesList = [];
+                if ($request->hasFile('proof_files')) {
+                    $proofFilesList = (array) $request->file('proof_files');
+                } elseif ($request->hasFile('proof_file')) {
+                    $proofFilesList = [$request->file('proof_file')];
+                }
             }
         }
 
@@ -405,13 +447,13 @@ class ProjectTaskController extends Controller
 
         // If ticking to complete: verify sequential prerequisites across tasks and subtasks
         if ($newCompleted) {
-            // 1. All previous major tasks must have all their subtasks completed (or pending review for Staff)
+            // 1. All previous major tasks must have all their subtasks completed
             if ($currentTaskIndex > 0) {
                 for ($i = 0; $i < $currentTaskIndex; $i++) {
                     $prevTask = $sortedTasks[$i];
-                    $hasUncompletedInPrev = $prevTask->subtasks->contains(fn ($st) => ! $isSubtaskSatisfied($st));
+                    $hasUncompletedInPrev = $prevTask->subtasks->contains(fn ($st) => ! $st->is_completed);
                     if ($hasUncompletedInPrev) {
-                        $msg = 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task';
+                        $msg = 'You cannot mark this as done when a previous task before your assigned task is not yet done';
                         if ($request->wantsJson() || $request->ajax()) {
                             return response()->json([
                                 'success' => false,
@@ -424,11 +466,11 @@ class ProjectTaskController extends Controller
                 }
             }
 
-            // 2. In the current major task, all previous subtasks before this one must be completed (or pending review for Staff)
+            // 2. In the current major task, all previous subtasks before this one must be completed
             if ($currentSubtaskIndex > 0) {
                 for ($j = 0; $j < $currentSubtaskIndex; $j++) {
-                    if (! $isSubtaskSatisfied($currentSubtasks[$j])) {
-                        $msg = 'You cannot proceed to mark these tasks as in-progress, as you still have previous on-going task';
+                    if (! $currentSubtasks[$j]->is_completed) {
+                        $msg = 'You cannot mark this as done when a previous task before your assigned task is not yet done';
                         if ($request->wantsJson() || $request->ajax()) {
                             return response()->json([
                                 'success' => false,
@@ -541,6 +583,7 @@ class ProjectTaskController extends Controller
                     $isPending = in_array((int) $sItem->id, $pendingSubtaskIds, true);
                     if ($isPending) {
                         $subtaskLocks[$sItem->id] = true;
+                        $foundUncompleted = true;
                     } elseif (! $sItem->is_completed) {
                         if (! $foundUncompleted) {
                             $subtaskLocks[$sItem->id] = false;
@@ -601,7 +644,7 @@ class ProjectTaskController extends Controller
             'completed_at' => $newCompleted ? now() : null,
             'completed_by' => $newCompleted ? Auth::id() : null,
             'approved_by' => $newCompleted ? Auth::id() : null,
-            'notes' => $notesText,
+            'notes' => $notesText ?: ($newCompleted ? 'Directly marked completed by Administrator' : null),
         ]);
 
         $wasCompleted = $task->status === 'completed';
@@ -930,6 +973,100 @@ class ProjectTaskController extends Controller
         return redirect()
             ->route('projects.show', $project)
             ->with('status', "Sub task removed.");
+    }
+
+    /**
+     * Assign or unassign a staff member to a sub task.
+     */
+    public function assignSubtask(Request $request, Project $project, ProjectTask $task, ProjectSubtask $subtask): RedirectResponse|JsonResponse
+    {
+        abort_unless(Auth::user()->hasAnyRole(['Admin', 'Manager']), 403, 'Unauthorized.');
+        abort_if($task->project_id !== $project->id || $subtask->project_task_id !== $task->id, 404);
+
+        if ($subtask->is_completed) {
+            $msg = 'Completed tasks cannot be assigned or reassigned.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+
+            return back()->withErrors(['subtask' => $msg]);
+        }
+
+        $isPending = \App\Models\StaffPendingAction::where('project_id', $project->id)
+            ->where('action_type', 'complete_subtask')
+            ->where('status', 'pending')
+            ->whereJsonContains('payload->subtask_id', $subtask->id)
+            ->exists();
+
+        if ($isPending) {
+            $msg = 'Tasks currently pending review cannot be assigned or reassigned.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+
+            return back()->withErrors(['subtask' => $msg]);
+        }
+
+        $validated = $request->validate([
+            'assigned_to' => ['nullable', 'exists:users,id'],
+        ]);
+
+        $assignee = !empty($validated['assigned_to']) ? \App\Models\User::find($validated['assigned_to']) : null;
+
+        $subtask->update([
+            'assigned_to' => $assignee?->id,
+        ]);
+        $subtask->load('assignedTo');
+
+        $actionNote = $assignee
+            ? "Assigned sub task '{$subtask->title}' under '{$task->task_name}' to {$assignee->name}"
+            : "Unassigned sub task '{$subtask->title}' under '{$task->task_name}'";
+
+        ProjectStatusHistory::create([
+            'project_id'  => $project->id,
+            'from_status' => $project->status,
+            'to_status'   => $project->status,
+            'notes'       => $actionNote,
+            'changed_by'  => Auth::id() ?? $project->created_by ?? 1,
+            'changed_at'  => now(),
+        ]);
+
+        if (function_exists('activity')) {
+            activity('project')
+                ->performedOn($project)
+                ->causedBy(Auth::user())
+                ->withProperties([
+                    'task_id' => $task->id,
+                    'subtask_id' => $subtask->id,
+                    'assigned_to' => $assignee?->id,
+                    'assigned_to_name' => $assignee?->name,
+                ])
+                ->log($actionNote);
+        }
+
+        if ($assignee) {
+            app(NotificationService::class)->notifyTaskAssigned($project, $task, $subtask, $assignee);
+        }
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $assignee ? "Assigned '{$subtask->title}' to {$assignee->name}." : "Unassigned '{$subtask->title}'.",
+                'subtask_id' => $subtask->id,
+                'assigned_to' => $assignee?->id,
+                'assigned_user' => $assignee ? [
+                    'id' => $assignee->id,
+                    'name' => $assignee->name,
+                    'email' => $assignee->email,
+                    'employee_number' => $assignee->employee_number,
+                    'job_title' => $assignee->job_title,
+                ] : null,
+            ]);
+        }
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('status', $assignee ? "Task assigned to {$assignee->name}." : "Task unassigned.");
     }
 
     /**

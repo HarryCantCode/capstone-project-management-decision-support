@@ -938,26 +938,55 @@
                                                 <div style="background: var(--color-surface-alt); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); margin-bottom: var(--space-4); font-size: 0.8125rem;">
                                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
                                                         <span class="text-muted font-bold uppercase" style="font-size: 0.6875rem;">Submitted By</span>
-                                                        <span class="font-bold" x-text="activeReviewItem.data.staff_name"></span>
+                                                        <span class="font-bold" style="color: var(--color-ink);" x-text="activeReviewItem.data.staff_name + (activeReviewItem.data.staff_employee_number && activeReviewItem.data.staff_employee_number !== 'N/A' ? ' (' + activeReviewItem.data.staff_employee_number + ')' : '')"></span>
                                                     </div>
                                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
                                                         <span class="text-muted font-bold uppercase" style="font-size: 0.6875rem;">Project</span>
-                                                        <span class="font-mono" x-text="(activeReviewItem.data.project_code || '') + ' — ' + (activeReviewItem.data.project_name || '')"></span>
+                                                        <a :href="activeReviewItem.data.url || (activeReviewItem.data.project_id ? '/projects/' + activeReviewItem.data.project_id : '#')" class="font-mono" style="color: var(--color-accent); font-weight: 600; text-decoration: none;" x-text="(activeReviewItem.data.project_code ? activeReviewItem.data.project_code + ' — ' : '') + (activeReviewItem.data.project_name || '')"></a>
+                                                    </div>
+                                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                                                        <span class="text-muted font-bold uppercase" style="font-size: 0.6875rem;">Submitted At</span>
+                                                        <span class="font-mono" style="color: var(--color-ink);" x-text="activeReviewItem.data.submitted_at || activeReviewItem.time_ago || '—'"></span>
+                                                    </div>
+                                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                                                        <span class="text-muted font-bold uppercase" style="font-size: 0.6875rem;">Action Type</span>
+                                                        <div>
+                                                            <template x-if="activeReviewItem.data.action_type === 'complete_subtask'">
+                                                                <span class="user-menu-role" style="background: rgba(234, 179, 8, 0.16); color: #FACC15; border: 1px solid rgba(234, 179, 8, 0.35); font-size: 0.75rem;">Task Completion</span>
+                                                            </template>
+                                                            <template x-if="activeReviewItem.data.action_type === 'add_expense'">
+                                                                <span class="user-menu-role" style="background: rgba(249, 115, 22, 0.16); color: #FB923C; border: 1px solid rgba(249, 115, 22, 0.35); font-size: 0.75rem;">Expense Entry</span>
+                                                            </template>
+                                                            <template x-if="activeReviewItem.data.action_type === 'add_file'">
+                                                                <span class="user-menu-role" style="font-size: 0.75rem;">File Attachment</span>
+                                                            </template>
+                                                            <template x-if="activeReviewItem.data.action_type !== 'complete_subtask' && activeReviewItem.data.action_type !== 'add_expense' && activeReviewItem.data.action_type !== 'add_file'">
+                                                                <span class="user-menu-role" style="font-size: 0.75rem; text-transform: capitalize;" x-text="(activeReviewItem.data.action_type || '').replace('_', ' ')"></span>
+                                                            </template>
+                                                        </div>
                                                     </div>
                                                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                                                        <span class="text-muted font-bold uppercase" style="font-size: 0.6875rem;">Action Type</span>
-                                                        <span class="badge" style="font-size: 0.75rem; text-transform: capitalize;" x-text="(activeReviewItem.data.action_type || '').replace('_', ' ')"></span>
+                                                        <span class="text-muted font-bold uppercase" style="font-size: 0.6875rem;">Review Status</span>
+                                                        <template x-if="!activeReviewItem.data.status || activeReviewItem.data.status === 'pending'">
+                                                            <span class="status-pill status-pill--ongoing" style="font-size: 0.75rem;">Unexamined</span>
+                                                        </template>
+                                                        <template x-if="activeReviewItem.data.status === 'approved'">
+                                                            <span class="status-pill status-pill--completed" style="font-size: 0.75rem;">Approved</span>
+                                                        </template>
+                                                        <template x-if="activeReviewItem.data.status === 'rejected'">
+                                                            <span class="status-pill status-pill--delayed" style="font-size: 0.75rem;">Rejected</span>
+                                                        </template>
                                                     </div>
                                                 </div>
 
                                                 {{-- Expense details --}}
                                                 <template x-if="activeReviewItem.data.action_type === 'add_expense'">
                                                     <div style="border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4);">
-                                                        <h4 style="margin: 0 0 var(--space-2) 0; font-size: 0.875rem; color: var(--color-accent);">Expense Details</h4>
+                                                        <h4 style="margin: 0 0 var(--space-2) 0; font-size: 0.875rem; color: var(--color-accent);">Expense Entry Details</h4>
                                                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); font-size: 0.8125rem;">
                                                             <div>
                                                                 <span class="text-muted" style="display: block; font-size: 0.6875rem;">Description</span>
-                                                                <strong x-text="activeReviewItem.data.payload?.description || 'N/A'"></strong>
+                                                                <strong style="color: var(--color-ink);" x-text="activeReviewItem.data.payload?.description || 'N/A'"></strong>
                                                             </div>
                                                             <div>
                                                                 <span class="text-muted" style="display: block; font-size: 0.6875rem;">Amount</span>
@@ -965,12 +994,16 @@
                                                             </div>
                                                             <div>
                                                                 <span class="text-muted" style="display: block; font-size: 0.6875rem;">Category</span>
-                                                                <span class="badge" style="text-transform: capitalize;" x-text="activeReviewItem.data.payload?.cost_type || 'General'"></span>
+                                                                <span style="text-transform: capitalize; color: var(--color-ink);" x-text="activeReviewItem.data.payload?.cost_type || activeReviewItem.data.payload?.category || 'General'"></span>
+                                                            </div>
+                                                            <div>
+                                                                <span class="text-muted" style="display: block; font-size: 0.6875rem;">Date</span>
+                                                                <span class="font-mono" style="color: var(--color-ink);" x-text="activeReviewItem.data.payload?.date || '—'"></span>
                                                             </div>
                                                             <template x-if="activeReviewItem.data.payload?.resource_name">
-                                                                <div>
+                                                                <div style="grid-column: span 2;">
                                                                     <span class="text-muted" style="display: block; font-size: 0.6875rem;">Linked Material</span>
-                                                                    <span x-text="activeReviewItem.data.payload.resource_name + ' (Qty: ' + (activeReviewItem.data.payload.quantity || 1) + ')'"></span>
+                                                                    <span style="color: var(--color-ink);" x-text="activeReviewItem.data.payload.resource_name + ' (Qty: ' + (activeReviewItem.data.payload.quantity || 1) + ')'"></span>
                                                                 </div>
                                                             </template>
                                                         </div>
@@ -980,19 +1013,37 @@
                                                 {{-- Task Completion details --}}
                                                 <template x-if="activeReviewItem.data.action_type === 'complete_subtask'">
                                                     <div style="border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4);">
-                                                        <h4 style="margin: 0 0 var(--space-2) 0; font-size: 0.875rem; color: var(--color-accent);">Task Completion Request</h4>
+                                                        <h4 style="margin: 0 0 var(--space-2) 0; font-size: 0.875rem; color: var(--color-accent);">Timeline Task Completion Request</h4>
                                                         <div style="font-size: 0.8125rem;">
                                                             <div style="margin-bottom: var(--space-2);">
-                                                                <span class="text-muted" style="display: block; font-size: 0.6875rem;">Major Task</span>
-                                                                <strong x-text="activeReviewItem.data.payload?.task_name || 'N/A'"></strong>
+                                                                <span class="text-muted" style="display: block; font-size: 0.6875rem;">Major Task / Milestone</span>
+                                                                <strong style="color: var(--color-ink);" x-text="activeReviewItem.data.payload?.task_name || 'Project Task'"></strong>
                                                             </div>
                                                             <div>
-                                                                <span class="text-muted" style="display: block; font-size: 0.6875rem;">Subtask Marked Completed</span>
-                                                                <div style="display: flex; align-items: center; gap: var(--space-2); margin-top: 4px;">
-                                                                    <span style="color: var(--color-success); font-weight: bold;">☑</span>
-                                                                    <span class="font-bold" x-text="activeReviewItem.data.payload?.subtask_title || 'N/A'"></span>
+                                                                <span class="text-muted" style="display: block; font-size: 0.6875rem;">Subtask Ticked by Staff</span>
+                                                                <div style="display: flex; align-items: center; gap: var(--space-2); margin-top: 4px; margin-bottom: var(--space-2);">
+                                                                    <span style="color: var(--color-success); font-weight: 700;">☑</span>
+                                                                    <span class="font-bold" style="color: var(--color-ink);" x-text="activeReviewItem.data.payload?.subtask_title || activeReviewItem.data.payload?.subtask_name || 'Subtask'"></span>
                                                                 </div>
                                                             </div>
+                                                            <template x-if="activeReviewItem.data.payload?.notes">
+                                                                <div style="background: var(--color-surface-alt); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); border-left: 3px solid var(--color-accent); margin-top: var(--space-2); margin-bottom: var(--space-2);">
+                                                                    <span class="text-muted font-bold" style="display: block; font-size: 0.6875rem; text-transform: uppercase;">Staff Remarks &amp; Notes</span>
+                                                                    <p style="margin: 4px 0 0 0; color: var(--color-ink); white-space: pre-wrap;" x-text="activeReviewItem.data.payload.notes"></p>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="activeReviewItem.data.payload?.file_path && activeReviewItem.data.status !== 'rejected'">
+                                                                <div style="border-top: 1px dashed var(--color-border); padding-top: var(--space-2); margin-top: var(--space-2);">
+                                                                    <span class="text-muted font-bold" style="display: block; font-size: 0.6875rem; text-transform: uppercase; margin-bottom: 4px;">Completion Proof Attachment</span>
+                                                                    <a :href="'/storage/' + activeReviewItem.data.payload.file_path" target="_blank" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem;">
+                                                                        <svg style="width: 14px; height: 14px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                                            <circle cx="12" cy="12" r="3"></circle>
+                                                                        </svg>
+                                                                        <span x-text="'View Proof: ' + (activeReviewItem.data.payload.file_name || 'Attached File')"></span>
+                                                                    </a>
+                                                                </div>
+                                                            </template>
                                                         </div>
                                                     </div>
                                                 </template>
@@ -1005,7 +1056,7 @@
                                                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
                                                                 <div>
                                                                     <span class="text-muted" style="display: block; font-size: 0.6875rem;">File Name</span>
-                                                                    <strong x-text="activeReviewItem.data.payload?.file_name || 'N/A'"></strong>
+                                                                    <strong style="color: var(--color-ink);" x-text="activeReviewItem.data.payload?.file_name || 'Uploaded File'"></strong>
                                                                 </div>
                                                                 <template x-if="activeReviewItem.data.payload?.file_path && activeReviewItem.data.status !== 'rejected'">
                                                                     <a :href="'/storage/' + activeReviewItem.data.payload.file_path" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 2px 8px;">
@@ -1016,29 +1067,49 @@
                                                             <template x-if="activeReviewItem.data.payload?.description">
                                                                 <div style="margin-top: var(--space-2);">
                                                                     <span class="text-muted" style="display: block; font-size: 0.6875rem;">Description / Notes</span>
-                                                                    <p style="margin: 2px 0 0 0; font-style: italic;" x-text="activeReviewItem.data.payload.description"></p>
+                                                                    <p style="margin: 2px 0 0 0; font-style: italic; color: var(--color-ink);" x-text="activeReviewItem.data.payload.description"></p>
                                                                 </div>
                                                             </template>
                                                         </div>
                                                     </div>
                                                 </template>
 
-                                                {{-- Prompt question or Already-Reviewed Status --}}
+                                                {{-- Reviewer Notes Input (if pending) or Already-Reviewed Audit Summary --}}
                                                 <template x-if="!activeReviewItem.data.status || activeReviewItem.data.status === 'pending'">
-                                                    <div style="background: rgba(56, 189, 248, 0.08); border-left: 3px solid var(--color-accent); padding: var(--space-3); border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-bottom: var(--space-4); font-size: 0.875rem;">
-                                                        <p style="margin: 0; font-weight: 500;">
-                                                            Do you want to accept or reject this action performed by <strong x-text="activeReviewItem.data.staff_name"></strong>?
-                                                        </p>
-                                                        <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.75rem;">
-                                                            Accepting will immediately reflect and apply the change into the project records.
-                                                        </p>
+                                                    <div>
+                                                        <div class="form-group" style="margin-bottom: var(--space-3);">
+                                                            <label for="notif-reviewer-notes-input" class="form-label" style="font-size: 0.8125rem;">Reviewer Notes (Optional)</label>
+                                                            <input
+                                                                type="text"
+                                                                id="notif-reviewer-notes-input"
+                                                                x-model="reviewNotes"
+                                                                class="form-control form-control--compact"
+                                                                placeholder="Add an optional note or reason for the staff member..."
+                                                                style="width: 100%; height: 34px; font-size: 0.8125rem;"
+                                                                autocomplete="off"
+                                                            >
+                                                        </div>
+
+                                                        <div style="background: var(--color-accent-light); border-left: 3px solid var(--color-accent); padding: var(--space-3); border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-bottom: var(--space-4); font-size: 0.8125rem;">
+                                                            <p style="margin: 0; font-weight: 500; color: var(--color-ink);">
+                                                                Do you want to accept or reject this action performed by <strong x-text="activeReviewItem.data.staff_name"></strong>?
+                                                            </p>
+                                                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.75rem;">
+                                                                Approving will immediately reflect and apply the change into the project records.
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </template>
 
                                                 <template x-if="activeReviewItem.data.status && activeReviewItem.data.status !== 'pending'">
-                                                    <div style="background: var(--color-surface-alt); border-left: 3px solid var(--color-success); padding: var(--space-3); border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-bottom: var(--space-4); font-size: 0.875rem;">
-                                                        <p style="margin: 0; font-weight: 600; text-transform: capitalize;" x-text="'Status: ' + activeReviewItem.data.status"></p>
+                                                    <div style="background: var(--color-surface-alt); border-left: 3px solid var(--color-accent); padding: var(--space-3); border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-bottom: var(--space-4); font-size: 0.8125rem;">
+                                                        <p style="margin: 0; font-weight: 600; color: var(--color-ink); text-transform: capitalize;" x-text="'Status: ' + activeReviewItem.data.status"></p>
                                                         <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.75rem;" x-text="activeReviewItem.data.reviewed_by_name ? ('Reviewed by ' + activeReviewItem.data.reviewed_by_name + (activeReviewItem.data.reviewed_at ? ' on ' + activeReviewItem.data.reviewed_at : '')) : 'This action has already been processed.'"></p>
+                                                        <template x-if="activeReviewItem.data.notes || activeReviewItem.data.admin_notes">
+                                                            <p style="margin: 6px 0 0 0; font-size: 0.8125rem; color: var(--color-ink);">
+                                                                <strong>Notes:</strong> <span x-text="activeReviewItem.data.notes || activeReviewItem.data.admin_notes"></span>
+                                                            </p>
+                                                        </template>
                                                     </div>
                                                 </template>
                                             </div>
@@ -1046,15 +1117,15 @@
                                     </div>
 
                                     <div class="card-footer" style="display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-top: 1px solid var(--color-border); flex-shrink: 0;">
-                                        <button type="button" class="btn btn-secondary" @click="closeReviewModal()" :disabled="reviewLoading" x-text="(!activeReviewItem?.data?.status || activeReviewItem?.data?.status === 'pending') ? 'Cancel' : 'Close'"></button>
+                                        <button type="button" class="btn btn-secondary btn-sm" @click="closeReviewModal()" :disabled="reviewLoading" x-text="(!activeReviewItem?.data?.status || activeReviewItem?.data?.status === 'pending') ? 'Cancel' : 'Close'"></button>
                                         <template x-if="!activeReviewItem?.data?.status || activeReviewItem?.data?.status === 'pending'">
-                                            <div style="display: flex; gap: var(--space-2);">
-                                                <button type="button" class="btn btn-danger" @click="rejectStaffAction()" :disabled="reviewLoading">
-                                                    <span x-show="!reviewLoading">✕ Reject</span>
+                                            <div style="display: inline-flex; gap: var(--space-2);">
+                                                <button type="button" class="btn btn-danger btn-sm" @click="rejectStaffAction()" :disabled="reviewLoading">
+                                                    <span x-show="!reviewLoading">Reject Request</span>
                                                     <span x-show="reviewLoading">Processing...</span>
                                                 </button>
-                                                <button type="button" class="btn btn-primary" @click="approveStaffAction()" :disabled="reviewLoading" style="background-color: var(--color-success); border-color: var(--color-success);">
-                                                    <span x-show="!reviewLoading">✓ Accept Action</span>
+                                                <button type="button" class="btn btn-primary btn-sm" @click="approveStaffAction()" :disabled="reviewLoading">
+                                                    <span x-show="!reviewLoading">Approve Request</span>
                                                     <span x-show="reviewLoading">Processing...</span>
                                                 </button>
                                             </div>
@@ -1629,11 +1700,35 @@
                 },
 
                 openReviewModal(notification) {
-                    this.activeReviewItem = notification;
+                    this.activeReviewItem = JSON.parse(JSON.stringify(notification));
                     this.reviewNotes = '';
                     this.reviewError = null;
                     this.reviewModalOpen = true;
                     this.open = false;
+
+                    const actionId = notification.data?.pending_action_id;
+                    if (actionId) {
+                        fetch(`/pending-actions/${actionId}`, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data && this.activeReviewItem && this.activeReviewItem.data?.pending_action_id === actionId) {
+                                const formatted = data.formatted_action || data;
+                                if (formatted.status) this.activeReviewItem.data.status = formatted.status;
+                                if (formatted.reviewed_by_name) this.activeReviewItem.data.reviewed_by_name = formatted.reviewed_by_name;
+                                if (formatted.reviewed_at) this.activeReviewItem.data.reviewed_at = formatted.reviewed_at;
+                                if (formatted.admin_notes) this.activeReviewItem.data.notes = formatted.admin_notes;
+                                if (formatted.payload) this.activeReviewItem.data.payload = formatted.payload;
+                                if (formatted.action_type) this.activeReviewItem.data.action_type = formatted.action_type;
+                                if (formatted.staff_employee_number) this.activeReviewItem.data.staff_employee_number = formatted.staff_employee_number;
+                            }
+                        })
+                        .catch(() => {});
+                    }
                 },
 
                 closeReviewModal() {

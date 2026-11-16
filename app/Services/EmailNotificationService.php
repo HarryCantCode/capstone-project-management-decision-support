@@ -9,6 +9,7 @@ use App\Mail\ProjectCreatedMail;
 use App\Mail\StaffActionPendingReviewMail;
 use App\Mail\StaffActionResultMail;
 use App\Mail\TaskAddedMail;
+use App\Mail\TaskAssignedMail;
 use App\Mail\TaskDueSoonMail;
 use App\Mail\WarrantyWarningMail;
 use App\Models\Project;
@@ -46,6 +47,31 @@ class EmailNotificationService
         $this->dispatchToRecipients($recipients, function (User $recipient) use ($project, $task, $subtaskTitle, $subtask) {
             return new TaskAddedMail($recipient, $project, $task, $subtaskTitle, $subtask);
         });
+    }
+
+    /**
+     * Action: A staff member was assigned to a task.
+     * Dispatches notification email directly to the assigned staff member.
+     */
+    public function sendTaskAssignedEmail(
+        Project $project,
+        ProjectTask $task,
+        ProjectSubtask $subtask,
+        User $staffUser,
+    ): void {
+        if (empty($staffUser->email)) {
+            return;
+        }
+
+        try {
+            Mail::to($staffUser->email)->send(new TaskAssignedMail($staffUser, $project, $task, $subtask));
+        } catch (\Throwable $e) {
+            Log::error("Failed sending task assigned email to {$staffUser->email}: {$e->getMessage()}", [
+                'staff_id' => $staffUser->id,
+                'subtask_id' => $subtask->id,
+                'exception' => $e,
+            ]);
+        }
     }
 
     /**

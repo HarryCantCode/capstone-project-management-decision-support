@@ -60,7 +60,7 @@
                     >
                 </div>
                 <div class="text-muted text-center mt-2 small">
-                    Code expires in <strong>3 minutes</strong>
+                    Code expires in <strong>5 minutes</strong>
                 </div>
                 @error('otp')
                     <div id="otp-error" class="invalid-feedback d-block text-center mt-2" role="alert">

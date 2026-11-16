@@ -10,6 +10,10 @@
     $currentModule = 'dashboard';
     if (request()->routeIs('dashboard')) {
         $currentModule = 'dashboard';
+    } elseif (request()->routeIs('projects.create')) {
+        $currentModule = 'projects.create';
+    } elseif (request()->routeIs('projects.show')) {
+        $currentModule = 'projects.show';
     } elseif (request()->routeIs('projects.*')) {
         $currentModule = 'projects';
     } elseif (request()->routeIs('costing.*')) {
@@ -318,6 +322,12 @@
     border-bottom: 1px solid var(--color-border);
 }
 
+.dex-tour-popover[data-placement="left"] .dex-tour-arrow {
+    right: -7px;
+    border-right: 1px solid var(--color-border);
+    border-top: 1px solid var(--color-border);
+}
+
 .dex-tour-popover[data-placement="bottom"] .dex-tour-arrow {
     top: -7px;
     border-left: 1px solid var(--color-border);
@@ -351,10 +361,10 @@
 }
 
 .dex-tour-badge {
-    font-size: 0.6875rem;
+    font-size: 0.65625rem;
     font-weight: 600;
     line-height: 1;
-    padding: 3px 8px;
+    padding: 2.5px 7px;
     border-radius: var(--radius-pill);
     letter-spacing: 0.03em;
     text-transform: uppercase;
@@ -529,10 +539,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--space-3, 0.75rem);
     margin-top: 1rem;
     padding-top: 0.75rem;
     border-top: 1px solid var(--color-border);
+    box-sizing: border-box;
+    width: 100%;
 }
 
 [data-theme="dark"] .dex-tour-footer {
@@ -542,18 +554,20 @@
 .dex-tour-dots {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
+    flex-shrink: 0;
 }
 
 .dex-tour-dot {
-    width: 7px;
-    height: 7px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: var(--color-border);
     border: none;
     padding: 0;
     cursor: pointer;
-    transition: background-color var(--transition-fast), transform var(--transition-fast), width var(--transition-fast);
+    flex-shrink: 0;
+    transition: background-color var(--transition-fast), transform var(--transition-fast), width var(--transition-fast), opacity var(--transition-fast);
 }
 
 .dex-tour-dot:hover {
@@ -561,13 +575,23 @@
 }
 
 .dex-tour-dot.is-active {
-    width: 16px;
+    width: 12px;
     border-radius: var(--radius-pill);
     background: var(--color-accent);
 }
 
+.dex-tour-dot.is-edge {
+    width: 3px;
+    height: 3px;
+    opacity: 0.5;
+}
+
 [data-theme="dark"] .dex-tour-dot {
     background: #2E3C52;
+}
+
+[data-theme="dark"] .dex-tour-dot:hover {
+    background: #38BDF8;
 }
 
 [data-theme="dark"] .dex-tour-dot.is-active {
@@ -577,13 +601,16 @@
 .dex-tour-actions {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
 .dex-tour-nav-btns {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
 }
 
 .dex-tour-btn {
@@ -593,9 +620,12 @@
     font-size: 0.8125rem;
     font-weight: 600;
     border-radius: var(--radius-md);
-    padding: 0.375rem 0.75rem;
+    padding: 0.35rem 0.75rem;
     cursor: pointer;
     line-height: 1.25;
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-sizing: border-box;
     transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
@@ -604,7 +634,8 @@
     border: none;
     color: var(--color-muted);
     font-weight: 500;
-    padding: 0.375rem 0.5rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.8125rem;
 }
 
 .dex-tour-btn--skip:hover {
@@ -769,6 +800,11 @@
     let activeSteps = [];
     let currentModuleKey = currentModule;
     let scrollRafId = null;
+    let isTransitioning = false;
+    let minAllowedScrollY = 0;
+    let maxAllowedScrollY = 0;
+    let touchStartY = 0;
+    let previousProjectShowState = null;
 
     // Multi-module step definitions
     const modulesConfig = {
@@ -832,6 +868,239 @@
                 placement: 'bottom',
                 padding: 6,
                 content: '<p>Whenever you need guidance on any page, click this <strong>Info icon</strong> ("Show tutorial") to view the tutorial for that module. Receive real-time system alerts via the Notification Bell beside it.</p>'
+            }
+        ],
+        'projects.create': [
+            {
+                target: '#section-identity',
+                title: 'Project Identity & Scope',
+                moduleName: 'Create Project',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Input your project information and it will be save to your project directory/list.</p>'
+            },
+            {
+                target: '#section-specs',
+                title: 'Elevator Technical Specifications',
+                moduleName: 'Create Project',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Technical specification required for building or constructing an elevator.</p>'
+            },
+            {
+                target: '#section-location',
+                title: 'Site Address / Project Location',
+                moduleName: 'Create Project',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Location where the project will take place.</p>'
+            },
+            {
+                target: '#section-schedule',
+                title: 'Execution Schedule & Timeline',
+                moduleName: 'Create Project',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Duration or timeline of the project.</p>'
+            },
+            {
+                target: '#project-manpower-section',
+                title: 'Project Manpower & Staffing',
+                moduleName: 'Create Project',
+                placement: 'bottom',
+                padding: 8,
+                skipIfMissing: true,
+                content: '<p>Assign available manpower based on your recommeneded project specification.</p>'
+            },
+            {
+                target: '#project-expenses-section',
+                title: 'Initial Materials & Expenditures',
+                moduleName: 'Create Project',
+                placement: 'bottom',
+                padding: 8,
+                skipIfMissing: true,
+                content: '<p>Log and track your expenses from this project.</p>'
+            },
+            {
+                target: '#project-attachments-section',
+                title: 'Project File Attachments',
+                moduleName: 'Create Project',
+                placement: 'bottom',
+                padding: 8,
+                skipIfMissing: true,
+                content: '<p>Attach required files and documents uplon project initialization.</p>'
+            },
+            {
+                target: '#section-financials',
+                title: 'Financials & Billing',
+                moduleName: 'Create Project',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Enter the contract amount and monitor your expenditures, see chose payment status and attach an invoice upon project creation.</p>'
+            },
+            {
+                target: '#section-preview',
+                title: 'Project Preview',
+                moduleName: 'Create Project',
+                placement: 'left',
+                padding: 8,
+                content: '<p>Check the information that you log from the project creation fields.</p>'
+            }
+        ],
+        'projects.show': [
+            {
+                target: '[data-tour="project-overview-card"]',
+                title: 'Overview',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Information about your project which includes client, project code, warranty period, and core details.</p>'
+            },
+            {
+                target: '[data-tour="overview-client"]',
+                title: 'Client',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>The client or organization for whom this project is being undertaken.</p>'
+            },
+            {
+                target: '[data-tour="overview-project-code"]',
+                title: 'Project Code',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>Unique code for your project to find your project much faster.</p>'
+            },
+            {
+                target: '[data-tour="overview-warranty"]',
+                title: 'Warranty Period',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>Indicates warranty inclusion and remaining days.</p>'
+            },
+            {
+                target: '[data-tour="project-financials-card"]',
+                title: 'Financials & Budget',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Track your budget for the project.</p>'
+            },
+            {
+                target: '[data-tour="financial-allocated-budget"]',
+                title: 'Allocated Budget',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>Your project budget.</p>'
+            },
+            {
+                target: '[data-tour="financial-actual-spend"]',
+                title: 'Actual Spend',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>Total expense of the project.</p>'
+            },
+            {
+                target: '[data-tour="financial-remaining-budget"]',
+                title: 'Remaining',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>Your remaining budget or possible profit without tax.</p>'
+            },
+            {
+                target: '[data-tour="project-files-card"]',
+                title: 'Project Files & Documents',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Attach related documents for your project.</p>'
+            },
+            {
+                target: '[data-tour="project-files-upload"]',
+                title: 'Upload File',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>Attach a file and organize them base on their category.</p>'
+            },
+            {
+                target: '[data-tour="project-files-list"]',
+                title: 'File List',
+                moduleName: 'Project View',
+                placement: 'top',
+                padding: 8,
+                content: '<p>Your attached files will go here.</p>'
+            },
+            {
+                target: '[data-tour="elevator-specs-card"]',
+                title: 'Elevator Technical Specifications',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>The specification of the elevator that we are going to build.</p>'
+            },
+            {
+                target: '[data-tour="project-timeline-card"]',
+                title: 'Project Progress Timeline',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Track your project progress here.</p>'
+            },
+            {
+                target: '[data-tour="timeline-major-task-first"]',
+                title: 'Major Task / Week 1',
+                moduleName: 'Project View',
+                placement: 'top',
+                padding: 8,
+                skipIfMissing: true,
+                content: '<p>Your major task for the project which has a start and end date typically by weekly, inside this are your specific tasks for the following week.</p>'
+            },
+            {
+                target: '[data-tour="timeline-add-major-task"]',
+                title: 'Add Major Task',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>Add major task or weekly task to track and organize your project progress.</p>'
+            },
+            {
+                target: '[data-tour="timeline-specific-tasks"]',
+                title: 'Specific Tasks',
+                moduleName: 'Project View',
+                placement: 'top',
+                padding: 8,
+                skipIfMissing: true,
+                content: '<p>Specific tasks are tasks that is inside your major task and these tasks has target date to be accomiplish.</p>'
+            },
+            {
+                target: '[data-tour="project-expenditures-card"]',
+                title: 'Expenditures',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Log your expenses for the current project that you are viewing.</p>'
+            },
+            {
+                target: '[data-tour="assigned-manpower-card"]',
+                title: 'Assigned Manpower',
+                moduleName: 'Project View',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Track the personnel that are curently assigned to your project, you can modify the list by assigning or unassigning.</p>'
+            },
+            {
+                target: '[data-tour="audit-trail-card"]',
+                title: 'Audit Trail & Status History',
+                moduleName: 'Project View',
+                placement: 'top',
+                padding: 8,
+                content: '<p>Track the changes of your project for auditing and accountability.</p>'
             }
         ],
         'projects': [
@@ -999,11 +1268,110 @@
     };
 
     /**
+     * Maximize specific tasks, expenditures, assigned manpower, and audit trail in project view
+     */
+    function maximizeProjectShowSections() {
+        if (window.__projectDetailComponent) {
+            previousProjectShowState = {
+                checklistMinimized: window.__projectDetailComponent.checklistMinimized,
+                expendituresMinimized: window.__projectDetailComponent.expendituresMinimized,
+                manpowerMinimized: window.__projectDetailComponent.manpowerMinimized,
+                auditTrailMinimized: window.__projectDetailComponent.auditTrailMinimized,
+                activeTaskId: window.__projectDetailComponent.activeTaskId
+            };
+
+            // Maximize specific tasks, expenditures, assigned manpower, audit trail
+            window.__projectDetailComponent.checklistMinimized = false;
+            window.__projectDetailComponent.expendituresMinimized = false;
+            window.__projectDetailComponent.manpowerMinimized = false;
+            window.__projectDetailComponent.auditTrailMinimized = false;
+
+            // Ensure first task is active if none selected
+            if (!window.__projectDetailComponent.activeTaskId) {
+                const firstCard = document.querySelector('[data-tour="timeline-major-task-first"]');
+                if (firstCard && firstCard.id) {
+                    const idMatch = firstCard.id.match(/\d+/);
+                    if (idMatch) {
+                        window.__projectDetailComponent.activeTaskId = parseInt(idMatch[0], 10);
+                    }
+                }
+            }
+        } else {
+            // DOM button fallback
+            previousProjectShowState = {
+                expendituresWasMinimized: false,
+                manpowerWasMinimized: false,
+                auditTrailWasMinimized: false
+            };
+
+            const expBtn = document.getElementById('btn-toggle-expenditures');
+            if (expBtn && expBtn.getAttribute('aria-expanded') === 'false') {
+                previousProjectShowState.expendituresWasMinimized = true;
+                expBtn.click();
+            }
+
+            const manBtn = document.getElementById('btn-toggle-manpower');
+            if (manBtn && manBtn.getAttribute('aria-expanded') === 'false') {
+                previousProjectShowState.manpowerWasMinimized = true;
+                manBtn.click();
+            }
+
+            const auditBtn = document.getElementById('btn-toggle-audit-trail');
+            if (auditBtn && auditBtn.getAttribute('aria-expanded') === 'false') {
+                previousProjectShowState.auditTrailWasMinimized = true;
+                auditBtn.click();
+            }
+
+            const firstCard = document.querySelector('[data-tour="timeline-major-task-first"]');
+            if (firstCard) firstCard.click();
+        }
+    }
+
+    /**
+     * Restore previous collapsible states when tour closes or is skipped
+     */
+    function restoreProjectShowSections() {
+        if (!previousProjectShowState) return;
+
+        if (window.__projectDetailComponent) {
+            window.__projectDetailComponent.checklistMinimized = previousProjectShowState.checklistMinimized;
+            window.__projectDetailComponent.expendituresMinimized = previousProjectShowState.expendituresMinimized;
+            window.__projectDetailComponent.manpowerMinimized = previousProjectShowState.manpowerMinimized;
+            window.__projectDetailComponent.auditTrailMinimized = previousProjectShowState.auditTrailMinimized;
+            if (previousProjectShowState.activeTaskId !== undefined) {
+                window.__projectDetailComponent.activeTaskId = previousProjectShowState.activeTaskId;
+            }
+        } else {
+            // DOM fallback
+            if (previousProjectShowState.expendituresWasMinimized) {
+                const expBtn = document.getElementById('btn-toggle-expenditures');
+                if (expBtn && expBtn.getAttribute('aria-expanded') === 'true') expBtn.click();
+            }
+            if (previousProjectShowState.manpowerWasMinimized) {
+                const manBtn = document.getElementById('btn-toggle-manpower');
+                if (manBtn && manBtn.getAttribute('aria-expanded') === 'true') manBtn.click();
+            }
+            if (previousProjectShowState.auditTrailWasMinimized) {
+                const auditBtn = document.getElementById('btn-toggle-audit-trail');
+                if (auditBtn && auditBtn.getAttribute('aria-expanded') === 'true') auditBtn.click();
+            }
+        }
+
+        previousProjectShowState = null;
+    }
+
+    /**
      * Start the tour for a specific module
      */
     function startTour(moduleKey, isManual = false) {
         const key = moduleKey || currentModule;
         currentModuleKey = key;
+
+        // In project view, expand collapsible sections (specific tasks, expenditures, manpower, audit logs)
+        if (key === 'projects.show') {
+            maximizeProjectShowSections();
+        }
+
         const candidateSteps = modulesConfig[key] || modulesConfig['dashboard'];
 
         // Filter valid steps that exist in current DOM
@@ -1024,11 +1392,59 @@
         }
 
         // Attach listeners
+        window.addEventListener('wheel', onWheel, { passive: false });
+        window.addEventListener('touchstart', onTouchStart, { passive: true });
+        window.addEventListener('touchmove', onTouchMove, { passive: false });
         window.addEventListener('scroll', onScrollOrResize, { passive: true });
         window.addEventListener('resize', onScrollOrResize, { passive: true });
         window.addEventListener('keydown', onKeyDown);
 
         goToStep(0);
+    }
+
+    /**
+     * Compute vertical scrolling bounds to restrict user from scrolling away from the highlighted section
+     */
+    function computeScrollBounds(el) {
+        if (!el) {
+            minAllowedScrollY = 0;
+            maxAllowedScrollY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+            return;
+        }
+
+        const rect = el.getBoundingClientRect();
+        const docTop = rect.top + window.scrollY;
+        const docBottom = docTop + rect.height;
+        const viewH = window.innerHeight;
+        const topBarOffset = 70; // 56px topbar + padding
+
+        // Also check if popover is visible to include it in the focus region
+        const popover = document.getElementById('dex-tour-popover');
+        let focusTop = docTop;
+        let focusBottom = docBottom;
+
+        if (popover && popover.classList.contains('is-visible')) {
+            const pRect = popover.getBoundingClientRect();
+            const pTop = pRect.top + window.scrollY;
+            const pBottom = pTop + pRect.height;
+            focusTop = Math.min(docTop, pTop);
+            focusBottom = Math.max(docBottom, pBottom);
+        }
+
+        const focusHeight = focusBottom - focusTop;
+        const availableH = viewH - topBarOffset;
+
+        if (focusHeight <= availableH) {
+            // Section fits inside viewport: lock/restrict around centered position
+            const idealY = Math.max(0, focusTop - topBarOffset - (availableH - focusHeight) / 2);
+            minAllowedScrollY = Math.max(0, idealY - 25);
+            maxAllowedScrollY = idealY + 25;
+        } else {
+            // Section is taller than viewport (e.g. large timeline or specs table):
+            // Allow user to scroll down through the section, but restrict from scrolling past its top/bottom
+            minAllowedScrollY = Math.max(0, focusTop - topBarOffset - 20);
+            maxAllowedScrollY = Math.max(minAllowedScrollY, focusBottom - viewH + 40);
+        }
     }
 
     /**
@@ -1057,7 +1473,8 @@
             if (sidebarEl) sidebarEl.classList.add('sidebar-open');
         }
 
-        // Smooth scroll to element
+        // Smooth scroll to element while unlocking transition
+        isTransitioning = true;
         el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
 
         // Update UI
@@ -1066,7 +1483,11 @@
         // Synchronize spotlight position after scroll starts and settles
         requestAnimationFrame(() => updatePositions(el, step));
         setTimeout(() => updatePositions(el, step), 150);
-        setTimeout(() => updatePositions(el, step), 320);
+        setTimeout(() => {
+            updatePositions(el, step);
+            computeScrollBounds(el);
+            isTransitioning = false;
+        }, 360);
     }
 
     /**
@@ -1113,16 +1534,41 @@
             }
         }
 
-        // Render progress dots
+        // Render minimized progress dots
         if (dotsContainer) {
             dotsContainer.innerHTML = '';
-            for (let i = 0; i < total; i++) {
-                const dot = document.createElement('button');
-                dot.type = 'button';
-                dot.className = `dex-tour-dot ${i === index ? 'is-active' : ''}`;
-                dot.setAttribute('aria-label', `Go to step ${i + 1}`);
-                dot.onclick = () => goToStep(i);
-                dotsContainer.appendChild(dot);
+
+            if (total <= 7) {
+                // When 7 or fewer steps, render all mini dots
+                for (let i = 0; i < total; i++) {
+                    const dot = document.createElement('button');
+                    dot.type = 'button';
+                    dot.className = `dex-tour-dot ${i === index ? 'is-active' : ''}`;
+                    dot.setAttribute('aria-label', `Go to step ${i + 1}`);
+                    dot.onclick = () => goToStep(i);
+                    dotsContainer.appendChild(dot);
+                }
+            } else {
+                // When more than 7 steps (e.g. 19 steps in Project View),
+                // render a compact sliding window of 5 dots (Instagram/Carousel style)
+                const maxVisible = 5;
+                let start = Math.max(0, index - Math.floor(maxVisible / 2));
+                let end = start + maxVisible;
+                if (end > total) {
+                    end = total;
+                    start = Math.max(0, end - maxVisible);
+                }
+
+                for (let i = start; i < end; i++) {
+                    const dot = document.createElement('button');
+                    dot.type = 'button';
+                    const isActive = i === index;
+                    const isEdge = (!isActive && ((i === start && start > 0) || (i === end - 1 && end < total)));
+                    dot.className = `dex-tour-dot ${isActive ? 'is-active' : ''} ${isEdge ? 'is-edge' : ''}`;
+                    dot.setAttribute('aria-label', `Go to step ${i + 1}`);
+                    dot.onclick = () => goToStep(i);
+                    dotsContainer.appendChild(dot);
+                }
             }
         }
     }
@@ -1179,6 +1625,12 @@
             }
         }
 
+        if (finalPlacement === 'left') {
+            if (x - popoverW - 16 < 16) {
+                finalPlacement = 'bottom';
+            }
+        }
+
         if (finalPlacement === 'bottom') {
             if (y + h + 16 + popoverH > window.innerHeight - 16 && y - popoverH - 16 > 16) {
                 finalPlacement = 'top';
@@ -1187,6 +1639,9 @@
 
         if (finalPlacement === 'right') {
             left = x + w + 16;
+            top = Math.max(16, Math.min(window.innerHeight - popoverH - 16, y + 10));
+        } else if (finalPlacement === 'left') {
+            left = Math.max(16, x - popoverW - 16);
             top = Math.max(16, Math.min(window.innerHeight - popoverH - 16, y + 10));
         } else if (finalPlacement === 'top') {
             top = Math.max(16, y - popoverH - 16);
@@ -1204,17 +1659,89 @@
         // Align arrow
         const arrow = document.getElementById('dex-tour-arrow');
         if (arrow) {
+            arrow.style.left = '';
+            arrow.style.right = '';
+            arrow.style.top = '';
+            arrow.style.bottom = '';
+
             if (finalPlacement === 'bottom' || finalPlacement === 'top') {
                 const targetCenter = x + w / 2;
                 const arrowLeft = Math.max(24, Math.min(popoverW - 24, targetCenter - left));
                 arrow.style.left = `${arrowLeft}px`;
-                arrow.style.top = '';
             } else if (finalPlacement === 'right') {
                 const targetCenter = y + Math.min(h / 2, 60);
                 const arrowTop = Math.max(20, Math.min(popoverH - 20, targetCenter - top));
                 arrow.style.top = `${arrowTop}px`;
-                arrow.style.left = '';
+            } else if (finalPlacement === 'left') {
+                const targetCenter = y + Math.min(h / 2, 60);
+                const arrowTop = Math.max(20, Math.min(popoverH - 20, targetCenter - top));
+                arrow.style.top = `${arrowTop}px`;
+                arrow.style.right = '-7px';
             }
+        }
+    }
+
+    /**
+     * Mouse wheel listener to restrict scrolling outside focused section
+     */
+    function onWheel(e) {
+        if (!active) return;
+
+        if (isTransitioning) {
+            e.preventDefault();
+            return;
+        }
+
+        // Allow scroll inside scrollable popover containers (e.g. sidebar module list)
+        const popover = document.getElementById('dex-tour-popover');
+        if (popover && popover.contains(e.target)) {
+            const scrollableParent = e.target.closest('.tour-modules-list');
+            if (scrollableParent && scrollableParent.scrollHeight > scrollableParent.clientHeight) {
+                return;
+            }
+        }
+
+        const currentY = window.scrollY;
+        const nextY = currentY + e.deltaY;
+
+        if (nextY < minAllowedScrollY) {
+            if (currentY <= minAllowedScrollY) {
+                e.preventDefault();
+            } else {
+                window.scrollTo({ top: minAllowedScrollY, behavior: 'auto' });
+                e.preventDefault();
+            }
+        } else if (nextY > maxAllowedScrollY) {
+            if (currentY >= maxAllowedScrollY) {
+                e.preventDefault();
+            } else {
+                window.scrollTo({ top: maxAllowedScrollY, behavior: 'auto' });
+                e.preventDefault();
+            }
+        }
+    }
+
+    /**
+     * Touch events to restrict mobile scrolling outside focused section
+     */
+    function onTouchStart(e) {
+        if (e.touches && e.touches.length > 0) {
+            touchStartY = e.touches[0].clientY;
+        }
+    }
+
+    function onTouchMove(e) {
+        if (!active || isTransitioning || !e.touches || e.touches.length === 0) return;
+
+        const popover = document.getElementById('dex-tour-popover');
+        if (popover && popover.contains(e.target)) return;
+
+        const currentTouchY = e.touches[0].clientY;
+        const deltaY = touchStartY - currentTouchY;
+        const nextY = window.scrollY + deltaY;
+
+        if (nextY < minAllowedScrollY || nextY > maxAllowedScrollY) {
+            e.preventDefault();
         }
     }
 
@@ -1223,11 +1750,27 @@
      */
     function onScrollOrResize() {
         if (!active || !activeSteps[currentStepIdx]) return;
+
+        // If user moved scrollbar or forced scroll past allowed section bounds, clamp it
+        if (!isTransitioning) {
+            const currentY = window.scrollY;
+            if (currentY < minAllowedScrollY - 2) {
+                window.scrollTo({ top: minAllowedScrollY, behavior: 'auto' });
+            } else if (currentY > maxAllowedScrollY + 2) {
+                window.scrollTo({ top: maxAllowedScrollY, behavior: 'auto' });
+            }
+        }
+
         if (scrollRafId) cancelAnimationFrame(scrollRafId);
         scrollRafId = requestAnimationFrame(() => {
             const step = activeSteps[currentStepIdx];
             const el = document.querySelector(step.target);
-            if (el) updatePositions(el, step);
+            if (el) {
+                updatePositions(el, step);
+                if (!isTransitioning) {
+                    computeScrollBounds(el);
+                }
+            }
         });
     }
 
@@ -1245,6 +1788,27 @@
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
             prevStep();
+        } else if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) {
+            const scrollDeltas = {
+                'ArrowUp': -50,
+                'ArrowDown': 50,
+                'PageUp': -Math.round(window.innerHeight * 0.75),
+                'PageDown': Math.round(window.innerHeight * 0.75),
+                ' ': Math.round(window.innerHeight * 0.75),
+                'Home': -100000,
+                'End': 100000
+            };
+
+            const delta = scrollDeltas[e.key] || 0;
+            const targetY = window.scrollY + delta;
+
+            if (targetY < minAllowedScrollY) {
+                e.preventDefault();
+                window.scrollTo({ top: minAllowedScrollY, behavior: 'smooth' });
+            } else if (targetY > maxAllowedScrollY) {
+                e.preventDefault();
+                window.scrollTo({ top: maxAllowedScrollY, behavior: 'smooth' });
+            }
         }
     }
 
@@ -1273,12 +1837,20 @@
      */
     function closeTour(completed = false) {
         active = false;
+        isTransitioning = false;
+
+        // Restore previous minimized/collapsible states in project view
+        restoreProjectShowSections();
+
         const container = document.getElementById('dex-tour-container');
         if (container) container.style.display = 'none';
 
         const popover = document.getElementById('dex-tour-popover');
         if (popover) popover.classList.remove('is-visible');
 
+        window.removeEventListener('wheel', onWheel);
+        window.removeEventListener('touchstart', onTouchStart);
+        window.removeEventListener('touchmove', onTouchMove);
         window.removeEventListener('scroll', onScrollOrResize);
         window.removeEventListener('resize', onScrollOrResize);
         window.removeEventListener('keydown', onKeyDown);

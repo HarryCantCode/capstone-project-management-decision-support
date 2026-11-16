@@ -491,9 +491,9 @@
                                                 <button
                                                     type="button"
                                                     class="btn btn-primary btn-sm"
-                                                    @click="quickProcessAction({{ $action->id }}, 'approve')"
+                                                    @click="openActionModal({{ $action->id }})"
                                                     :disabled="processingActionId === {{ $action->id }}"
-                                                    title="Approve this staff request"
+                                                    title="Review and approve this staff request"
                                                 >
                                                     Approve
                                                 </button>
@@ -813,7 +813,7 @@
                                                     <button
                                                         type="button"
                                                         class="btn btn-primary btn-sm"
-                                                        @click="quickProcessAction(req.id, 'approve')"
+                                                        @click="openActionModal(req.id)"
                                                         :disabled="processingActionId === req.id"
                                                     >
                                                         Approve
@@ -887,7 +887,7 @@
                                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                                     <path d="m9 14 2 2 4-4"></path>
                                 </svg>
-                                <span style="font-weight: 700; font-size: 1.05rem; color: var(--color-ink);">Review Staff Request</span>
+                                <span style="font-weight: 700; font-size: 1.05rem; color: var(--color-ink);">Review Staff Action</span>
                             </div>
                             <button type="button" class="staff-action-review-close" @click="closeActionModal()" aria-label="Close modal">&times;</button>
                         </div>
@@ -1210,8 +1210,9 @@ function staffRequestsModule() {
             })
             .then(r => r.json())
             .then(data => {
-                this.actionsMap[actionId] = data;
-                this.selectedAction = data;
+                const action = data.formatted_action || data;
+                this.actionsMap[actionId] = action;
+                this.selectedAction = action;
                 this.reviewNotes = '';
                 this.actionModalOpen = true;
             });
@@ -1222,8 +1223,7 @@ function staffRequestsModule() {
         },
 
         quickProcessAction(actionId, decision) {
-            this.reviewNotes = '';
-            this.submitDecision(actionId, decision);
+            this.openActionModal(actionId);
         },
 
         submitDecision(actionId, decision) {

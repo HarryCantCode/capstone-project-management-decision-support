@@ -104,11 +104,11 @@
 
         <p>Hello <strong>{{ $user->first_name ?? $user->name }}</strong>,</p>
 
-        <p>To complete your process we need to verify you, Here is your 6-digit one-time password (OTP) for your DEX PMS Account that we will use to verify if it is you. Please do not share this OTP with others. This will expire within 3-minutes:</p>
+        <p>To complete your process we need to verify you, Here is your 6-digit one-time password (OTP) for your DEX PMS Account that we will use to verify if it is you. Please do not share this OTP with others. This will expire within 5-minutes:</p>
 
         <div class="otp-box">
             <p class="otp-code">{{ $otp }}</p>
-            <p class="otp-expiry">Valid for 3 minutes only.</p>
+            <p class="otp-expiry">Valid for 5 minutes only.</p>
         </div>
 
         <div class="details-box">

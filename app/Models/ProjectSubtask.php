@@ -28,6 +28,7 @@ class ProjectSubtask extends Model
         'project_task_id',
         'title',
         'due_date',
+        'assigned_to',
         'is_completed',
         'completed_at',
         'completed_by',
@@ -38,6 +39,7 @@ class ProjectSubtask extends Model
 
     protected $casts = [
         'due_date' => 'date',
+        'assigned_to' => 'integer',
         'is_completed' => 'boolean',
         'completed_at' => 'datetime',
         'completed_by' => 'integer',
@@ -59,6 +61,14 @@ class ProjectSubtask extends Model
     public function task(): BelongsTo
     {
         return $this->belongsTo(ProjectTask::class, 'project_task_id');
+    }
+
+    /**
+     * User (staff) assigned to this subtask.
+     */
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
     }
 
     /**

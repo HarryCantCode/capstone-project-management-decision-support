@@ -694,7 +694,7 @@
                                 Fill in current password, new password, and matching confirmation to enable "Send OTP".
                             </div>
                             <div class="otp-hint" x-show="canSendPwdOtp() || pwdOtpSent">
-                                A 6-digit one-time code will be dispatched to {{ Auth::user()->email }}. Valid for 3 minutes.
+                                A 6-digit one-time code will be dispatched to {{ Auth::user()->email }}. Valid for 5 minutes.
                             </div>
                             <div x-show="pwdOtpSent" x-cloak class="otp-success-msg">
                                 <span class="otp-check-icon">&check;</span> Code sent successfully to {{ Auth::user()->email }}
@@ -843,7 +843,7 @@
                                 Fill in new email and current password to enable "Send OTP".
                             </div>
                             <div class="otp-hint" x-show="canSendEmailOtp() || emailOtpSent">
-                                A 6-digit one-time code will be dispatched to your current email address ({{ Auth::user()->email }}). Valid for 3 minutes.
+                                A 6-digit one-time code will be dispatched to your current email address ({{ Auth::user()->email }}). Valid for 5 minutes.
                             </div>
                             <div x-show="emailOtpSent" x-cloak class="otp-success-msg">
                                 <span class="otp-check-icon">&check;</span> Code sent successfully to {{ Auth::user()->email }}

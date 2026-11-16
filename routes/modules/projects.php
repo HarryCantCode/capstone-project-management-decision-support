@@ -64,6 +64,9 @@ Route::patch('projects/{project}/tasks/{task}/subtasks/{subtask}/toggle', [\App\
 Route::put('projects/{project}/tasks/{task}/subtasks/{subtask}', [\App\Http\Controllers\ProjectTaskController::class, 'updateSubtask'])
     ->name('projects.tasks.subtasks.update');
 
+Route::patch('projects/{project}/tasks/{task}/subtasks/{subtask}/assign', [\App\Http\Controllers\ProjectTaskController::class, 'assignSubtask'])
+    ->name('projects.tasks.subtasks.assign');
+
 Route::delete('projects/{project}/tasks/{task}/subtasks/{subtask}', [\App\Http\Controllers\ProjectTaskController::class, 'destroySubtask'])
     ->name('projects.tasks.subtasks.destroy');
 

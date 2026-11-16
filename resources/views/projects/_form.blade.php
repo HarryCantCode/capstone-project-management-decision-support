@@ -2366,7 +2366,7 @@
     </div>
 
     {{-- Card 2: Live Overview Preview --}}
-    <div class="card card-glass" style="border-left: 4px solid var(--color-accent);">
+    <div class="card card-glass" id="section-preview" data-tour="section-preview" style="border-left: 4px solid var(--color-accent);">
         <div class="card-header" style="font-weight: 700; font-size: 0.9375rem; display: flex; align-items: center; justify-content: space-between;">
             <span>Project Preview</span>
             <x-status-pill :status="$project->status ?? 'pending'" />

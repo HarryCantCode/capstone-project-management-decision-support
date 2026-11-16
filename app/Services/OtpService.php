@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Mail;
 
 class OtpService
 {
-    public const OTP_EXPIRY_MINUTES = 3;
+    public const OTP_EXPIRY_MINUTES = 5;
     public const MAX_ATTEMPTS = 5;
     public const MAX_CONSECUTIVE_SENDS = 2;
     public const THROTTLE_LOCKOUT_SECONDS = 180; // 3 minutes

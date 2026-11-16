@@ -174,6 +174,7 @@ class ProjectController extends Controller
             'tasks.subtasks.files.uploader',
             'tasks.subtasks.completedBy',
             'tasks.subtasks.approvedBy',
+            'tasks.subtasks.assignedTo',
             'files.uploader',
             'files.subtask',
         ]);
@@ -206,7 +207,15 @@ class ProjectController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return view('projects.show', compact('project', 'availablePersonnel', 'catalogMaterials', 'pendingSubtaskIds', 'pendingExpenses'));
+        $staffUsers = \App\Models\User::role('Staff')
+            ->withoutTrashed()
+            ->where(function ($q) {
+                $q->whereNull('locked_until')->orWhere('locked_until', '<=', now());
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'employee_number', 'job_title']);
+
+        return view('projects.show', compact('project', 'availablePersonnel', 'catalogMaterials', 'pendingSubtaskIds', 'pendingExpenses', 'staffUsers'));
     }
 
     /** Show the edit project form. */

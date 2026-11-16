@@ -3848,6 +3848,23 @@ input::-ms-clear {
     box-shadow: 0 2px 6px rgba(16, 185, 129, 0.12);
 }
 
+.costing-kpi-card--assigned::before {
+    background: linear-gradient(90deg, #6366F1, #38BDF8);
+    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4);
+}
+.costing-kpi-card--assigned::after {
+    background: #6366F1;
+}
+.costing-kpi-card--assigned:hover {
+    border-color: rgba(99, 102, 241, 0.45);
+}
+.costing-kpi-card__icon-badge--assigned {
+    background: rgba(99, 102, 241, 0.12);
+    color: #6366F1;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.12);
+}
+
 /* Dark mode overrides for status cards */
 [data-theme="dark"] .costing-kpi-card--ongoing:hover {
     border-color: #60A5FA;
@@ -3860,6 +3877,10 @@ input::-ms-clear {
 [data-theme="dark"] .costing-kpi-card--completed:hover {
     border-color: #34D399;
     box-shadow: 0 14px 28px -6px rgba(16, 185, 129, 0.35);
+}
+[data-theme="dark"] .costing-kpi-card--assigned:hover {
+    border-color: #818CF8;
+    box-shadow: 0 14px 28px -6px rgba(99, 102, 241, 0.35);
 }
 
 [data-theme="dark"] .costing-kpi-card__icon-badge--ongoing {
@@ -3876,6 +3897,11 @@ input::-ms-clear {
     background: rgba(16, 185, 129, 0.2);
     color: #6EE7B7;
     border-color: rgba(16, 185, 129, 0.35);
+}
+[data-theme="dark"] .costing-kpi-card__icon-badge--assigned {
+    background: rgba(99, 102, 241, 0.2);
+    color: #A5B4FC;
+    border-color: rgba(99, 102, 241, 0.35);
 }
 
 /* ==========================================================================
@@ -4117,6 +4143,110 @@ input::-ms-clear {
 [data-theme="dark"] .expense-item-card:hover {
     border-color: var(--color-accent);
 }
+
+/* ==========================================================================
+   21. Assign Staff Modal List Layout & Horizontal Alignment
+   ========================================================================== */
+.assign-staff-scroll-list {
+    max-height: 250px !important;
+    overflow-y: auto !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-md) !important;
+    padding: 8px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    background: var(--color-surface) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.assign-staff-option {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 10px 14px !important;
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--color-border) !important;
+    background: transparent !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    margin: 0 !important;
+}
+
+.assign-staff-option:hover {
+    background: var(--color-surface-alt) !important;
+    border-color: var(--color-accent) !important;
+}
+
+.assign-staff-option.is-selected {
+    background: rgba(56, 189, 248, 0.12) !important;
+    border-color: rgba(56, 189, 248, 0.45) !important;
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25) !important;
+}
+
+.assign-staff-radio-wrap {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    width: 20px !important;
+    height: 20px !important;
+    margin: 0 !important;
+}
+
+.assign-staff-radio {
+    width: 18px !important;
+    height: 18px !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+    accent-color: var(--color-accent) !important;
+    flex-shrink: 0 !important;
+}
+
+.assign-staff-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    background: rgba(56, 189, 248, 0.15) !important;
+    border: 1px solid rgba(56, 189, 248, 0.3) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0.8125rem !important;
+    font-weight: 700 !important;
+    color: var(--color-accent) !important;
+    flex-shrink: 0 !important;
+}
+
+.assign-staff-info {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+}
+
+.assign-staff-name {
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+    color: var(--color-ink) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.assign-staff-meta {
+    font-size: 0.75rem !important;
+    color: var(--color-muted) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
 
 
 

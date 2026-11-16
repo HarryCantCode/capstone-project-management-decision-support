@@ -6,6 +6,7 @@ use App\Models\Notification;
 use App\Models\ProjectFile;
 use App\Models\ProjectStatusHistory;
 use App\Models\ProjectSubtask;
+use App\Models\ProjectTask;
 use App\Models\StaffPendingAction;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -212,6 +213,71 @@ class StaffPendingActionService
         $approvedCount = (clone $userScope)->where('status', 'approved')->count();
         $rejectedCount = (clone $userScope)->where('status', 'rejected')->count();
 
+        // Tasks assigned to this staff user
+        $assignedTasksQuery = ProjectSubtask::query()
+            ->where('assigned_to', $user->id)
+            ->with(['task.project']);
+
+        $assignedTasksCount = (clone $assignedTasksQuery)->where('is_completed', false)->count();
+
+        $assignedTasks = (clone $assignedTasksQuery)
+            ->orderBy('is_completed')
+            ->orderBy('due_date')
+            ->orderByDesc('id')
+            ->get();
+
+        // Sequential locking check for assigned tasks:
+        // An assigned task cannot be marked as done if any prior task in the same project is not yet completed.
+        $projectIds = $assignedTasks->map(fn ($st) => $st->task?->project_id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $projectSubtasksMap = [];
+        if (!empty($projectIds)) {
+            $tasksByProject = ProjectTask::query()
+                ->whereIn('project_id', $projectIds)
+                ->with(['subtasks' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')])
+                ->orderBy('sort_order')
+                ->orderBy('start_date')
+                ->orderBy('id')
+                ->get()
+                ->groupBy('project_id');
+
+            foreach ($projectIds as $pId) {
+                $projectTasks = $tasksByProject->get($pId, collect());
+                $projectSubtasksMap[$pId] = $projectTasks->flatMap(fn ($t) => $t->subtasks)->values();
+            }
+        }
+
+        foreach ($assignedTasks as $assignedTask) {
+            $pId = $assignedTask->task?->project_id;
+            $allProjectSubtasks = $projectSubtasksMap[$pId] ?? collect();
+            $currIndex = $allProjectSubtasks->search(fn ($st) => $st->id === $assignedTask->id);
+
+            $isLocked = false;
+            if ($currIndex !== false && $currIndex > 0) {
+                for ($k = 0; $k < $currIndex; $k++) {
+                    if (! $allProjectSubtasks[$k]->is_completed) {
+                        $isLocked = true;
+                        break;
+                    }
+                }
+            }
+            $assignedTask->is_locked_by_previous = $isLocked;
+        }
+
+        $pendingSubtaskIdsForStaff = StaffPendingAction::where('user_id', $user->id)
+            ->where('action_type', 'complete_subtask')
+            ->where('status', 'pending')
+            ->get(['payload'])
+            ->map(fn ($action) => (int) ($action->payload['subtask_id'] ?? 0))
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
         // Filtered Query
         $actionsQuery = StaffPendingAction::query()
             ->where('user_id', $user->id)
@@ -258,6 +324,10 @@ class StaffPendingActionService
             'unexaminedCount' => $unexaminedCount,
             'approvedCount' => $approvedCount,
             'rejectedCount' => $rejectedCount,
+            'assignedTasks' => $assignedTasks,
+            'assignedTasksCount' => $assignedTasksCount,
+            'pendingSubtaskIdsForStaff' => $pendingSubtaskIdsForStaff,
+            'initialTab' => $filters['tab'] ?? 'my_requests',
         ];
     }
 
@@ -690,6 +760,7 @@ class StaffPendingActionService
             $data['status'] = $decision;
             $data['reviewed_by_name'] = $reviewerName;
             $data['reviewed_at'] = $now->format('M j, Y · g:i A');
+            $data['notes'] = $pendingAction->admin_notes;
 
             $notification->update([
                 'read_at' => $notification->read_at ?? $now,

@@ -16,7 +16,7 @@
     {{-- Summary KPI Cards (4-Column Grid matching Dashboard, Costing & Staff Requests) --}}
     <div class="costing-kpi-grid dashboard-stats-grid">
         {{-- Card 1: Total Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--contract costing-kpi-card--interactive" @click="setStatusFilter('all')" role="button" tabindex="0" @keydown.enter="setStatusFilter('all')">
+        <div class="costing-kpi-card costing-kpi-card--contract costing-kpi-card--interactive" @click="setActiveTab('my_requests'); setStatusFilter('all')" role="button" tabindex="0" @keydown.enter="setStatusFilter('all')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
@@ -54,25 +54,25 @@
             </div>
         </div>
 
-        {{-- Card 2: Unexamined Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--pending costing-kpi-card--interactive" @click="setStatusFilter('unexamined')" role="button" tabindex="0" @keydown.enter="setStatusFilter('unexamined')">
+        {{-- Card 2: Assigned Tasks (Replaces Unexamined - Same Layout & Glowing Effect) --}}
+        <div class="costing-kpi-card costing-kpi-card--assigned costing-kpi-card--interactive" @click="setActiveTab('assigned_tasks')" role="button" tabindex="0" @keydown.enter="setActiveTab('assigned_tasks')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
+                <polyline points="9 11 12 14 22 4"></polyline>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
             </svg>
             <div>
                 <div class="costing-kpi-card__header">
-                    <span class="costing-kpi-card__label">Unexamined</span>
-                    <span class="costing-kpi-card__icon-badge costing-kpi-card__icon-badge--pending" aria-hidden="true">
+                    <span class="costing-kpi-card__label">Assigned Tasks</span>
+                    <span class="costing-kpi-card__icon-badge costing-kpi-card__icon-badge--assigned" aria-hidden="true">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
+                            <polyline points="9 11 12 14 22 4"></polyline>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
                         </svg>
                     </span>
                 </div>
                 <div class="costing-kpi-card__body">
-                    <div class="costing-kpi-card__value numeric">{{ number_format($unexaminedCount) }}</div>
-                    <p class="costing-kpi-card__description">Requests currently awaiting Admin or Manager review.</p>
+                    <div class="costing-kpi-card__value numeric" style="color: #6366F1;">{{ number_format($assignedTasksCount) }}</div>
+                    <p class="costing-kpi-card__description">Timeline tasks assigned to you across active projects.</p>
                 </div>
             </div>
             <div class="costing-kpi-card__footer">
@@ -80,20 +80,19 @@
                     <span class="costing-kpi-card__tag-icon" aria-hidden="true">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            <polyline points="12 6 12 12 16 14"></polyline>
                         </svg>
                     </span>
-                    Awaiting Review
+                    My Assignments
                 </span>
-                <span class="costing-kpi-card__pill {{ $unexaminedCount > 0 ? 'costing-kpi-card__pill--warning' : 'costing-kpi-card__pill--neutral' }}">
-                    {{ $unexaminedCount > 0 ? 'Pending Action' : 'All Reviewed' }}
+                <span class="costing-kpi-card__pill {{ $assignedTasksCount > 0 ? 'costing-kpi-card__pill--warning' : 'costing-kpi-card__pill--neutral' }}">
+                    {{ $assignedTasksCount > 0 ? $assignedTasksCount . ' Active' : 'All Clear' }}
                 </span>
             </div>
         </div>
 
         {{-- Card 3: Approved Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--completed costing-kpi-card--interactive" @click="setStatusFilter('approved')" role="button" tabindex="0" @keydown.enter="setStatusFilter('approved')">
+        <div class="costing-kpi-card costing-kpi-card--completed costing-kpi-card--interactive" @click="setActiveTab('my_requests'); setStatusFilter('approved')" role="button" tabindex="0" @keydown.enter="setStatusFilter('approved')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
@@ -129,7 +128,7 @@
         </div>
 
         {{-- Card 4: Rejected Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--remaining-negative costing-kpi-card--interactive" @click="setStatusFilter('rejected')" role="button" tabindex="0" @keydown.enter="setStatusFilter('rejected')">
+        <div class="costing-kpi-card costing-kpi-card--remaining-negative costing-kpi-card--interactive" @click="setActiveTab('my_requests'); setStatusFilter('rejected')" role="button" tabindex="0" @keydown.enter="setStatusFilter('rejected')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="15" y1="9" x2="9" y2="15"></line>
@@ -167,6 +166,53 @@
             </div>
         </div>
     </div>
+
+    {{-- ─── Tab View Switcher (My Submitted Requests vs. Assigned Tasks) ──────── --}}
+    <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: var(--space-4);">
+        <div class="switch-pill-container" role="tablist" aria-label="Approval List Views">
+            <button 
+                type="button" 
+                role="tab"
+                :aria-selected="(activeTab === 'my_requests').toString()"
+                class="switch-pill-btn"
+                :class="{ 'switch-pill-btn--active': activeTab === 'my_requests' }"
+                @click="setActiveTab('my_requests')"
+                style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.8125rem;"
+            >
+                <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                <span>My Submitted Requests</span>
+                <span class="badge font-mono" style="font-size: 0.6875rem; padding: 2px 7px; border-radius: 9999px;" :style="activeTab === 'my_requests' ? 'background: rgba(255,255,255,0.25); color: #fff;' : 'background: rgba(44, 95, 124, 0.12); color: var(--color-accent);'">
+                    {{ $totalCount }}
+                </span>
+            </button>
+            <button 
+                type="button" 
+                role="tab"
+                :aria-selected="(activeTab === 'assigned_tasks').toString()"
+                class="switch-pill-btn"
+                :class="{ 'switch-pill-btn--active': activeTab === 'assigned_tasks' }"
+                @click="setActiveTab('assigned_tasks')"
+                style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.8125rem;"
+            >
+                <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 11 12 14 22 4"></polyline>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                <span>Assigned Tasks</span>
+                <span class="badge font-mono" style="font-size: 0.6875rem; padding: 2px 7px; border-radius: 9999px;" :style="activeTab === 'assigned_tasks' ? 'background: rgba(255,255,255,0.25); color: #fff;' : 'background: rgba(99, 102, 241, 0.15); color: #6366F1;'">
+                    {{ $assignedTasksCount }}
+                </span>
+            </button>
+        </div>
+    </div>
+
+    {{-- ─── TAB 1: My Submitted Requests ───────────────────────────────────────── --}}
+    <div x-show="activeTab === 'my_requests'">
 
     {{-- Main Register Card --}}
     <div class="card card-glass">
@@ -482,6 +528,328 @@
             @endif
         </div>
     </div>
+    </div>{{-- End of Tab 1: My Submitted Requests --}}
+
+    {{-- ─── TAB 2: Assigned Tasks List ────────────────────────────────────────── --}}
+    <div x-show="activeTab === 'assigned_tasks'" x-cloak>
+        <div class="card card-glass">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-5);">
+                {{-- Left: Section Title & Count Badge --}}
+                <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
+                    <span style="font-weight: 700; font-size: 0.95rem; color: var(--color-ink); white-space: nowrap;">Assigned Timeline Tasks</span>
+                    <span class="badge font-mono" style="background: rgba(99, 102, 241, 0.12); color: #6366F1; border: 1px solid rgba(99, 102, 241, 0.25); font-size: 0.6875rem;">
+                        {{ $assignedTasks->count() }} {{ Str::plural('task', $assignedTasks->count()) }}
+                    </span>
+                </div>
+
+                {{-- Right: Filter Controls --}}
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-left: auto;">
+                    {{-- Search Input --}}
+                    <div class="project-search-wrapper" style="width: 240px; flex-shrink: 0;">
+                        <label for="assigned-tasks-search" class="visually-hidden">Search assigned tasks</label>
+                        <svg class="project-search-icon" width="15" height="15" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" style="width: 15px; height: 15px; flex-shrink: 0;">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                        <input
+                            type="text"
+                            id="assigned-tasks-search"
+                            x-model="assignedTasksSearch"
+                            placeholder="Filter task, project..."
+                            class="form-control form-control--compact project-search-input"
+                            style="width: 100%; height: 34px; font-size: 0.8125rem;"
+                            autocomplete="off"
+                        >
+                    </div>
+
+                    {{-- Status Filter --}}
+                    <div style="flex-shrink: 0;">
+                        <label for="assigned-tasks-status" class="visually-hidden">Filter by status</label>
+                        <select
+                            id="assigned-tasks-status"
+                            x-model="assignedTasksStatusFilter"
+                            class="form-control form-control--compact project-status-select"
+                            style="width: auto; min-width: 148px; height: 34px; padding: 0 0.65rem; font-size: 0.8125rem;"
+                        >
+                            <option value="all">All Statuses ({{ $assignedTasks->count() }})</option>
+                            <option value="to_complete">To Complete ({{ $assignedTasksCount }})</option>
+                            <option value="in_review">In Review ({{ count($pendingSubtaskIdsForStaff) }})</option>
+                            <option value="completed">Completed ({{ $assignedTasks->where('is_completed', true)->count() }})</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body" style="padding: 0;">
+                @if ($assignedTasks->isEmpty())
+                    <div class="empty-state" style="padding: var(--space-8); text-align: center;">
+                        <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                        <h2 class="empty-state__title">No assigned tasks</h2>
+                        <p class="empty-state__description">
+                            You currently do not have any timeline tasks assigned to you by your manager.
+                        </p>
+                    </div>
+                @else
+                    <div class="table-wrapper" style="border: none; border-radius: 0; box-shadow: none;">
+                        <table class="data-table">
+                            <caption class="visually-hidden">Assigned timeline tasks list</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col" style="min-width: 280px;">Task Details</th>
+                                    <th scope="col" style="min-width: 200px;">Project</th>
+                                    <th scope="col" style="min-width: 140px;">Target Date</th>
+                                    <th scope="col" style="min-width: 120px;">Status</th>
+                                    <th scope="col" class="text-right" style="min-width: 140px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($assignedTasks as $task)
+                                    @php
+                                        $isPendingReview = in_array((int) $task->id, $pendingSubtaskIdsForStaff, true);
+                                        $project = $task->task?->project;
+                                        $majorTask = $task->task;
+                                        $taskStatusCategory = $task->is_completed ? 'completed' : ($isPendingReview ? 'in_review' : 'to_complete');
+                                    @endphp
+                                    <tr 
+                                        x-show="(assignedTasksStatusFilter === 'all' || assignedTasksStatusFilter === '{{ $taskStatusCategory }}') && (!assignedTasksSearch || '{{ strtolower(addslashes($task->title . ' ' . ($project?->name ?? '') . ' ' . ($project?->project_code ?? '') . ' ' . ($majorTask?->task_name ?? ''))) }}'.includes(assignedTasksSearch.toLowerCase()))"
+                                    >
+                                        {{-- Task Details --}}
+                                        <td>
+                                            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                                                <span style="display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-md); background: rgba(99, 102, 241, 0.12); color: #6366F1; border: 1px solid rgba(99, 102, 241, 0.25); flex-shrink: 0;" title="Assigned Subtask">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <polyline points="9 11 12 14 22 4"></polyline>
+                                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                                    </svg>
+                                                </span>
+                                                <div style="flex: 1; min-width: 0;">
+                                                    <div style="font-weight: 600; color: var(--color-ink); line-height: 1.4; font-size: 0.875rem; {{ $task->is_completed ? 'text-decoration: line-through; opacity: 0.65;' : '' }}">
+                                                        {{ $task->title }}
+                                                    </div>
+                                                    @if ($majorTask)
+                                                        <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 2px;">
+                                                            Major Task: <strong style="color: var(--color-ink); font-weight: 600;">{{ $majorTask->task_name }}</strong>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        {{-- Project --}}
+                                        <td>
+                                            @if ($project)
+                                                <a href="{{ route('projects.show', $project) }}" class="table-link" style="display: inline-flex; flex-direction: column; text-decoration: none;">
+                                                    @if ($project->project_code)
+                                                        <span class="font-mono" style="font-size: 0.75rem; color: var(--color-accent); font-weight: 600;">{{ $project->project_code }}</span>
+                                                    @endif
+                                                    <span class="project-name" style="font-size: 0.8125rem; font-weight: 600; color: var(--color-ink);">{{ $project->name }}</span>
+                                                </a>
+                                            @else
+                                                <span class="text-muted" style="font-size: 0.8125rem;">N/A</span>
+                                            @endif
+                                        </td>
+
+                                        {{-- Target Date --}}
+                                        <td>
+                                            @if ($task->due_date)
+                                                @php
+                                                    $isOverdue = !$task->is_completed && $task->due_date->isPast();
+                                                @endphp
+                                                <div style="display: inline-flex; align-items: center; gap: 6px;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-muted); flex-shrink: 0;">
+                                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                                    </svg>
+                                                    <span class="font-mono" style="font-size: 0.8125rem; color: var(--color-ink);">
+                                                        {{ $task->due_date->format('M j, Y') }}
+                                                    </span>
+                                                    @if ($isOverdue)
+                                                        <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: var(--color-danger); font-size: 0.6875rem; padding: 1px 6px;">Overdue</span>
+                                                    @endif
+                                                </div>
+                                            @else
+                                                <span class="text-muted font-mono" style="font-size: 0.75rem;">Scheduled Week</span>
+                                            @endif
+                                        </td>
+
+                                        {{-- Status --}}
+                                        <td>
+                                            @if ($task->is_completed)
+                                                <span class="status-pill status-pill--completed">Completed</span>
+                                            @elseif ($isPendingReview)
+                                                <span class="status-pill status-pill--ongoing" title="Submitted — Awaiting review">Pending Review</span>
+                                            @else
+                                                <span class="status-pill status-pill--pending">To Complete</span>
+                                            @endif
+                                        </td>
+
+                                        {{-- Actions --}}
+                                        <td class="text-right">
+                                            <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                                                @if ($task->is_completed)
+                                                    <span class="badge font-mono" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); color: var(--color-muted); font-size: 0.75rem; padding: 4px 10px; border-radius: var(--radius-sm);">Done</span>
+                                                @elseif ($isPendingReview)
+                                                    <button 
+                                                        type="button" 
+                                                        class="btn btn-secondary btn-sm"
+                                                        disabled
+                                                        style="display: inline-flex; align-items: center; gap: 5px; height: 32px; font-size: 0.75rem; opacity: 0.85; cursor: not-allowed; padding: 0 0.75rem;"
+                                                        title="Awaiting Admin or Manager approval"
+                                                    >
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                            <circle cx="12" cy="12" r="10"></circle>
+                                                            <polyline points="12 6 12 12 16 14"></polyline>
+                                                        </svg>
+                                                        <span>In Review</span>
+                                                    </button>
+                                                @elseif ($task->is_locked_by_previous)
+                                                    <span 
+                                                        class="d-inline-flex" 
+                                                        tabindex="0"
+                                                        title="You cannot mark this as done when a previous task before your assigned task is not yet done"
+                                                        style="cursor: not-allowed;"
+                                                    >
+                                                        <button 
+                                                            type="button" 
+                                                            class="btn btn-secondary btn-sm"
+                                                            disabled
+                                                            style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 0.85rem; font-size: 0.75rem; font-weight: 600; opacity: 0.55; cursor: not-allowed; filter: grayscale(100%); pointer-events: none;"
+                                                            title="You cannot mark this as done when a previous task before your assigned task is not yet done"
+                                                        >
+                                                            <svg style="width: 13px; height: 13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                                <polyline points="20 6 9 17 4 12"></polyline>
+                                                            </svg>
+                                                            <span>Mark as done</span>
+                                                        </button>
+                                                    </span>
+                                                @else
+                                                    <button 
+                                                        type="button" 
+                                                        class="btn btn-primary btn-sm"
+                                                        style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 0.85rem; font-size: 0.75rem; font-weight: 600;"
+                                                        @click="openSubmitApprovalModal({
+                                                            projectId: {{ $project?->id ?? 'null' }},
+                                                            taskId: {{ $majorTask?->id ?? 'null' }},
+                                                            subtaskId: {{ $task->id }},
+                                                            title: @js($task->title),
+                                                            projectName: @js($project?->name ?? 'Project'),
+                                                            projectCode: @js($project?->project_code ?? ''),
+                                                            majorTask: @js($majorTask?->task_name ?? 'Major Task'),
+                                                            dueDate: @js($task->due_date ? $task->due_date->format('M j, Y') : 'Scheduled Week')
+                                                        })"
+                                                    >
+                                                        <svg style="width: 13px; height: 13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                            <polyline points="20 6 9 17 4 12"></polyline>
+                                                        </svg>
+                                                        <span>Mark as done</span>
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>{{-- End of Tab 2: Assigned Tasks --}}
+
+    {{-- ─── MODAL: Submit Approval Request for Task Completion ─────────────── --}}
+    <div class="reassign-modal-overlay" style="display: none; z-index: 1000000;" x-show="submitApprovalModalOpen" x-cloak>
+        <div class="reassign-modal-backdrop" @click="if(!submitApprovalSubmitting) submitApprovalModalOpen = false"></div>
+        <div class="reassign-modal-content card" x-show="submitApprovalModalOpen" x-transition style="max-width: 540px;">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: var(--color-success);">
+                        <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                    <div>
+                        <span style="font-weight: 700; font-size: 1rem; color: var(--color-ink);">Submit Approval Request</span>
+                        <p class="text-muted" style="font-size: 0.75rem; margin-bottom: 0;">Submit task completion for Admin or Manager review.</p>
+                    </div>
+                </div>
+                <button type="button" class="flash-close" @click="if(!submitApprovalSubmitting) submitApprovalModalOpen = false" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="card-body" style="padding: var(--space-4);">
+                {{-- Task Target Summary Card --}}
+                <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-4);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span class="badge font-mono" style="background: rgba(56, 189, 248, 0.15); color: var(--color-accent); font-size: 0.6875rem;" x-text="submitApprovalTask.projectCode"></span>
+                        <span class="text-muted font-mono" style="font-size: 0.75rem;" x-text="'Target: ' + submitApprovalTask.dueDate"></span>
+                    </div>
+                    <div style="font-size: 0.9375rem; font-weight: 700; color: var(--color-ink);" x-text="submitApprovalTask.title"></div>
+                    <div style="font-size: 0.75rem; color: var(--color-muted); margin-top: 2px;">
+                        Project: <span style="color: var(--color-ink);" x-text="submitApprovalTask.projectName"></span> &middot; Major Task: <span style="color: var(--color-ink);" x-text="submitApprovalTask.majorTask"></span>
+                    </div>
+                </div>
+
+                {{-- Remarks / Notes --}}
+                <div class="form-group form-group-premium" style="margin-bottom: var(--space-4);">
+                    <label for="submit_approval_notes" class="form-label" style="font-size: 0.8125rem;">
+                        Completion Remarks / Notes <span class="text-muted">(Optional)</span>
+                    </label>
+                    <textarea
+                        id="submit_approval_notes"
+                        class="form-control"
+                        rows="3"
+                        x-model="submitApprovalNotes"
+                        placeholder="Describe completed work, milestone details, or notes for the reviewer..."
+                        style="font-size: 0.8125rem;"
+                    ></textarea>
+                </div>
+
+                {{-- Proof of Completion Attachments --}}
+                <div class="form-group form-group-premium" style="margin-bottom: var(--space-2);">
+                    <label class="form-label" style="font-size: 0.8125rem;">
+                        Proof of Completion Attachments <span class="text-muted">(Photos, documents - Optional)</span>
+                    </label>
+                    <div 
+                        style="border: 2px dashed var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); text-align: center; background: var(--color-surface); cursor: pointer;"
+                        @click="$refs.submitApprovalFileInput.click()"
+                    >
+                        <input 
+                            type="file" 
+                            x-ref="submitApprovalFileInput" 
+                            multiple 
+                            style="display: none;" 
+                            @change="handleSubmitApprovalFiles($event)"
+                        >
+                        <svg style="width: 24px; height: 24px; color: var(--color-muted); margin: 0 auto 6px auto; display: block;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <div style="font-size: 0.8125rem; font-weight: 600; color: var(--color-accent);">Click to select proof files</div>
+                        <div style="font-size: 0.6875rem; color: var(--color-muted); margin-top: 2px;">PDF, PNG, JPG, DOCX up to 20MB</div>
+                    </div>
+
+                    {{-- Selected Files List --}}
+                    <div x-show="submitApprovalFiles.length > 0" style="margin-top: var(--space-2); display: flex; flex-direction: column; gap: 4px;">
+                        <template x-for="(file, idx) in submitApprovalFiles" :key="idx">
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 0.75rem;">
+                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 340px;" x-text="file.name"></span>
+                                <button type="button" @click.stop="submitApprovalFiles.splice(idx, 1)" style="color: var(--color-danger); background: none; border: none; cursor: pointer; font-size: 0.875rem;">&times;</button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn btn-secondary" @click="submitApprovalModalOpen = false" :disabled="submitApprovalSubmitting">Cancel</button>
+                <button type="button" class="btn btn-primary" @click="submitTaskApproval()" :disabled="submitApprovalSubmitting" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <span x-show="submitApprovalSubmitting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span x-text="submitApprovalSubmitting ? 'Submitting...' : 'Submit Approval Request'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     {{-- ================================================================= --}}
     {{-- MODAL: SINGLE REQUEST DETAILS & REMINDER INSPECTION               --}}
@@ -770,6 +1138,105 @@ function approvalListModule() {
         cooldowns: @json($cooldownsMap ?? []),
         actionsMap: @json($actionsMap ?? []),
         timerInterval: null,
+        activeTab: '{{ $initialTab ?? "my_requests" }}',
+        assignedTasksSearch: '',
+        assignedTasksStatusFilter: 'all',
+        setActiveTab(tab) {
+            this.activeTab = tab;
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tab);
+            window.history.replaceState({}, '', url);
+        },
+        submitApprovalModalOpen: false,
+        submitApprovalSubmitting: false,
+        submitApprovalTask: {},
+        submitApprovalNotes: '',
+        submitApprovalFiles: [],
+        openSubmitApprovalModal(taskData) {
+            this.submitApprovalTask = taskData;
+            this.submitApprovalNotes = '';
+            this.submitApprovalFiles = [];
+            this.submitApprovalModalOpen = true;
+        },
+        handleSubmitApprovalFiles(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+            for (const file of Array.from(files)) {
+                if (file.size <= 20 * 1024 * 1024) {
+                    this.submitApprovalFiles.push(file);
+                }
+            }
+            event.target.value = '';
+        },
+        async submitTaskApproval() {
+            if (!this.submitApprovalTask || !this.submitApprovalTask.subtaskId) return;
+            this.submitApprovalSubmitting = true;
+            const t = this.submitApprovalTask;
+            const url = `/projects/${t.projectId}/tasks/${t.taskId}/subtasks/${t.subtaskId}/toggle`;
+            const formData = new FormData();
+            formData.append('_method', 'PATCH');
+            formData.append('notes', this.submitApprovalNotes);
+            for (let i = 0; i < this.submitApprovalFiles.length; i++) {
+                formData.append('proof_files[]', this.submitApprovalFiles[i]);
+            }
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                });
+                const data = await res.json();
+                this.submitApprovalSubmitting = false;
+
+                if (res.ok && (data.success || data.pending_approval)) {
+                    this.submitApprovalModalOpen = false;
+                    const toastDetail = {
+                        type: 'success',
+                        title: 'Approval Request Submitted',
+                        message: data.message || 'Your task completion request has been submitted for review.',
+                        duration: 5000
+                    };
+                    if (window.showToast) {
+                        window.showToast(toastDetail);
+                    } else {
+                        window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
+                    }
+                    setTimeout(() => {
+                        window.location.href = "{{ route('approval-list.index') }}?tab=my_requests";
+                    }, 600);
+                } else {
+                    const toastDetail = {
+                        type: 'error',
+                        title: 'Submission Failed',
+                        message: data.message || 'Could not submit task completion request.',
+                        duration: 5000
+                    };
+                    if (window.showToast) {
+                        window.showToast(toastDetail);
+                    } else {
+                        window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
+                    }
+                }
+            } catch (err) {
+                this.submitApprovalSubmitting = false;
+                const toastDetail = {
+                    type: 'error',
+                    title: 'Network Error',
+                    message: 'A network error occurred while submitting.',
+                    duration: 5000
+                };
+                if (window.showToast) {
+                    window.showToast(toastDetail);
+                } else {
+                    window.dispatchEvent(new CustomEvent('show-toast', { detail: toastDetail }));
+                }
+            }
+        },
 
         init() {
             // Live countdown timer ticking every 1 second
