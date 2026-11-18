@@ -2077,7 +2077,7 @@
             {
                 id: 'kd-msg-welcome',
                 sender: 'assistant',
-                text: 'How can I help you today?',
+                text: 'Hi, I am **Kuya DEX**. Your personal AI buddy, I can help you about your inquiries about your projects and provide you answers to help you with your decision-making. Just send your question and I will try to answer that!',
                 time: 'Now'
             }
         ],
@@ -2151,7 +2151,7 @@
                 {
                     id: 'kd-msg-welcome-' + Date.now(),
                     sender: 'assistant',
-                    text: 'How can I help you today?',
+                    text: 'Hi, I am **Kuya DEX**. Your personal AI buddy, I can help you about your inquiries about your projects and provide you answers to help you with your decision-making. Just send your question and I will try to answer that!',
                     time: 'Now'
                 }
             ];
