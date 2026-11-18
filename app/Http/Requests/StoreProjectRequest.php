@@ -150,7 +150,7 @@ class StoreProjectRequest extends FormRequest
             'expenses.*.amount' => ['required_with:expenses.*.description', 'nullable', 'numeric', 'min:0.01', 'max:999999999.99'],
             'attachments' => ['nullable', 'array'],
             'attachments.*.file' => ['required', 'file', 'mimes:pdf,docx,doc,jpg,jpeg,png,webp', 'max:20480'],
-            'attachments.*.category' => ['required', 'string', 'in:project_document,project_transaction,invoice,project_notes,project_drawing'],
+            'attachments.*.category' => ['required', 'string', 'max:100'],
             'attachments.*.description' => ['nullable', 'string', 'max:255'],
         ];
     }

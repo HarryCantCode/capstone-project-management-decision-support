@@ -841,6 +841,42 @@ class ReportService
         $statusFilter = $filters['status'] ?? null;
         $scopeFilter = $filters['scope'] ?? 'active';
 
+        $startMonth = isset($filters['start_month']) && $filters['start_month'] !== '' ? (int) $filters['start_month'] : null;
+        $endMonth = isset($filters['end_month']) && $filters['end_month'] !== '' ? (int) $filters['end_month'] : null;
+        $startDate = $filters['start_date'] ?? null;
+        $endDate = $filters['end_date'] ?? null;
+        $monthRangeLabel = $filters['month_range_label'] ?? null;
+
+        if ($startMonth === null && ! empty($startDate) && strtotime($startDate)) {
+            $startMonth = (int) date('n', strtotime($startDate));
+        }
+        if ($endMonth === null && ! empty($endDate) && strtotime($endDate)) {
+            $endMonth = (int) date('n', strtotime($endDate));
+        }
+
+        if ($startMonth !== null) {
+            $startMonth = max(1, min(12, $startMonth));
+        }
+        if ($endMonth !== null) {
+            $endMonth = max(1, min(12, $endMonth));
+            if ($startMonth !== null && $endMonth < $startMonth) {
+                $endMonth = $startMonth;
+            }
+        }
+
+        $hasMonthRange = ($comparisonMode === 'monthly') && ($startMonth !== null && $endMonth !== null) && ($startMonth > 1 || $endMonth < 12);
+
+        if ($hasMonthRange && empty($monthRangeLabel)) {
+            $monthShorts = [
+                1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr',
+                5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug',
+                9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec',
+            ];
+            $sDay = ! empty($startDate) && strlen($startDate) >= 10 ? substr($startDate, 8, 2) : '01';
+            $eDay = ! empty($endDate) && strlen($endDate) >= 10 ? substr($endDate, 8, 2) : '01';
+            $monthRangeLabel = sprintf('%s %s – %s %s', $monthShorts[$startMonth] ?? 'Jan', $sDay, $monthShorts[$endMonth] ?? 'Dec', $eDay);
+        }
+
         $query = Project::query()->with(['creator:id,name']);
 
         if ($scopeFilter === 'archived') {
@@ -855,12 +891,23 @@ class ReportService
 
         $allScopedProjects = $query->orderByDesc('start_date')->orderByDesc('created_at')->get();
 
-        // Filter projects for the selected year when in monthly mode (unless 'all' is selected)
-        $filteredProjects = $allScopedProjects->filter(function (Project $p) use ($comparisonMode, $yearFilter) {
-            if ($comparisonMode === 'monthly' && $yearFilter !== '' && $yearFilter !== 'all') {
+        // Filter projects for the selected year and month range when in monthly mode (unless 'all' is selected)
+        $filteredProjects = $allScopedProjects->filter(function (Project $p) use ($comparisonMode, $yearFilter, $hasMonthRange, $startMonth, $endMonth) {
+            if ($comparisonMode === 'monthly') {
                 $effDate = $p->start_date ?? $p->created_at;
 
-                return (int) $effDate->format('Y') === (int) $yearFilter;
+                if ($yearFilter !== '' && $yearFilter !== 'all') {
+                    if ((int) $effDate->format('Y') !== (int) $yearFilter) {
+                        return false;
+                    }
+                }
+
+                if ($hasMonthRange) {
+                    $m = (int) $effDate->format('n');
+                    if ($m < $startMonth || $m > $endMonth) {
+                        return false;
+                    }
+                }
             }
 
             return true;
@@ -916,6 +963,10 @@ class ReportService
                 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December',
             ];
 
+            if ($hasMonthRange) {
+                $months = array_filter($months, fn ($mNum) => $mNum >= $startMonth && $mNum <= $endMonth, ARRAY_FILTER_USE_KEY);
+            }
+
             $prevContract = null;
             foreach ($months as $mNum => $mName) {
                 $mProjects = $filteredProjects->filter(fn (Project $p) => (int) ($p->start_date ?? $p->created_at)->format('n') === $mNum);
@@ -944,9 +995,13 @@ class ReportService
 
         $maxPeriodValue = max(1.0, (float) collect($periodRows)->max('contract_price'));
 
+        $comparisonLabel = $comparisonMode === 'yearly'
+            ? 'Yearly Revenue Comparison'
+            : ('Monthly Revenue Comparison (' . ($yearFilter === 'all' ? 'All Years' : $yearFilter) . ($hasMonthRange ? ' · ' . $monthRangeLabel : '') . ')');
+
         $filterSummaryParts = [
             'Tax Basis: Revenue Displayed Without Taxes',
-            'Comparison Mode: ' . ($comparisonMode === 'yearly' ? 'Yearly Revenue Comparison' : 'Monthly Revenue Comparison (' . ($yearFilter === 'all' ? 'All Years' : $yearFilter) . ')'),
+            'Comparison Mode: ' . $comparisonLabel,
             'Project Status: ' . ($statusFilter ? ucfirst($statusFilter) : 'All Statuses'),
             'Repository Scope: ' . ucfirst($scopeFilter) . ' Projects',
         ];
@@ -961,6 +1016,12 @@ class ReportService
             'yearFilter' => $yearFilter,
             'statusFilter' => $statusFilter,
             'scopeFilter' => $scopeFilter,
+            'hasMonthRange' => $hasMonthRange,
+            'startMonth' => $startMonth,
+            'endMonth' => $endMonth,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'monthRangeLabel' => $monthRangeLabel,
             'filterSummary' => implode('  |  ', $filterSummaryParts),
             'projects' => $filteredProjects,
             'periodRows' => $periodRows,
@@ -987,7 +1048,10 @@ class ReportService
         $pdf = Pdf::loadView('reports.pdf.revenue', $data)
             ->setPaper('a4', 'portrait');
 
-        $modeSuffix = $data['comparisonMode'] === 'yearly' ? 'Yearly' : ('Monthly-' . $data['yearFilter']);
+        $rangeSuffix = ($data['hasMonthRange'] ?? false)
+            ? sprintf('-M%02dtoM%02d', $data['startMonth'], $data['endMonth'])
+            : '';
+        $modeSuffix = $data['comparisonMode'] === 'yearly' ? 'Yearly' : ('Monthly-' . $data['yearFilter'] . $rangeSuffix);
         $filename = sprintf('DEX-Revenue-Report-Without-Taxes-%s-%s.pdf', $modeSuffix, now()->format('Ymd'));
 
         if (($filters['disposition'] ?? 'download') === 'stream') {
@@ -1008,7 +1072,12 @@ class ReportService
         $periodRows = $data['periodRows'];
         $projects = $data['projects'];
         $summary = $data['summary'];
-        $filename = sprintf('DEX-Revenue-Report-Without-Taxes-%s.csv', now()->format('Ymd'));
+
+        $rangeSuffix = ($data['hasMonthRange'] ?? false)
+            ? sprintf('-M%02dtoM%02d', $data['startMonth'], $data['endMonth'])
+            : '';
+        $modeSuffix = $data['comparisonMode'] === 'yearly' ? 'Yearly' : ('Monthly-' . $data['yearFilter'] . $rangeSuffix);
+        $filename = sprintf('DEX-Revenue-Report-Without-Taxes-%s-%s.csv', $modeSuffix, now()->format('Ymd'));
 
         return response()->streamDownload(function () use ($periodRows, $projects, $summary, $data) {
             $handle = fopen('php://output', 'w');

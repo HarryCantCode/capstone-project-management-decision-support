@@ -29,6 +29,7 @@ test('admin and manager can access reports module index with real-time metrics',
         'contract_price' => 3500000.00,
         'actual_spend' => 1200000.00,
         'created_by' => $manager->id,
+        'updated_by' => $manager->id,
     ]);
 
     Resource::create([
@@ -41,6 +42,7 @@ test('admin and manager can access reports module index with real-time metrics',
         'unit_cost' => 195000.00,
         'demand_status' => 'fast-moving',
         'created_by' => $manager->id,
+        'updated_by' => $manager->id,
     ]);
 
     Personnel::create([
@@ -51,6 +53,7 @@ test('admin and manager can access reports module index with real-time metrics',
         'address' => '100 Ayala Ave, Makati',
         'expertise' => Personnel::EXPERTISE_SITE_ENGINEER,
         'created_by' => $manager->id,
+        'updated_by' => $manager->id,
     ]);
 
     $response = $this->actingAs($manager)->get(route('reports.index'));
@@ -70,7 +73,7 @@ test('inventory staff is forbidden from accessing reports module', function () {
 });
 
 test('project pdf export succeeds with overview, financials, elevator specs, expenditures, and manpower', function () {
-    $admin = User::factory()->create(['two_factor_confirmed_at' => null]);
+    $admin = User::factory()->create();
     $admin->assignRole('Manager');
 
     $project = Project::factory()->create([
@@ -132,6 +135,7 @@ test('project pdf export does not error on a project with no expenditures or man
         'contract_price' => 1500000.00,
         'actual_spend' => 0.00,
         'created_by' => $manager->id,
+        'updated_by' => $manager->id,
     ]);
 
     $response = $this->actingAs($manager)->get(route('reports.project.pdf', $emptyProject));
@@ -154,6 +158,7 @@ test('materials list can be exported by selected materials or filtered by fast-m
         'unit_cost' => 8500.00,
         'demand_status' => 'fast-moving',
         'created_by' => $manager->id,
+        'updated_by' => $manager->id,
     ]);
 
     $slowItem = Resource::create([
@@ -166,6 +171,7 @@ test('materials list can be exported by selected materials or filtered by fast-m
         'unit_cost' => 70000.00,
         'demand_status' => 'slow-moving',
         'created_by' => $manager->id,
+        'updated_by' => $manager->id,
     ]);
 
     // 1. Export filtered by fast-moving (PDF)
@@ -198,6 +204,7 @@ test('manpower list can be exported by selected personnel or expertise filter wi
         'project_code' => 'DEX-2026-055',
         'status' => 'completed',
         'created_by' => $manager->id,
+        'updated_by' => $manager->id,
     ]);
 
     $engineer = Personnel::create([
@@ -208,6 +215,7 @@ test('manpower list can be exported by selected personnel or expertise filter wi
         'address' => 'Taguig City',
         'expertise' => Personnel::EXPERTISE_SITE_ENGINEER,
         'created_by' => $manager->id,
+        'updated_by' => $manager->id,
     ]);
 
     ProjectPersonnelHistory::create([
@@ -257,6 +265,7 @@ test('revenue data can be exported as pdf and csv without taxes for monthly and 
         'actual_spend' => 2000000.00,
         'start_date' => now()->toDateString(),
         'created_by' => $manager->id,
+        'updated_by' => $manager->id,
     ]);
 
     // 1. Monthly Revenue PDF Export
@@ -282,4 +291,68 @@ test('revenue data can be exported as pdf and csv without taxes for monthly and 
         ->and($csvContent)->toContain('5000000.00')
         ->and($csvContent)->toContain('2000000.00')
         ->and($csvContent)->toContain('3000000.00');
+});
+
+test('revenue data can be exported with month range filter for monthly comparison', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole('Manager');
+
+    $year = now()->year;
+
+    // Project in May (Month 5 - inside range Jan 01 - Jun 01)
+    Project::factory()->create([
+        'name' => 'Spring Plaza Elevator',
+        'project_code' => 'DEX-2026-M05',
+        'status' => 'ongoing',
+        'contract_price' => 3000000.00,
+        'actual_spend' => 1000000.00,
+        'start_date' => sprintf('%04d-05-15', $year),
+        'created_by' => $manager->id,
+        'updated_by' => $manager->id,
+    ]);
+
+    // Project in October (Month 10 - outside range Jan 01 - Jun 01)
+    Project::factory()->create([
+        'name' => 'Autumn Heights Lift',
+        'project_code' => 'DEX-2026-M10',
+        'status' => 'ongoing',
+        'contract_price' => 4000000.00,
+        'actual_spend' => 2000000.00,
+        'start_date' => sprintf('%04d-10-20', $year),
+        'created_by' => $manager->id,
+        'updated_by' => $manager->id,
+    ]);
+
+    // 1. Export PDF with month range (Jan 01 - Jun 01)
+    $pdfResponse = $this->actingAs($manager)->post(route('reports.revenue.export'), [
+        'comparison_mode' => 'monthly',
+        'year' => (string) $year,
+        'start_month' => 1,
+        'end_month' => 6,
+        'start_date' => sprintf('%04d-01-01', $year),
+        'end_date' => sprintf('%04d-06-01', $year),
+        'month_range_label' => 'Jan 01 – Jun 01',
+        'scope' => 'active',
+        'format' => 'pdf',
+    ]);
+    $pdfResponse->assertStatus(200);
+    expect($pdfResponse->headers->get('content-type'))->toContain('application/pdf');
+
+    // 2. Export CSV with month range and verify only Month 5 project is included
+    $csvResponse = $this->actingAs($manager)->post(route('reports.revenue.export'), [
+        'comparison_mode' => 'monthly',
+        'year' => (string) $year,
+        'start_month' => 1,
+        'end_month' => 6,
+        'start_date' => sprintf('%04d-01-01', $year),
+        'end_date' => sprintf('%04d-06-01', $year),
+        'month_range_label' => 'Jan 01 – Jun 01',
+        'scope' => 'active',
+        'format' => 'csv',
+    ]);
+    $csvResponse->assertStatus(200);
+    $csvContent = $csvResponse->streamedContent();
+    expect($csvContent)->toContain('Jan 01')
+        ->and($csvContent)->toContain('DEX-2026-M05')
+        ->and($csvContent)->not->toContain('DEX-2026-M10');
 });

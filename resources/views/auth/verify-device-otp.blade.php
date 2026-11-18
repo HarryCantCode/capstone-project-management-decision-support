@@ -24,7 +24,7 @@
         <div class="auth-header-group">
             <h1 class="auth-heading">Device Verification</h1>
             <p class="auth-subheading">
-                We sent a 6-digit one-time code to <strong class="text-white">{{ $emailMasked }}</strong> to verify this device.
+                We sent a 6-digit one-time code to <strong style="color: var(--color-ink);">{{ $emailMasked }}</strong> to verify this device.
             </p>
         </div>
 
@@ -79,12 +79,12 @@
             </button>
         </form>
 
-        <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-secondary border-opacity-25">
-            <form method="POST" action="{{ route('auth.device-verification.resend') }}">
+        <div class="d-flex justify-content-between align-items-center mt-3 pt-3" style="border-top: 1px solid var(--color-border);">
+            <form method="POST" action="{{ route('auth.device-verification.resend') }}" style="margin: 0;">
                 @csrf
                 <button
                     type="submit"
-                    class="btn btn-link text-decoration-none p-0 text-muted small"
+                    class="auth-action-link"
                     :disabled="cooldown > 0"
                 >
                     <span x-show="cooldown <= 0">Didn't receive code? Resend</span>
@@ -94,7 +94,7 @@
                 </button>
             </form>
 
-            <a href="{{ route('login') }}" class="btn btn-link text-decoration-none p-0 text-muted small">
+            <a href="{{ route('login') }}" class="auth-action-link">
                 Back to Sign in
             </a>
         </div>

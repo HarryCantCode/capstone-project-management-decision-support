@@ -11,47 +11,6 @@
             <h1>Staff Request Approvals</h1>
             <p class="page-header__description">Review, filter, and process timeline task completions, expense entries, and file uploads submitted by staff.</p>
         </div>
-        <div class="page-actions">
-            {{-- View Mode Switcher: Request Approvals List vs View from Staff List --}}
-            <div class="switch-pill-container" role="tablist" aria-label="Staff requests view mode">
-                <button
-                    type="button"
-                    role="tab"
-                    :aria-selected="viewMode === 'list'"
-                    class="switch-pill-btn"
-                    :class="{ 'switch-pill-btn--active': viewMode === 'list' }"
-                    @click="switchView('list')"
-                    style="gap: 6px;"
-                >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width: 14px; height: 14px; flex-shrink: 0;">
-                        <line x1="8" y1="6" x2="21" y2="6"></line>
-                        <line x1="8" y1="12" x2="21" y2="12"></line>
-                        <line x1="8" y1="18" x2="21" y2="18"></line>
-                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                    </svg>
-                    <span>Request Approvals ({{ $totalCount }})</span>
-                </button>
-                <button
-                    type="button"
-                    role="tab"
-                    :aria-selected="viewMode === 'staff'"
-                    class="switch-pill-btn"
-                    :class="{ 'switch-pill-btn--active': viewMode === 'staff' }"
-                    @click="switchView('staff')"
-                    style="gap: 6px;"
-                >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width: 14px; height: 14px; flex-shrink: 0;">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                    <span>View from Staff List ({{ $staffMembers->count() }})</span>
-                </button>
-            </div>
-        </div>
     </div>
 
     {{-- Summary KPI Cards (4-Column Grid matching Dashboard & Costing) --}}
@@ -206,6 +165,54 @@
                     {{ $totalCount > 0 ? round(($rejectedCount / $totalCount) * 100) : 0 }}% Rate
                 </span>
             </div>
+        </div>
+    </div>
+
+    {{-- ─── Tab View Switcher (Request Approvals vs. View from Staff List) ──────── --}}
+    <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: var(--space-4);">
+        <div class="switch-pill-container" role="tablist" aria-label="Staff requests view mode">
+            <button
+                type="button"
+                role="tab"
+                :aria-selected="(viewMode === 'list').toString()"
+                class="switch-pill-btn"
+                :class="{ 'switch-pill-btn--active': viewMode === 'list' }"
+                @click="switchView('list')"
+                style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.8125rem;"
+            >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width: 15px; height: 15px; flex-shrink: 0;">
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+                <span>Request Approvals</span>
+                <span class="badge font-mono" style="font-size: 0.6875rem; padding: 2px 7px; border-radius: 9999px;" :style="viewMode === 'list' ? 'background: rgba(255,255,255,0.25); color: #fff;' : 'background: rgba(44, 95, 124, 0.12); color: var(--color-accent);'">
+                    {{ $totalCount }}
+                </span>
+            </button>
+            <button
+                type="button"
+                role="tab"
+                :aria-selected="(viewMode === 'staff').toString()"
+                class="switch-pill-btn"
+                :class="{ 'switch-pill-btn--active': viewMode === 'staff' }"
+                @click="switchView('staff')"
+                style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.8125rem;"
+            >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width: 15px; height: 15px; flex-shrink: 0;">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>View from Staff List</span>
+                <span class="badge font-mono" style="font-size: 0.6875rem; padding: 2px 7px; border-radius: 9999px;" :style="viewMode === 'staff' ? 'background: rgba(255,255,255,0.25); color: #fff;' : 'background: rgba(44, 95, 124, 0.12); color: var(--color-accent);'">
+                    {{ $staffMembers->count() }}
+                </span>
+            </button>
         </div>
     </div>
 
@@ -493,27 +500,20 @@
                                                     class="btn btn-primary btn-sm"
                                                     @click="openActionModal({{ $action->id }})"
                                                     :disabled="processingActionId === {{ $action->id }}"
-                                                    title="Review and approve this staff request"
+                                                    title="Review staff action and make verdict"
                                                 >
-                                                    Approve
+                                                    Verdict
                                                 </button>
+                                            @else
                                                 <button
                                                     type="button"
-                                                    class="btn btn-danger btn-sm"
+                                                    class="btn btn-secondary btn-sm"
                                                     @click="openActionModal({{ $action->id }})"
-                                                    :disabled="processingActionId === {{ $action->id }}"
-                                                    title="Reject or add reviewer notes"
+                                                    title="Review decision details"
                                                 >
-                                                    Reject
+                                                    Review
                                                 </button>
                                             @endif
-                                            <button
-                                                type="button"
-                                                class="btn btn-secondary btn-sm"
-                                                @click="openActionModal({{ $action->id }})"
-                                            >
-                                                Review
-                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -815,27 +815,21 @@
                                                         class="btn btn-primary btn-sm"
                                                         @click="openActionModal(req.id)"
                                                         :disabled="processingActionId === req.id"
+                                                        title="Review staff action and make verdict"
                                                     >
-                                                        Approve
+                                                        Verdict
                                                     </button>
                                                 </template>
-                                                <template x-if="req.status === 'pending'">
+                                                <template x-if="req.status !== 'pending'">
                                                     <button
                                                         type="button"
-                                                        class="btn btn-danger btn-sm"
+                                                        class="btn btn-secondary btn-sm"
                                                         @click="openActionModal(req.id)"
-                                                        :disabled="processingActionId === req.id"
+                                                        title="View review details"
                                                     >
-                                                        Reject
+                                                        Review
                                                     </button>
                                                 </template>
-                                                <button
-                                                    type="button"
-                                                    class="btn btn-secondary btn-sm"
-                                                    @click="openActionModal(req.id)"
-                                                >
-                                                    Review
-                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -1043,14 +1037,33 @@
                             <template x-if="selectedAction.status === 'pending'">
                                 <div>
                                     <div class="form-group" style="margin-bottom: var(--space-3);">
-                                        <label for="reviewer-notes-input" class="form-label" style="font-size: 0.8125rem;">Reviewer Notes (Optional)</label>
+                                        <label 
+                                            for="reviewer-notes-input" 
+                                            class="form-label" 
+                                            style="font-size: 0.8125rem; font-weight: 600; display: inline-block; transition: all 0.2s ease;"
+                                            :style="reviewNotesError ? 'color: var(--color-danger); text-decoration: underline; text-decoration-color: var(--color-danger); text-decoration-thickness: 2px; text-underline-offset: 4px;' : ''"
+                                        >
+                                            Reason for the verdict <span style="color: var(--color-danger);" aria-hidden="true">*</span>
+                                        </label>
                                         <input
                                             type="text"
                                             id="reviewer-notes-input"
+                                            x-ref="reviewerNotesInput"
                                             x-model="reviewNotes"
+                                            @input="if (reviewNotes.trim()) reviewNotesError = false"
                                             class="form-control form-control--compact"
-                                            placeholder="Add an optional note or reason for the staff member..."
+                                            :style="reviewNotesError ? 'border-color: var(--color-danger); box-shadow: 0 0 0 1px var(--color-danger);' : ''"
+                                            placeholder="Enter the reason for the verdict..."
+                                            autocomplete="off"
+                                            required
                                         >
+                                        <div 
+                                            x-show="reviewNotesError" 
+                                            x-cloak 
+                                            style="color: var(--color-danger); font-size: 0.75rem; margin-top: 4px; font-weight: 500;"
+                                        >
+                                            Please provide a reason for the verdict before proceeding.
+                                        </div>
                                     </div>
 
                                     <div style="background: var(--color-accent-light); border-left: 3px solid var(--color-accent); padding: var(--space-3); border-radius: 0 var(--radius-md) var(--radius-md) 0; font-size: 0.8125rem;">
@@ -1132,6 +1145,7 @@ function staffRequestsModule() {
         actionModalOpen: false,
         selectedAction: null,
         reviewNotes: '',
+        reviewNotesError: false,
         processingActionId: null,
 
         switchView(mode) {
@@ -1194,6 +1208,7 @@ function staffRequestsModule() {
         },
 
         openActionModal(actionId) {
+            this.reviewNotesError = false;
             const actionData = this.actionsMap[actionId];
             if (actionData) {
                 this.selectedAction = actionData;
@@ -1220,6 +1235,7 @@ function staffRequestsModule() {
 
         closeActionModal() {
             this.actionModalOpen = false;
+            this.reviewNotesError = false;
         },
 
         quickProcessAction(actionId, decision) {
@@ -1228,6 +1244,17 @@ function staffRequestsModule() {
 
         submitDecision(actionId, decision) {
             if (this.processingActionId) return;
+
+            if (!this.reviewNotes || this.reviewNotes.trim() === '') {
+                this.reviewNotesError = true;
+                this.$nextTick(() => {
+                    const inputEl = document.getElementById('reviewer-notes-input');
+                    if (inputEl) inputEl.focus();
+                });
+                return;
+            }
+            this.reviewNotesError = false;
+
             this.processingActionId = actionId;
 
             fetch(`/pending-actions/${actionId}/${decision}`, {

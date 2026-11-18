@@ -32,6 +32,11 @@ class ProjectFile extends Model
     public const TYPE_PROJECT_INVOICE = 'invoice';
     public const TYPE_PROJECT_NOTES = 'project_notes';
     public const TYPE_PROJECT_DRAWING = 'project_drawing';
+    public const TYPE_PERMIT_TO_INSTALL = 'permit_to_install';
+    public const TYPE_PERMIT_TO_OPERATE = 'permit_to_operate';
+    public const TYPE_PEZA_PERMIT = 'peza_permit';
+    public const TYPE_MECHANICAL_PERMIT = 'mechanical_permit';
+    public const TYPE_OTHERS = 'others';
     public const TYPE_TASK_ATTACHMENT = 'task_attachment';
     public const TYPE_GENERAL = 'general';
 
@@ -41,6 +46,11 @@ class ProjectFile extends Model
         self::TYPE_PROJECT_INVOICE => 'Project invoice',
         self::TYPE_PROJECT_NOTES => 'Project notes',
         self::TYPE_PROJECT_DRAWING => 'Project drawing / blueprint',
+        self::TYPE_PERMIT_TO_INSTALL => 'PTI: Permit to Install',
+        self::TYPE_PERMIT_TO_OPERATE => 'PTO: Permit to Operate',
+        self::TYPE_PEZA_PERMIT => 'PEZA Permit',
+        self::TYPE_MECHANICAL_PERMIT => 'Mechanical Permit',
+        self::TYPE_OTHERS => 'Others',
     ];
 
     public const CATEGORY_LABELS = [
@@ -50,6 +60,11 @@ class ProjectFile extends Model
         'project_invoice' => 'Project invoice',
         self::TYPE_PROJECT_NOTES => 'Project notes',
         self::TYPE_PROJECT_DRAWING => 'Project drawing / blueprint',
+        self::TYPE_PERMIT_TO_INSTALL => 'PTI: Permit to Install',
+        self::TYPE_PERMIT_TO_OPERATE => 'PTO: Permit to Operate',
+        self::TYPE_PEZA_PERMIT => 'PEZA Permit',
+        self::TYPE_MECHANICAL_PERMIT => 'Mechanical Permit',
+        self::TYPE_OTHERS => 'Others',
         self::TYPE_TASK_ATTACHMENT => 'Task Attachment',
         self::TYPE_GENERAL => 'Project document',
     ];

@@ -1468,8 +1468,11 @@ input::-ms-clear {
     text-decoration: underline;
 }
 
-.auth-forgot-link {
+.auth-forgot-link,
+.auth-action-link,
+.btn-link {
     background: transparent !important;
+    background-color: transparent !important;
     border: none !important;
     padding: 0 !important;
     margin: 0 !important;
@@ -1479,20 +1482,48 @@ input::-ms-clear {
     color: var(--color-muted);
     cursor: pointer;
     text-decoration: none;
-    transition: color var(--transition-fast);
+    box-shadow: none !important;
+    transform: none !important;
+    transition: color var(--transition-fast), opacity var(--transition-fast);
 }
 
-.auth-forgot-link:hover {
+.auth-forgot-link:hover,
+.auth-action-link:hover:not(:disabled),
+.btn-link:hover:not(:disabled) {
     color: var(--color-accent);
     text-decoration: underline;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
 }
 
-[data-theme="dark"] .auth-forgot-link {
+.auth-action-link:disabled,
+.btn-link:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    text-decoration: none !important;
+}
+
+.text-warning {
+    color: #d97706;
+}
+
+[data-theme="dark"] .auth-forgot-link,
+[data-theme="dark"] .auth-action-link,
+[data-theme="dark"] .btn-link {
     color: #94A3B8;
 }
 
-[data-theme="dark"] .auth-forgot-link:hover {
+[data-theme="dark"] .auth-forgot-link:hover,
+[data-theme="dark"] .auth-action-link:hover:not(:disabled),
+[data-theme="dark"] .btn-link:hover:not(:disabled) {
     color: #38BDF8;
+}
+
+[data-theme="dark"] .text-warning,
+[data-theme="dark"] .auth-action-link .text-warning,
+[data-theme="dark"] .btn-link .text-warning {
+    color: #FBBF24 !important;
 }
 
 /* ─── Responsive adjustments ─── */

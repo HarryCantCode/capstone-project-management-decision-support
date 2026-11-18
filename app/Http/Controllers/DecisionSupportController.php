@@ -6,10 +6,12 @@ use App\Models\Personnel;
 use App\Models\Project;
 use App\Models\Resource;
 use App\Services\DecisionSupport\DecisionSupportService;
+use App\Services\DecisionSupport\KuyaDexChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -113,7 +115,7 @@ class DecisionSupportController extends Controller implements HasMiddleware
         })->values();
 
         $expertiseOptions = Personnel::EXPERTISE_OPTIONS;
-        $initialTab = in_array($request->query('tab'), ['simulator', 'allocation'], true)
+        $initialTab = in_array($request->query('tab'), ['simulator', 'allocation', 'kuya_dex'], true)
             ? $request->query('tab')
             : 'simulator';
 
@@ -128,6 +130,7 @@ class DecisionSupportController extends Controller implements HasMiddleware
             'resourcesForSim' => $resourcesForSim,
             'expertiseOptions' => $expertiseOptions,
             'initialTab' => $initialTab,
+            'kuyaDexConnected' => filled(config('services.gemini.api_key')),
         ]);
     }
 
@@ -262,5 +265,25 @@ class DecisionSupportController extends Controller implements HasMiddleware
                 'project_id' => $project->id,
             ])
             ->with('status', $msg);
+    }
+
+    /**
+     * Handle messaging inquiries to "Kuya DEX" (Personal AI Assistant).
+     * Passes only sanitized operational JSON data (Materials, Projects, Costing, Manpower)
+     * and enforces strict domain guardrails.
+     */
+    public function chat(Request $request, KuyaDexChatService $chatService): JsonResponse
+    {
+        $validated = $request->validate([
+            'message' => ['required', 'string', 'max:1000'],
+            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+        ]);
+
+        $response = $chatService->ask(
+            (string) $validated['message'],
+            isset($validated['project_id']) ? (int) $validated['project_id'] : null,
+        );
+
+        return response()->json($response);
     }
 }

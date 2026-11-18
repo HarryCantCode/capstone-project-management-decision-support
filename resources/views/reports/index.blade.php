@@ -40,6 +40,8 @@
             'progress' => $progress,
             'year' => (int) $effDate->format('Y'),
             'month' => (int) $effDate->format('n'),
+            'day' => (int) $effDate->format('j'),
+            'date_iso' => $effDate->format('Y-m-d'),
             'report_date' => $effDate->format('M j, Y'),
             'target_date' => $p->target_completion_date ? $p->target_completion_date->format('M j, Y') : 'Not set',
             'pdf_url' => route('reports.project.pdf', $p->id),
@@ -284,13 +286,142 @@
         revenueStatus: '',
         revenueScope: 'active',
 
+        // Month / Date Range State (for Monthly Comparison)
+        revenueStartMonth: 1,
+        revenueEndMonth: 12,
+        revenueStartDate: '{{ $currentYear }}-01-01',
+        revenueEndDate: '{{ $currentYear }}-12-31',
+        revenueMonthPickerOpen: false,
+        _firstPickedMonth: null,
+        _monthPickStep: 0,
+
+        monthsList: [
+            { num: 1, short: 'Jan', full: 'January' },
+            { num: 2, short: 'Feb', full: 'February' },
+            { num: 3, short: 'Mar', full: 'March' },
+            { num: 4, short: 'Apr', full: 'April' },
+            { num: 5, short: 'May', full: 'May' },
+            { num: 6, short: 'Jun', full: 'June' },
+            { num: 7, short: 'Jul', full: 'July' },
+            { num: 8, short: 'Aug', full: 'August' },
+            { num: 9, short: 'Sep', full: 'September' },
+            { num: 10, short: 'Oct', full: 'October' },
+            { num: 11, short: 'Nov', full: 'November' },
+            { num: 12, short: 'Dec', full: 'December' }
+        ],
+
+        get isRevenueMonthFiltered() {
+            return this.revenueStartMonth !== 1 || this.revenueEndMonth !== 12;
+        },
+
+        get revenueMonthRangeLabel() {
+            if (!this.isRevenueMonthFiltered) {
+                return 'Jan 01 - Dec 31';
+            }
+            const sName = this.monthsList.find(m => m.num === this.revenueStartMonth)?.short || 'Jan';
+            const eName = this.monthsList.find(m => m.num === this.revenueEndMonth)?.short || 'Dec';
+            const sDay = this.revenueStartDate && this.revenueStartDate.length >= 10 ? this.revenueStartDate.slice(8, 10) : '01';
+            const eDay = this.revenueEndDate && this.revenueEndDate.length >= 10 ? this.revenueEndDate.slice(8, 10) : '01';
+            return `${sName} ${sDay} - ${eName} ${eDay}`;
+        },
+
+        setRevenueMonthRange(startM, endM, startDay = '01', endDay = null) {
+            this.revenueStartMonth = Math.max(1, Math.min(12, parseInt(startM, 10)));
+            this.revenueEndMonth = Math.max(this.revenueStartMonth, Math.min(12, parseInt(endM, 10)));
+
+            const yr = this.revenueYear === 'all' ? (this.availableYears[0] || new Date().getFullYear()) : this.revenueYear;
+            const smStr = String(this.revenueStartMonth).padStart(2, '0');
+            const emStr = String(this.revenueEndMonth).padStart(2, '0');
+
+            if (!endDay) {
+                endDay = '01';
+            }
+            this.revenueStartDate = `${yr}-${smStr}-${String(startDay).padStart(2, '0')}`;
+            this.revenueEndDate = `${yr}-${emStr}-${String(endDay).padStart(2, '0')}`;
+            this.selectedChartBucket = null;
+        },
+
+        onRevenueYearChange() {
+            this.selectedChartBucket = null;
+            if (this.revenueYear !== 'all') {
+                const yr = this.revenueYear;
+                const sm = String(this.revenueStartMonth).padStart(2, '0');
+                const em = String(this.revenueEndMonth).padStart(2, '0');
+                const sd = this.revenueStartDate && this.revenueStartDate.length >= 10 ? this.revenueStartDate.slice(8, 10) : '01';
+                const ed = this.revenueEndDate && this.revenueEndDate.length >= 10 ? this.revenueEndDate.slice(8, 10) : '01';
+                this.revenueStartDate = `${yr}-${sm}-${sd}`;
+                this.revenueEndDate = `${yr}-${em}-${ed}`;
+            }
+        },
+
+        onDateInputChange() {
+            if (this.revenueYear !== 'all') {
+                const yr = this.revenueYear;
+                const minY = `${yr}-01-01`;
+                const maxY = `${yr}-12-31`;
+
+                if (this.revenueStartDate) {
+                    if (this.revenueStartDate.slice(0, 4) !== String(yr)) {
+                        const mPart = this.revenueStartDate.length >= 7 ? this.revenueStartDate.slice(5, 7) : '01';
+                        const dPart = this.revenueStartDate.length >= 10 ? this.revenueStartDate.slice(8, 10) : '01';
+                        this.revenueStartDate = `${yr}-${mPart}-${dPart}`;
+                    }
+                    if (this.revenueStartDate < minY) this.revenueStartDate = minY;
+                    if (this.revenueStartDate > maxY) this.revenueStartDate = maxY;
+                }
+
+                if (this.revenueEndDate) {
+                    if (this.revenueEndDate.slice(0, 4) !== String(yr)) {
+                        const mPart = this.revenueEndDate.length >= 7 ? this.revenueEndDate.slice(5, 7) : '12';
+                        const dPart = this.revenueEndDate.length >= 10 ? this.revenueEndDate.slice(8, 10) : '31';
+                        this.revenueEndDate = `${yr}-${mPart}-${dPart}`;
+                    }
+                    if (this.revenueEndDate < minY) this.revenueEndDate = minY;
+                    if (this.revenueEndDate > maxY) this.revenueEndDate = maxY;
+                }
+            }
+
+            if (this.revenueStartDate && this.revenueEndDate) {
+                if (this.revenueStartDate > this.revenueEndDate) {
+                    this.revenueEndDate = this.revenueStartDate;
+                }
+                const sMonth = parseInt(this.revenueStartDate.slice(5, 7), 10);
+                const eMonth = parseInt(this.revenueEndDate.slice(5, 7), 10);
+                if (sMonth >= 1 && sMonth <= 12) this.revenueStartMonth = sMonth;
+                if (eMonth >= 1 && eMonth <= 12) this.revenueEndMonth = eMonth;
+                this.selectedChartBucket = null;
+            }
+        },
+
+        onMonthGridClick(mNum) {
+            if (this._monthPickStep === 1) {
+                const start = Math.min(this._firstPickedMonth, mNum);
+                const end = Math.max(this._firstPickedMonth, mNum);
+                this.setRevenueMonthRange(start, end, '01', '01');
+                this._monthPickStep = 0;
+            } else {
+                this._firstPickedMonth = mNum;
+                this._monthPickStep = 1;
+                this.setRevenueMonthRange(mNum, mNum, '01', '01');
+            }
+        },
+
+        resetRevenueMonthRange() {
+            this._monthPickStep = 0;
+            this.setRevenueMonthRange(1, 12, '01', '31');
+        },
+
         get revenueFilteredProjects() {
             return this.projects.filter(p => {
                 if (this.revenueScope === 'active' && p.is_archived) return false;
                 if (this.revenueScope === 'archived' && !p.is_archived) return false;
                 if (this.revenueStatus && p.status !== this.revenueStatus) return false;
-                if (this.revenueMode === 'monthly' && this.revenueYear !== 'all') {
-                    if (Number(p.year) !== Number(this.revenueYear)) return false;
+                if (this.revenueMode === 'monthly') {
+                    if (this.revenueYear !== 'all' && Number(p.year) !== Number(this.revenueYear)) return false;
+                    if (this.isRevenueMonthFiltered) {
+                        const m = Number(p.month);
+                        if (m < this.revenueStartMonth || m > this.revenueEndMonth) return false;
+                    }
                 }
                 return true;
             });
@@ -325,22 +456,11 @@
                 });
             }
 
-            const monthNames = [
-                { num: 1, short: 'Jan', full: 'January' },
-                { num: 2, short: 'Feb', full: 'February' },
-                { num: 3, short: 'Mar', full: 'March' },
-                { num: 4, short: 'Apr', full: 'April' },
-                { num: 5, short: 'May', full: 'May' },
-                { num: 6, short: 'Jun', full: 'June' },
-                { num: 7, short: 'Jul', full: 'July' },
-                { num: 8, short: 'Aug', full: 'August' },
-                { num: 9, short: 'Sep', full: 'September' },
-                { num: 10, short: 'Oct', full: 'October' },
-                { num: 11, short: 'Nov', full: 'November' },
-                { num: 12, short: 'Dec', full: 'December' }
-            ];
+            const visibleMonths = this.monthsList.filter(m => {
+                return m.num >= this.revenueStartMonth && m.num <= this.revenueEndMonth;
+            });
 
-            return monthNames.map(m => {
+            return visibleMonths.map(m => {
                 const mItems = baseProjects.filter(p => {
                     if (this.revenueYear !== 'all' && Number(p.year) !== Number(this.revenueYear)) return false;
                     return Number(p.month) === m.num;
@@ -631,6 +751,119 @@
         }
         .reports-module .rev-bar--deficit {
             background: linear-gradient(180deg, #F87171 0%, #DC2626 100%);
+        }
+        .reports-module .reports-month-picker-trigger {
+            height: 36px;
+            padding: 0 0.75rem;
+            font-size: 0.8125rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--color-border);
+            background: var(--color-surface);
+            color: var(--color-ink);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .reports-module .reports-month-picker-trigger:hover {
+            border-color: var(--color-accent);
+            background: var(--color-surface-alt);
+        }
+        .reports-module .reports-month-picker-trigger--active {
+            border-color: var(--color-accent) !important;
+            background: rgba(44, 95, 124, 0.1) !important;
+            color: var(--color-accent) !important;
+        }
+        [data-theme="dark"] .reports-module .reports-month-picker-trigger--active,
+        .dark .reports-module .reports-month-picker-trigger--active {
+            background: rgba(84, 150, 186, 0.18) !important;
+            color: #79B5D6 !important;
+            border-color: #5496BA !important;
+        }
+        .reports-module .reports-month-popover {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            z-index: 1050;
+            width: 330px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.16), 0 4px 10px rgba(0, 0, 0, 0.08);
+            padding: 0.85rem;
+        }
+        [data-theme="dark"] .reports-module .reports-month-popover,
+        .dark .reports-module .reports-month-popover {
+            background: #151D2A;
+            border-color: #2A384C;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+        }
+        .reports-module .reports-preset-chip {
+            font-size: 0.7rem;
+            height: 24px;
+            padding: 0 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--color-border);
+            background: var(--color-surface-alt);
+            color: var(--color-ink);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            line-height: 1;
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+        .reports-module .reports-preset-chip:hover {
+            border-color: var(--color-accent);
+            color: var(--color-accent);
+        }
+        .reports-module .reports-preset-chip--active {
+            background: var(--color-accent) !important;
+            color: #FFFFFF !important;
+            border-color: var(--color-accent) !important;
+            font-weight: 700;
+        }
+        .reports-module .reports-month-grid-chip {
+            font-size: 0.72rem;
+            height: 26px;
+            padding: 0;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--color-border);
+            background: var(--color-surface-alt);
+            color: var(--color-muted);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+        .reports-module .reports-month-grid-chip:hover {
+            color: var(--color-ink);
+            border-color: var(--color-accent);
+        }
+        .reports-module .reports-month-grid-chip--in-range {
+            background: rgba(44, 95, 124, 0.12);
+            color: var(--color-ink);
+            font-weight: 600;
+            border-color: rgba(44, 95, 124, 0.35);
+        }
+        .reports-module .reports-month-grid-chip--edge {
+            background: var(--color-accent) !important;
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            border-color: var(--color-accent) !important;
+        }
+        .reports-module .reports-date-input {
+            width: 100% !important;
+            height: 30px !important;
+            font-size: 0.75rem !important;
+            padding: 0 0.5rem !important;
+            border-radius: var(--radius-sm) !important;
+            background: var(--color-surface-alt) !important;
+            color: var(--color-ink) !important;
+            border: 1px solid var(--color-border) !important;
         }
     </style>
 
@@ -1186,6 +1419,11 @@
                 @csrf
                 <input type="hidden" name="comparison_mode" :value="revenueMode">
                 <input type="hidden" name="year" :value="revenueYear">
+                <input type="hidden" name="start_month" :value="revenueStartMonth">
+                <input type="hidden" name="end_month" :value="revenueEndMonth">
+                <input type="hidden" name="start_date" :value="revenueStartDate">
+                <input type="hidden" name="end_date" :value="revenueEndDate">
+                <input type="hidden" name="month_range_label" :value="revenueMonthRangeLabel">
                 <input type="hidden" name="status" :value="revenueStatus">
                 <input type="hidden" name="scope" :value="revenueScope">
                 <input type="hidden" name="format" x-ref="revExportFormat" value="pdf">
@@ -1228,20 +1466,186 @@
                             Yearly Comparison
                         </button>
 
-                        {{-- Year Selector (Monthly Mode) --}}
+                        {{-- Year Selector & Month Range Calendar Picker (Monthly Mode) --}}
                         <template x-if="revenueMode === 'monthly'">
-                            <select
-                                id="revenue-year-filter"
-                                x-model="revenueYear"
-                                @change="selectedChartBucket = null"
-                                class="form-control form-control--compact filter-select reports-select"
-                                aria-label="Select year for monthly revenue comparison"
-                            >
-                                <template x-for="yr in availableYears" :key="'rev-yr-' + yr">
-                                    <option :value="String(yr)" x-text="`Year ${yr}`"></option>
-                                </template>
-                                <option value="all">All Years (Combined)</option>
-                            </select>
+                            <div style="display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                <select
+                                    id="revenue-year-filter"
+                                    x-model="revenueYear"
+                                    @change="onRevenueYearChange()"
+                                    class="form-control form-control--compact filter-select reports-select"
+                                    aria-label="Select year for monthly revenue comparison"
+                                >
+                                    <template x-for="yr in availableYears" :key="'rev-yr-' + yr">
+                                        <option :value="String(yr)" x-text="`Year ${yr}`"></option>
+                                    </template>
+                                    <option value="all">All Years (Combined)</option>
+                                </select>
+
+                                {{-- Calendar Range Picker Trigger Button & Popover --}}
+                                <div class="reports-month-picker-wrapper" style="position: relative;" @click.outside="revenueMonthPickerOpen = false">
+                                    <button
+                                        type="button"
+                                        class="btn reports-month-picker-trigger"
+                                        :class="isRevenueMonthFiltered ? 'reports-month-picker-trigger--active' : 'btn-secondary'"
+                                        @click="revenueMonthPickerOpen = !revenueMonthPickerOpen"
+                                        id="btn-revenue-month-range"
+                                        title="Choose a range of months of the year"
+                                        aria-haspopup="dialog"
+                                        :aria-expanded="revenueMonthPickerOpen ? 'true' : 'false'"
+                                    >
+                                        <svg style="width: 14px; height: 14px; color: var(--color-accent); flex-shrink: 0;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                            <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+                                        </svg>
+                                        <span class="font-mono" style="font-size: 0.8125rem; font-weight: 500;" x-text="`[${revenueMonthRangeLabel}]`"></span>
+                                        <svg style="width: 12px; height: 12px; opacity: 0.6; transition: transform 0.2s;" :style="revenueMonthPickerOpen ? 'transform: rotate(180deg)' : ''" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+
+                                    {{-- Popover Dropdown Panel --}}
+                                    <div
+                                        x-show="revenueMonthPickerOpen"
+                                        x-transition:enter="transition ease-out duration-150"
+                                        x-transition:enter-start="opacity-0 transform scale-95"
+                                        x-transition:enter-end="opacity-100 transform scale-100"
+                                        x-transition:leave="transition ease-in duration-100"
+                                        x-transition:leave-start="opacity-100 transform scale-100"
+                                        x-transition:leave-end="opacity-0 transform scale-95"
+                                        class="reports-month-popover"
+                                        x-cloak
+                                    >
+                                        {{-- Popover Header --}}
+                                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid var(--color-border); margin-bottom: 0.65rem;">
+                                            <div>
+                                                <strong style="color: var(--color-ink); font-size: 0.85rem; font-weight: 600;">Month Range Selector</strong>
+                                                <span class="text-muted" style="display: block; font-size: 0.72rem;" x-text="`Year: ${revenueYear === 'all' ? 'All Years' : revenueYear}`"></span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                class="btn btn-link btn-sm"
+                                                style="padding: 0; font-size: 0.75rem; text-decoration: none; color: var(--color-accent); font-weight: 500;"
+                                                @click="resetRevenueMonthRange()"
+                                            >
+                                                Reset (Full Year)
+                                            </button>
+                                        </div>
+
+                                        {{-- Quick Range Presets (Buttons) --}}
+                                        <div style="margin-bottom: 0.75rem;">
+                                            <span class="text-muted" style="display: block; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;">
+                                                Quick Range Presets
+                                            </span>
+                                            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm reports-preset-chip"
+                                                    :class="(revenueStartMonth === 1 && revenueEndMonth === 3) ? 'reports-preset-chip--active' : ''"
+                                                    @click="setRevenueMonthRange(1, 3, '01', '31')"
+                                                >
+                                                    Q1 (Jan–Mar)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm reports-preset-chip"
+                                                    :class="(revenueStartMonth === 4 && revenueEndMonth === 6) ? 'reports-preset-chip--active' : ''"
+                                                    @click="setRevenueMonthRange(4, 6, '01', '30')"
+                                                >
+                                                    Q2 (Apr–Jun)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm reports-preset-chip"
+                                                    :class="(revenueStartMonth === 7 && revenueEndMonth === 9) ? 'reports-preset-chip--active' : ''"
+                                                    @click="setRevenueMonthRange(7, 9, '01', '30')"
+                                                >
+                                                    Q3 (Jul–Sep)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm reports-preset-chip"
+                                                    :class="(revenueStartMonth === 10 && revenueEndMonth === 12) ? 'reports-preset-chip--active' : ''"
+                                                    @click="setRevenueMonthRange(10, 12, '01', '31')"
+                                                >
+                                                    Q4 (Oct–Dec)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm reports-preset-chip"
+                                                    :class="(!isRevenueMonthFiltered) ? 'reports-preset-chip--active' : ''"
+                                                    @click="resetRevenueMonthRange()"
+                                                >
+                                                    Full Year
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {{-- Interactive 12-Month Calendar Grid --}}
+                                        <div style="margin-bottom: 0.75rem;">
+                                            <span class="text-muted" style="display: block; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;">
+                                                Months in Range (Click to Select)
+                                            </span>
+                                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
+                                                <template x-for="m in monthsList" :key="'month-chip-' + m.num">
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm reports-month-grid-chip"
+                                                        :class="{
+                                                            'reports-month-grid-chip--in-range': m.num >= revenueStartMonth && m.num <= revenueEndMonth,
+                                                            'reports-month-grid-chip--edge': m.num === revenueStartMonth || m.num === revenueEndMonth
+                                                        }"
+                                                        @click="onMonthGridClick(m.num)"
+                                                        x-text="m.short"
+                                                    ></button>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        {{-- Custom Calendar Date Pickers --}}
+                                        <div style="border-top: 1px solid var(--color-border); padding-top: 0.65rem; margin-top: 0.5rem;">
+                                            <span class="text-muted" style="display: block; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;">
+                                                Exact Calendar Dates
+                                            </span>
+                                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                                <div>
+                                                    <label style="display: block; font-size: 0.6875rem; color: var(--color-muted); margin-bottom: 2px;">Start Date</label>
+                                                    <input
+                                                        type="date"
+                                                        class="form-control form-control--compact reports-date-input"
+                                                        x-model="revenueStartDate"
+                                                        :min="revenueYear === 'all' ? null : `${revenueYear}-01-01`"
+                                                        :max="revenueYear === 'all' ? null : `${revenueYear}-12-31`"
+                                                        @change="onDateInputChange()"
+                                                    >
+                                                </div>
+                                                <div>
+                                                    <label style="display: block; font-size: 0.6875rem; color: var(--color-muted); margin-bottom: 2px;">End Date</label>
+                                                    <input
+                                                        type="date"
+                                                        class="form-control form-control--compact reports-date-input"
+                                                        x-model="revenueEndDate"
+                                                        :min="revenueYear === 'all' ? null : `${revenueYear}-01-01`"
+                                                        :max="revenueYear === 'all' ? null : `${revenueYear}-12-31`"
+                                                        @change="onDateInputChange()"
+                                                    >
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {{-- Footer Apply Button --}}
+                                        <div style="display: flex; justify-content: flex-end; margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--color-border);">
+                                            <button
+                                                type="button"
+                                                class="btn btn-primary btn-sm reports-btn"
+                                                style="height: 30px; font-size: 0.75rem; padding: 0 0.85rem;"
+                                                @click="revenueMonthPickerOpen = false"
+                                            >
+                                                Apply Range
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </template>
 
                         {{-- Project Status Filter --}}
@@ -1357,7 +1761,7 @@
                     {{-- Chart Legend & Title Row --}}
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: var(--space-4);">
                         <div style="font-size: 0.8125rem; font-weight: 700; color: var(--color-ink);">
-                            <span x-text="revenueMode === 'yearly' ? 'Yearly Total Contract Value, Actual Spends & Total Revenue (Without Taxes)' : `Monthly Total Contract Value, Actual Spends & Total Revenue (${revenueYear === 'all' ? 'All Years' : revenueYear}) — Without Taxes`"></span>
+                            <span x-text="revenueMode === 'yearly' ? 'Yearly Total Contract Value, Actual Spends & Total Revenue (Without Taxes)' : `Monthly Total Contract Value, Actual Spends & Total Revenue (${revenueYear === 'all' ? 'All Years' : revenueYear}${isRevenueMonthFiltered ? ' · [' + revenueMonthRangeLabel + ']' : ''}) — Without Taxes`"></span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.75rem;">
                             <span style="display: inline-flex; align-items: center; gap: 6px;">
@@ -1398,7 +1802,7 @@
                             </div>
 
                             {{-- 3-Bar Groups per Period --}}
-                            <div class="rev-chart-bars-grid">
+                            <div class="rev-chart-bars-grid" :style="{ gridTemplateColumns: `repeat(${Math.max(1, revenueChartBuckets.length)}, minmax(0, 1fr))` }">
                                 <template x-for="bucket in revenueChartBuckets" :key="bucket.key">
                                     <div
                                         class="rev-chart-bucket"
@@ -1438,7 +1842,7 @@
                             </div>
 
                             {{-- X-Axis Labels (Year / Months) --}}
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 8px; height: 24px; align-items: center; padding-top: 4px;">
+                            <div :style="{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, revenueChartBuckets.length)}, minmax(0, 1fr))`, gap: '8px', height: '24px', alignItems: 'center', paddingTop: '4px' }">
                                 <template x-for="bucket in revenueChartBuckets" :key="'lbl-' + bucket.key">
                                     <div class="font-mono" style="text-align: center; font-size: 0.7rem; font-weight: 600; color: var(--color-muted);" x-text="bucket.shortLabel"></div>
                                 </template>

@@ -1225,7 +1225,12 @@
                     { key: 'project_transaction', label: 'Project transaction' },
                     { key: 'invoice', label: 'Project invoice' },
                     { key: 'project_notes', label: 'Project notes' },
-                    { key: 'project_drawing', label: 'Project drawing / blueprint' }
+                    { key: 'project_drawing', label: 'Project drawing / blueprint' },
+                    { key: 'permit_to_install', label: 'PTI: Permit to Install' },
+                    { key: 'permit_to_operate', label: 'PTO: Permit to Operate' },
+                    { key: 'peza_permit', label: 'PEZA Permit' },
+                    { key: 'mechanical_permit', label: 'Mechanical Permit' },
+                    { key: 'others', label: 'Others' }
                 ],
                 formatSize(bytes) {
                     if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
@@ -1253,7 +1258,8 @@
                             name: file.name,
                             size: file.size,
                             formattedSize: this.formatSize(file.size),
-                            category: this.defaultCategory,
+                            category: this.defaultCategory || 'project_document',
+                            customCategory: '',
                             description: ''
                         });
                     }
@@ -1291,7 +1297,11 @@
                         const catInput = document.createElement('input');
                         catInput.type = 'hidden';
                         catInput.name = `attachments[${idx}][category]`;
-                        catInput.value = att.category;
+                        let resolvedCategory = att.category || 'project_document';
+                        if (resolvedCategory === 'others') {
+                            resolvedCategory = (att.customCategory && att.customCategory.trim() !== '') ? att.customCategory.trim() : 'Others';
+                        }
+                        catInput.value = resolvedCategory;
                         container.appendChild(catInput);
 
                         const descInput = document.createElement('input');
@@ -1332,7 +1342,7 @@
             </div>
             <div class="card-body">
                 <p class="form-hint" style="margin-bottom: var(--space-3); margin-top: 0;">
-                    Attach files categorized into Project document, Project transaction, Project invoice, Project notes, or Project drawing / blueprint. Multiple files can be selected at once.
+                    Attach files categorized into Project document, Project transaction, Project invoice, Project notes, Project drawing / blueprint, Permits (PTI, PTO, PEZA, Mechanical), or custom categories. Multiple files can be selected at once.
                 </p>
 
                 {{-- Hidden input for file picker --}}
@@ -1356,8 +1366,9 @@
                     @dragleave.prevent="isDragging = false"
                     @drop.prevent="handleDrop($event)"
                     @click="$refs.batchFileInput.click()"
+                    style="cursor: pointer;"
                 >
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;">
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 6px 0;">
                         <svg style="width: 24px; height: 24px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="17 8 12 3 7 8"></polyline>
@@ -1369,38 +1380,24 @@
                         <span class="text-muted" style="font-size: 0.75rem;">
                             PDF, DOCX, DOC, JPG, PNG, WEBP (Max 20MB per file) · Multiple files supported
                         </span>
+                        <button type="button" class="btn btn-primary btn-sm" style="margin-top: 6px; pointer-events: none; padding: 6px 16px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                            <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            Select Files
+                        </button>
                     </div>
                 </div>
 
-                {{-- Category Setting & Toolbar with uniform 34px controls --}}
-                <div class="pms-toolbar">
-                    <span style="font-size: 0.8125rem; color: var(--color-ink); font-weight: 500;">
-                        Category for new files:
-                    </span>
-                    <select x-model="defaultCategory" class="pms-toolbar-select">
-                        <template x-for="cat in categories" :key="cat.key">
-                            <option :value="cat.key" x-text="cat.label"></option>
-                        </template>
-                    </select>
+                {{-- Toolbar with file count and Clear All when files are queued --}}
+                <div class="pms-toolbar" x-show="attachments.length > 0" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3);">
+                    <span class="text-muted" style="font-size: 0.75rem; font-weight: 600;" x-text="attachments.length + ' file(s) attached'"></span>
 
-                    <button type="button" @click="$refs.batchFileInput.click()" class="btn btn-secondary pms-toolbar-btn">
-                        <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                        Select Files
+                    <button type="button" @click="clearAll()" class="btn btn-secondary btn-sm pms-toolbar-btn" style="color: var(--color-danger); border-color: transparent; margin-left: auto;">
+                        Clear All
                     </button>
-
-                    <template x-if="attachments.length > 0">
-                        <button type="button" @click="clearAll()" class="btn btn-secondary pms-toolbar-btn" style="color: var(--color-danger); border-color: transparent;">
-                            Clear All
-                        </button>
-                    </template>
-
-                    <div style="margin-left: auto;" x-show="attachments.length > 0">
-                        <span class="text-muted" style="font-size: 0.75rem;" x-text="attachments.length + ' file(s) attached'"></span>
-                    </div>
                 </div>
 
                 {{-- Queued Files Cards List (Bounded to 240px max height to eliminate scroll hassle) --}}
@@ -1436,6 +1433,20 @@
                                         style="margin-bottom: 0;"
                                     >
                                 </div>
+                                {{-- Custom Category Input when "Others" is selected --}}
+                                <template x-if="att.category === 'others'">
+                                    <div style="margin-top: 6px;">
+                                        <input
+                                            type="text"
+                                            x-model="att.customCategory"
+                                            @input="syncInputs()"
+                                            class="form-control"
+                                            placeholder="Type your own category name (e.g. Fire Safety Certificate)..."
+                                            maxlength="100"
+                                            style="height: 34px; font-size: 0.8125rem; border-color: var(--color-primary); width: 100%;"
+                                        >
+                                    </div>
+                                </template>
                             </div>
                         </template>
                     </div>

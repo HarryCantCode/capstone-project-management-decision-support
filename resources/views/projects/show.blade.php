@@ -300,6 +300,9 @@
                             catMatch = (fileType === 'project_document' || fileType === 'general');
                         } else if (this.fileCategory === 'invoice') {
                             catMatch = (fileType === 'invoice' || fileType === 'project_invoice');
+                        } else if (this.fileCategory === 'others') {
+                            const standardTypes = ['project_document', 'general', 'project_transaction', 'invoice', 'project_invoice', 'project_notes', 'project_drawing', 'task_attachment', 'permit_to_install', 'permit_to_operate', 'peza_permit', 'mechanical_permit'];
+                            catMatch = (fileType === 'others' || !standardTypes.includes(fileType));
                         } else {
                             catMatch = (fileType === this.fileCategory);
                         }
@@ -319,7 +322,13 @@
                     $countInvFiles = $allProjectFiles->filter(fn($f) => in_array($f->file_type, ['invoice', 'project_invoice']))->count();
                     $countNotesFiles = $allProjectFiles->where('file_type', 'project_notes')->count();
                     $countDrawingFiles = $allProjectFiles->where('file_type', 'project_drawing')->count();
+                    $countPtiFiles = $allProjectFiles->where('file_type', 'permit_to_install')->count();
+                    $countPtoFiles = $allProjectFiles->where('file_type', 'permit_to_operate')->count();
+                    $countPezaFiles = $allProjectFiles->where('file_type', 'peza_permit')->count();
+                    $countMechFiles = $allProjectFiles->where('file_type', 'mechanical_permit')->count();
                     $countTaskFiles = $allProjectFiles->where('file_type', 'task_attachment')->count();
+                    $knownFileTypes = ['project_document', 'general', 'project_transaction', 'invoice', 'project_invoice', 'project_notes', 'project_drawing', 'task_attachment', 'permit_to_install', 'permit_to_operate', 'peza_permit', 'mechanical_permit'];
+                    $countOtherFiles = $allProjectFiles->filter(fn($f) => !in_array($f->file_type, $knownFileTypes) || $f->file_type === 'others')->count();
                 @endphp
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-4);">
                     <div style="display: flex; align-items: center; gap: var(--space-2);">
@@ -371,7 +380,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                             </svg>
                             <p style="margin: 0; font-size: 0.875rem; font-weight: 600;">No files uploaded yet.</p>
-                            <p class="form-hint" style="margin-top: 4px; font-size: 0.8125rem;">Supported categories: Project document, transaction, invoice, notes, and drawings / blueprints.</p>
+                            <p class="form-hint" style="margin-top: 4px; font-size: 0.8125rem;">Supported categories: Project document, transaction, invoice, notes, drawings / blueprints, and permits (PTI, PTO, PEZA, Mechanical).</p>
                         </div>
                     @else
                         {{-- Category Filter Navigation --}}
@@ -432,6 +441,53 @@
                                 >
                                     Project drawing / blueprint <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countDrawingFiles }})</span>
                                 </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="fileCategory === 'permit_to_install' ? 'btn-primary' : 'btn-secondary'"
+                                    @click="fileCategory = 'permit_to_install'"
+                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                >
+                                    PTI: Permit to Install <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countPtiFiles }})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="fileCategory === 'permit_to_operate' ? 'btn-primary' : 'btn-secondary'"
+                                    @click="fileCategory = 'permit_to_operate'"
+                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                >
+                                    PTO: Permit to Operate <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countPtoFiles }})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="fileCategory === 'peza_permit' ? 'btn-primary' : 'btn-secondary'"
+                                    @click="fileCategory = 'peza_permit'"
+                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                >
+                                    PEZA Permit <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countPezaFiles }})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    :class="fileCategory === 'mechanical_permit' ? 'btn-primary' : 'btn-secondary'"
+                                    @click="fileCategory = 'mechanical_permit'"
+                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                >
+                                    Mechanical Permit <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countMechFiles }})</span>
+                                </button>
+                                @if ($countOtherFiles > 0)
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm"
+                                        :class="fileCategory === 'others' ? 'btn-primary' : 'btn-secondary'"
+                                        @click="fileCategory = 'others'"
+                                        style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                    >
+                                        Others <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countOtherFiles }})</span>
+                                    </button>
+                                @endif
                                 @if ($countTaskFiles > 0)
                                     <button
                                         type="button"
@@ -514,6 +570,8 @@
                                                     📘
                                                 @elseif ($file->file_type === 'project_drawing')
                                                     📐
+                                                @elseif (in_array($file->file_type, ['permit_to_install', 'permit_to_operate', 'peza_permit', 'mechanical_permit']))
+                                                    📜
                                                 @else
                                                     📄
                                                 @endif
@@ -533,12 +591,22 @@
                                                 <span class="badge" style="background: rgba(139, 92, 246, 0.14); color: #7c3aed; font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">Project notes</span>
                                             @elseif ($file->file_type === 'project_drawing')
                                                 <span class="badge" style="background: rgba(6, 182, 212, 0.14); color: #0891b2; font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">Project drawing</span>
+                                            @elseif ($file->file_type === 'permit_to_install')
+                                                <span class="badge" style="background: rgba(99, 102, 241, 0.14); color: #6366f1; font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">PTI: Permit to Install</span>
+                                            @elseif ($file->file_type === 'permit_to_operate')
+                                                <span class="badge" style="background: rgba(16, 185, 129, 0.14); color: #10b981; font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">PTO: Permit to Operate</span>
+                                            @elseif ($file->file_type === 'peza_permit')
+                                                <span class="badge" style="background: rgba(236, 72, 153, 0.14); color: #ec4899; font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">PEZA Permit</span>
+                                            @elseif ($file->file_type === 'mechanical_permit')
+                                                <span class="badge" style="background: rgba(249, 115, 22, 0.14); color: #f97316; font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">Mechanical Permit</span>
                                             @elseif ($file->file_type === 'task_attachment' && $file->subtask)
                                                 <span class="badge" style="background: var(--color-surface-alt); font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--color-border); flex-shrink: 0;" title="Subtask: {{ $file->subtask->title }}">
                                                     Task #{{ $file->subtask->id }}
                                                 </span>
-                                            @else
+                                            @elseif (in_array($file->file_type, ['project_document', 'general']))
                                                 <span class="badge" style="background: rgba(44, 95, 124, 0.14); color: var(--color-accent); font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">Project document</span>
+                                            @else
+                                                <span class="badge" style="background: rgba(148, 163, 184, 0.16); color: var(--color-ink); font-size: 0.6875rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">{{ $file->category_label }}</span>
                                             @endif
                                         </div>
 
@@ -3023,7 +3091,7 @@
                                                     x-model="fileItem.category" 
                                                     @change="syncModalUploadInputs()"
                                                     class="form-control"
-                                                    style="padding: 4px 8px; font-size: 0.8125rem; height: 32px; width: 165px; border-radius: var(--radius-sm);"
+                                                    style="padding: 4px 8px; font-size: 0.8125rem; height: 32px; width: 175px; border-radius: var(--radius-sm);"
                                                     title="Select category for this file"
                                                 >
                                                     <option value="project_document">Project document</option>
@@ -3031,6 +3099,11 @@
                                                     <option value="invoice">Project invoice</option>
                                                     <option value="project_notes">Project notes</option>
                                                     <option value="project_drawing">Project drawing / blueprint</option>
+                                                    <option value="permit_to_install">PTI: Permit to Install</option>
+                                                    <option value="permit_to_operate">PTO: Permit to Operate</option>
+                                                    <option value="peza_permit">PEZA Permit</option>
+                                                    <option value="mechanical_permit">Mechanical Permit</option>
+                                                    <option value="others">Others</option>
                                                 </select>
                                                 <button
                                                     type="button"
@@ -3043,6 +3116,21 @@
                                                 </button>
                                             </div>
                                         </div>
+
+                                        {{-- Row 1.5: Custom Category Input when "Others" is selected --}}
+                                        <template x-if="fileItem.category === 'others'">
+                                            <div style="margin-top: 2px;">
+                                                <input 
+                                                    type="text" 
+                                                    x-model="fileItem.customCategory"
+                                                    @input="syncModalUploadInputs()"
+                                                    class="form-control"
+                                                    placeholder="Type your own category name (e.g. Fire Safety Certificate)..."
+                                                    maxlength="100"
+                                                    style="width: 100%; height: 34px; font-size: 0.8125rem; padding: 4px 10px; border-radius: var(--radius-sm); border-color: var(--color-primary);"
+                                                >
+                                            </div>
+                                        </template>
 
                                         {{-- Row 2: Optional notes (Enlarged, comfortable full-width input) --}}
                                         <div>
@@ -3123,7 +3211,7 @@
         <div class="reassign-modal-content card" x-show="viewFileModalOpen" x-transition style="max-width: 620px; width: 100%;">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: var(--space-2); min-width: 0;">
-                    <span x-text="activeFileData.is_img ? '🖼️' : (activeFileData.is_pdf ? '📕' : (activeFileData.is_word ? '📘' : (activeFileData.type === 'project_drawing' ? '📐' : '📄')))"></span>
+                    <span x-text="activeFileData.is_img ? '🖼️' : (activeFileData.is_pdf ? '📕' : (activeFileData.is_word ? '📘' : (activeFileData.type === 'project_drawing' ? '📐' : (['permit_to_install', 'permit_to_operate', 'peza_permit', 'mechanical_permit'].includes(activeFileData.type) ? '📜' : '📄'))))"></span>
                     <span style="font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="activeFileData.name"></span>
                 </div>
                 <button type="button" class="flash-close" @click="viewFileModalOpen = false" aria-label="Close modal">&times;</button>
@@ -4498,6 +4586,7 @@ function projectDetail() {
                         size: file.size,
                         formattedSize: (file.size >= 1048576) ? (file.size / 1048576).toFixed(2) + ' MB' : (file.size / 1024).toFixed(1) + ' KB',
                         category: this.uploadModalDefaultCategory,
+                        customCategory: '',
                         description: ''
                     });
                 }
@@ -4529,7 +4618,11 @@ function projectDetail() {
                 const cInput = document.createElement('input');
                 cInput.type = 'hidden';
                 cInput.name = `categories[${idx}]`;
-                cInput.value = item.category || this.uploadModalDefaultCategory;
+                let resolvedCat = item.category || this.uploadModalDefaultCategory;
+                if (resolvedCat === 'others') {
+                    resolvedCat = (item.customCategory && item.customCategory.trim() !== '') ? item.customCategory.trim() : 'Others';
+                }
+                cInput.value = resolvedCat;
                 container.appendChild(cInput);
 
                 const dInput = document.createElement('input');
@@ -4553,6 +4646,16 @@ function projectDetail() {
                         singleInput.files = dt.files;
                     } catch(e) {}
                     singleSlot.appendChild(singleInput);
+
+                    const singleCatInput = document.createElement('input');
+                    singleCatInput.type = 'hidden';
+                    singleCatInput.name = 'file_type';
+                    let singleCat = this.uploadModalFiles[0].category || this.uploadModalDefaultCategory;
+                    if (singleCat === 'others') {
+                        singleCat = (this.uploadModalFiles[0].customCategory && this.uploadModalFiles[0].customCategory.trim() !== '') ? this.uploadModalFiles[0].customCategory.trim() : 'Others';
+                    }
+                    singleCatInput.value = singleCat;
+                    singleSlot.appendChild(singleCatInput);
                 }
             }
         },

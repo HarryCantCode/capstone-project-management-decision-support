@@ -22,7 +22,19 @@ class ReviewStaffPendingActionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'notes' => ['nullable', 'string', 'max:255'],
+            'notes' => ['required', 'string', 'min:1', 'max:255'],
+        ];
+    }
+
+    /**
+     * Custom message for validation errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'notes.required' => 'The reason for the verdict is required.',
         ];
     }
 }

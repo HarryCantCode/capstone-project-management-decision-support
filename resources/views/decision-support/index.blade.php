@@ -2057,6 +2057,292 @@
             if (status === 'critical') return '#DC2626';
             if (status === 'warning') return '#D97706';
             return '#10B981';
+        },
+
+        /* ── Tab 3: Kuya DEX (Personal AI Assistant) Volatile Session State ── */
+        kuyaDexConnected: @js((bool) ($kuyaDexConnected ?? false)),
+        kuyaDexProjectId: {{ $selectedProject ? (int) $selectedProject->id : ($matrix[0]['id'] ?? 'null') }},
+        kuyaDexInput: '',
+        kuyaDexIsTyping: false,
+        kuyaDexPendingChoiceText: '',
+        kuyaDexQueue: [],
+        kuyaDexActiveRequestId: 0,
+        kuyaDexAbortController: null,
+        kuyaDexSamplePrompts: [
+            'Who are my available manpower?',
+            'How much is the total progress of my project x',
+            'How much is the total spend on this project'
+        ],
+        kuyaDexMessages: [
+            {
+                id: 'kd-msg-welcome',
+                sender: 'assistant',
+                text: 'How can I help you today?',
+                time: 'Now'
+            }
+        ],
+
+        scrollKuyaDexToBottom() {
+            this.$nextTick(() => {
+                const container = document.getElementById('kuya-dex-chat-scroll');
+                if (container) {
+                    container.scrollTo({
+                        top: container.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        },
+
+        formatKuyaDexMessage(rawText) {
+            if (!rawText) return '';
+            // 1. Escape HTML entities to prevent XSS
+            let safe = String(rawText)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+
+            // 2. Convert markdown headings (e.g. ### Title) to bold text
+            safe = safe.replace(/^#{1,6}\s+(.+)$/gm, '<strong>$1</strong>');
+
+            // 3. Convert **bold** and __bold__ to <strong>
+            safe = safe.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');
+            safe = safe.replace(/__([\s\S]+?)__/g, '<strong>$1</strong>');
+
+            // 4. Convert *italic* to <em>
+            safe = safe.replace(/(^|[^\*])\*([^\*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+
+            // 5. Convert `inline code` to <code class="font-mono">
+            safe = safe.replace(/`([^`\n]+)`/g, '<code class="font-mono">$1</code>');
+
+            // 6. Convert markdown bullet lines (* item or - item) to clean bullets
+            safe = safe.replace(/^\s*[\*\-]\s+/gm, '• ');
+
+            return safe;
+        },
+
+        selectKuyaDexSamplePrompt(sampleText) {
+            this.kuyaDexInput = String(sampleText || '');
+            this.$nextTick(() => {
+                const inputEl = document.getElementById('kuya-dex-message-input');
+                if (inputEl) {
+                    inputEl.focus();
+                    const len = inputEl.value.length;
+                    try {
+                        inputEl.setSelectionRange(len, len);
+                    } catch (e) {}
+                }
+            });
+        },
+
+        resetKuyaDexChat() {
+            if (this.kuyaDexAbortController) {
+                try { this.kuyaDexAbortController.abort(); } catch (e) {}
+                this.kuyaDexAbortController = null;
+            }
+            this.kuyaDexActiveRequestId++;
+            this.kuyaDexIsTyping = false;
+            this.kuyaDexInput = '';
+            this.kuyaDexPendingChoiceText = '';
+            this.kuyaDexQueue = [];
+            this.kuyaDexMessages = [
+                {
+                    id: 'kd-msg-welcome-' + Date.now(),
+                    sender: 'assistant',
+                    text: 'How can I help you today?',
+                    time: 'Now'
+                }
+            ];
+            this.scrollKuyaDexToBottom();
+        },
+
+        sendKuyaDexMessage(presetText = null) {
+            const rawText = presetText !== null ? String(presetText) : String(this.kuyaDexInput || '');
+            const text = rawText.trim();
+            if (!text) return;
+
+            if (presetText === null) {
+                this.kuyaDexInput = '';
+            }
+
+            // If Kuya DEX is currently typing, let the user choose between "Send It Now" or "Queue It Up"
+            if (this.kuyaDexIsTyping) {
+                this.kuyaDexPendingChoiceText = text;
+                this.scrollKuyaDexToBottom();
+                return;
+            }
+
+            this.executeKuyaDexInquiry(text);
+        },
+
+        sendKuyaDexPendingNow() {
+            const text = String(this.kuyaDexPendingChoiceText || '').trim();
+            if (!text) return;
+            this.kuyaDexPendingChoiceText = '';
+
+            // Abort any previous in-flight request so Kuya DEX answers the new inquiry immediately
+            if (this.kuyaDexAbortController) {
+                try { this.kuyaDexAbortController.abort(); } catch (e) {}
+                this.kuyaDexAbortController = null;
+            }
+
+            this.executeKuyaDexInquiry(text);
+        },
+
+        queueKuyaDexPendingMessage() {
+            const text = String(this.kuyaDexPendingChoiceText || '').trim();
+            if (!text) return;
+            this.kuyaDexPendingChoiceText = '';
+
+            this.kuyaDexQueue.push({
+                id: 'kd-queue-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                text: text,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            this.scrollKuyaDexToBottom();
+        },
+
+        cancelKuyaDexPendingChoice() {
+            if (!this.kuyaDexInput && this.kuyaDexPendingChoiceText) {
+                this.kuyaDexInput = this.kuyaDexPendingChoiceText;
+            }
+            this.kuyaDexPendingChoiceText = '';
+        },
+
+        promoteQueuedMessageNow(qIdx) {
+            if (qIdx < 0 || qIdx >= this.kuyaDexQueue.length) return;
+            const [item] = this.kuyaDexQueue.splice(qIdx, 1);
+            if (!item || !item.text) return;
+
+            if (this.kuyaDexAbortController) {
+                try { this.kuyaDexAbortController.abort(); } catch (e) {}
+                this.kuyaDexAbortController = null;
+            }
+
+            this.executeKuyaDexInquiry(item.text);
+        },
+
+        removeQueuedMessage(qIdx) {
+            if (qIdx < 0 || qIdx >= this.kuyaDexQueue.length) return;
+            this.kuyaDexQueue.splice(qIdx, 1);
+        },
+
+        processNextKuyaDexQueue() {
+            if (this.kuyaDexIsTyping || this.kuyaDexQueue.length === 0) return;
+            const nextItem = this.kuyaDexQueue.shift();
+            if (nextItem && nextItem.text) {
+                this.executeKuyaDexInquiry(nextItem.text);
+            }
+        },
+
+        async executeKuyaDexInquiry(text) {
+            const cleanText = String(text || '').trim();
+            if (!cleanText) return;
+
+            const requestId = ++this.kuyaDexActiveRequestId;
+            const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            this.kuyaDexMessages.push({
+                id: 'kd-user-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                sender: 'user',
+                text: cleanText,
+                time: nowTime
+            });
+
+            // Show the 3-dot typing indicator animation
+            this.kuyaDexIsTyping = true;
+            this.scrollKuyaDexToBottom();
+
+            // If not yet connected to Gemini API in .env, keep the 3-dot typing indicator active
+            if (!this.kuyaDexConnected) {
+                return;
+            }
+
+            const startedAt = Date.now();
+            const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            this.kuyaDexAbortController = controller;
+
+            try {
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                const response = await fetch('{{ route('decision-support.chat') }}', {
+                    method: 'POST',
+                    signal: controller ? controller.signal : undefined,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfMeta ? csrfMeta.getAttribute('content') : '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        message: cleanText,
+                        project_id: this.kuyaDexProjectId ? Number(this.kuyaDexProjectId) : null
+                    })
+                });
+
+                // Ignore if superseded by a newer "Send It Now" inquiry
+                if (requestId !== this.kuyaDexActiveRequestId) {
+                    return;
+                }
+
+                const data = await response.json();
+
+                // Ensure the 3-dot typing animation is visible for at least 650ms for natural feel
+                const elapsed = Date.now() - startedAt;
+                if (elapsed < 650) {
+                    await new Promise(resolve => setTimeout(resolve, 650 - elapsed));
+                }
+
+                if (requestId !== this.kuyaDexActiveRequestId) {
+                    return;
+                }
+
+                if (data && data.mode === 'typing_only') {
+                    this.kuyaDexIsTyping = true;
+                    this.scrollKuyaDexToBottom();
+                    return;
+                }
+
+                this.kuyaDexIsTyping = false;
+                this.kuyaDexAbortController = null;
+                this.kuyaDexMessages.push({
+                    id: 'kd-ai-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                    sender: 'assistant',
+                    text: (data && data.reply) ? data.reply : 'I have no idea with that, please let us focus to your project management',
+                    isGuardrail: data && data.mode === 'guardrail',
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+                this.scrollKuyaDexToBottom();
+
+                // Automatically send the next queued message after Kuya DEX replies
+                if (this.kuyaDexQueue.length > 0) {
+                    setTimeout(() => {
+                        this.processNextKuyaDexQueue();
+                    }, 350);
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') {
+                    return;
+                }
+                if (requestId !== this.kuyaDexActiveRequestId) {
+                    return;
+                }
+                this.kuyaDexIsTyping = false;
+                this.kuyaDexAbortController = null;
+                this.kuyaDexMessages.push({
+                    id: 'kd-err-' + Date.now(),
+                    sender: 'assistant',
+                    text: 'Sorry I encountered an issue from my end, please check your internet connection or try again at a later time.',
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+                this.scrollKuyaDexToBottom();
+
+                if (this.kuyaDexQueue.length > 0) {
+                    setTimeout(() => {
+                        this.processNextKuyaDexQueue();
+                    }, 350);
+                }
+            }
         }
         };
     };
@@ -2893,6 +3179,346 @@
             background: #162030;
             border-color: #2A384E;
         }
+
+        /* ── Tab 3: Kuya DEX (Personal AI Assistant) Minimalist & Dark Mode Adaptive UI ── */
+        .dss-module .kuya-dex-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-xl, 12px);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            min-height: 620px;
+            max-height: 760px;
+            overflow: hidden;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-card,
+        .dark .dss-module .kuya-dex-card {
+            background: #0E1522;
+            border-color: #243042;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+        }
+
+        .dss-module .kuya-dex-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding: 1rem 1.35rem;
+            background: var(--color-surface-alt);
+            border-bottom: 1px solid var(--color-border);
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-header,
+        .dark .dss-module .kuya-dex-header {
+            background: #141C2B;
+            border-bottom-color: #243042;
+        }
+
+        .dss-module .kuya-dex-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+        }
+
+        .dss-module .kuya-dex-icon-badge {
+            width: 42px;
+            height: 42px;
+            border-radius: 11px;
+            background: linear-gradient(135deg, #2C5F7C 0%, #1E4258 100%);
+            color: #FFFFFF;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(44, 95, 124, 0.25);
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-icon-badge,
+        .dark .dss-module .kuya-dex-icon-badge {
+            background: linear-gradient(135deg, #0284C7 0%, #1D4ED8 100%);
+            box-shadow: 0 4px 14px rgba(56, 189, 248, 0.22);
+        }
+
+        .dss-module .kuya-dex-stream {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.15rem;
+            background: var(--color-bg);
+            scrollbar-width: thin;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-stream,
+        .dark .dss-module .kuya-dex-stream {
+            background: #0B101B;
+        }
+
+        .dss-module .kuya-dex-msg-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            max-width: 82%;
+        }
+        .dss-module .kuya-dex-msg-row.is-user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .dss-module .kuya-dex-msg-row.is-assistant {
+            align-self: flex-start;
+        }
+
+        .dss-module .kuya-dex-avatar-sm {
+            width: 32px;
+            height: 32px;
+            border-radius: 9px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: var(--color-accent-light);
+            color: var(--color-accent);
+            border: 1px solid rgba(44, 95, 124, 0.2);
+            margin-top: 2px;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-avatar-sm,
+        .dark .dss-module .kuya-dex-avatar-sm {
+            background: rgba(56, 189, 248, 0.14);
+            color: #38BDF8;
+            border-color: rgba(56, 189, 248, 0.28);
+        }
+
+        .dss-module .kuya-dex-bubble {
+            padding: 0.85rem 1.1rem;
+            border-radius: 14px;
+            font-size: 0.875rem;
+            line-height: 1.55;
+            word-break: break-word;
+            white-space: pre-line;
+            position: relative;
+        }
+        .dss-module .kuya-dex-bubble.is-assistant {
+            background: var(--color-surface);
+            color: var(--color-ink);
+            border: 1px solid var(--color-border);
+            border-top-left-radius: 4px;
+            box-shadow: var(--shadow-sm);
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-bubble.is-assistant,
+        .dark .dss-module .kuya-dex-bubble.is-assistant {
+            background: #151F30;
+            color: #F1F5F9;
+            border-color: #26354D;
+        }
+
+        .dss-module .kuya-dex-bubble.is-user {
+            background: var(--color-accent);
+            color: #FFFFFF;
+            border: 1px solid var(--color-accent);
+            border-top-right-radius: 4px;
+            box-shadow: 0 2px 6px rgba(44, 95, 124, 0.18);
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-bubble.is-user,
+        .dark .dss-module .kuya-dex-bubble.is-user {
+            background: #2563EB;
+            border-color: #3B82F6;
+            color: #FFFFFF;
+        }
+
+        /* Sample Prompt Chips */
+        .dss-module .kuya-dex-samples-wrap {
+            margin-left: 2.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .dss-module .kuya-dex-samples-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+        }
+        .dss-module .kuya-dex-sample-btn {
+            background: var(--color-surface);
+            color: var(--color-ink);
+            border: 1px solid var(--color-border);
+            border-radius: 999px;
+            padding: 0.48rem 0.95rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            transition: all 0.16s ease;
+            box-shadow: var(--shadow-sm);
+            text-align: left;
+        }
+        .dss-module .kuya-dex-sample-btn:hover {
+            border-color: var(--color-accent);
+            background: var(--color-accent-light);
+            color: var(--color-accent);
+            transform: translateY(-1px);
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-sample-btn,
+        .dark .dss-module .kuya-dex-sample-btn {
+            background: #141E30;
+            color: #E2E8F0;
+            border-color: #2A3A53;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-sample-btn:hover,
+        .dark .dss-module .kuya-dex-sample-btn:hover {
+            background: rgba(56, 189, 248, 0.12);
+            border-color: #38BDF8;
+            color: #38BDF8;
+        }
+
+        /* 3-Dot Typing Animation Bubble */
+        .dss-module .kuya-dex-typing-bubble {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0.85rem 1.15rem;
+            border-radius: 14px;
+            border-top-left-radius: 4px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow-sm);
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-typing-bubble,
+        .dark .dss-module .kuya-dex-typing-bubble {
+            background: #151F30;
+            border-color: #26354D;
+        }
+        .dss-module .kuya-dex-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--color-accent);
+            opacity: 0.45;
+            animation: kuyaDexDotBounce 1.35s infinite ease-in-out both;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-dot,
+        .dark .dss-module .kuya-dex-dot {
+            background: #38BDF8;
+        }
+        .dss-module .kuya-dex-dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+        .dss-module .kuya-dex-dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+        .dss-module .kuya-dex-dot:nth-child(3) {
+            animation-delay: 0s;
+        }
+        @keyframes kuyaDexDotBounce {
+            0%, 80%, 100% {
+                transform: translateY(0) scale(0.85);
+                opacity: 0.4;
+            }
+            40% {
+                transform: translateY(-5px) scale(1.1);
+                opacity: 1;
+            }
+        }
+
+        /* Composer Footer (Messaging Only — No File/Image Upload) */
+        .dss-module .kuya-dex-composer {
+            padding: 0.95rem 1.35rem;
+            background: var(--color-surface);
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-composer,
+        .dark .dss-module .kuya-dex-composer {
+            background: #141C2B;
+            border-top-color: #243042;
+        }
+        .dss-module .kuya-dex-input-row {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+        }
+        .dss-module .kuya-dex-input {
+            flex: 1 1 auto;
+            height: 42px;
+            padding: 0 1rem;
+            font-size: 0.875rem;
+            border-radius: 999px;
+            border: 1px solid var(--color-border);
+            background: var(--color-surface-alt);
+            color: var(--color-ink);
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+        .dss-module .kuya-dex-input:focus {
+            border-color: var(--color-accent);
+            background: var(--color-surface);
+            box-shadow: 0 0 0 3px rgba(44, 95, 124, 0.12);
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-input,
+        .dark .dss-module .kuya-dex-input {
+            background: #0E1522;
+            border-color: #2A384E;
+            color: #F1F5F9;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-input:focus,
+        .dark .dss-module .kuya-dex-input:focus {
+            border-color: #38BDF8;
+            background: #0B101B;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+        }
+
+        /* "Send It Now vs. Queue It Up" Choice Banner & Queued Messages Bar */
+        .dss-module .kuya-dex-choice-banner {
+            padding: 0.85rem 1.25rem;
+            background: var(--color-accent-light);
+            border-top: 1px solid rgba(44, 95, 124, 0.28);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.85rem;
+            flex-wrap: wrap;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-choice-banner,
+        .dark .dss-module .kuya-dex-choice-banner {
+            background: #132238;
+            border-top-color: rgba(56, 189, 248, 0.32);
+        }
+
+        .dss-module .kuya-dex-queue-bar {
+            padding: 0.65rem 1.25rem;
+            background: var(--color-surface-alt);
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-queue-bar,
+        .dark .dss-module .kuya-dex-queue-bar {
+            background: #101826;
+            border-top-color: #243042;
+        }
+
+        .dss-module .kuya-dex-queue-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+            padding: 0.38rem 0.7rem;
+            border-radius: var(--radius-md);
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            font-size: 0.78rem;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-queue-item,
+        .dark .dss-module .kuya-dex-queue-item {
+            background: #162032;
+            border-color: #2A384E;
+            color: #E2E8F0;
+        }
     </style>
 
     {{-- Page Header --}}
@@ -2961,6 +3587,22 @@
                 <span>Generate Resource Allocation</span>
             </button>
             @endif
+
+            <button
+                type="button"
+                role="tab"
+                :aria-selected="activeTab === 'kuya_dex'"
+                class="btn dss-tab-btn"
+                :class="activeTab === 'kuya_dex' ? 'btn-primary' : 'btn-secondary'"
+                @click="activeTab = 'kuya_dex'; scrollKuyaDexToBottom()"
+                id="tab-btn-dss-kuya-dex"
+            >
+                {{-- AI Stars / Glimmers Icon --}}
+                <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/>
+                </svg>
+                <span>Kuya DEX (Personal AI assistant)</span>
+            </button>
         </div>
     </div>
 
@@ -4800,5 +5442,280 @@
         </template>
     </div>
     @endif
+
+    {{-- =========================================================================
+         TAB 3: KUYA DEX (Personal AI Assistant for DEX Project Management System)
+         ========================================================================= --}}
+    <div x-show="activeTab === 'kuya_dex'" x-cloak x-transition.opacity id="panel-dss-kuya-dex">
+        <div class="kuya-dex-card mb-6">
+            {{-- Chat Window Top Header --}}
+            <div class="kuya-dex-header">
+                <div class="kuya-dex-brand">
+                    <div class="kuya-dex-icon-badge" aria-hidden="true">
+                        {{-- AI Stars / Glimmers Icon --}}
+                        <svg style="width: 22px; height: 22px;" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;">
+                            <h2 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--color-ink);">Kuya DEX</h2>
+                            <span
+                                class="dss-risk-pill"
+                                style="background: var(--color-accent-light); color: var(--color-accent); border: 1px solid rgba(44, 95, 124, 0.25); text-transform: none; font-size: 0.72rem;"
+                            >
+                                Personal AI Assistant
+                            </span>
+                        </div>
+                        <span style="display: block; font-size: 0.78rem; color: var(--color-muted); margin-top: 2px;">
+                            Inquiries for Materials, Projects, Costing, Manpower &amp; Elevator Operation/Construction
+                        </span>
+                    </div>
+                </div>
+
+                {{-- Right Controls: Active Project Reference Selector & Reset Chat --}}
+                <div class="dss-filter-group">
+                    <template x-if="matrix && matrix.length > 0">
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <label for="kuya-dex-project-select" style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--color-muted); white-space: nowrap;">
+                                Project Context:
+                            </label>
+                            <select
+                                id="kuya-dex-project-select"
+                                x-model="kuyaDexProjectId"
+                                class="form-control form-control--compact dss-select"
+                                style="min-width: 210px; height: 34px; font-size: 0.78rem;"
+                                aria-label="Select project context for Kuya DEX"
+                            >
+                                <template x-for="p in matrix" :key="'kd-proj-' + p.id">
+                                    <option :value="p.id" x-text="`${p.project_code} — ${p.name}`"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </template>
+
+                    <button
+                        type="button"
+                        class="btn btn-secondary btn-sm dss-btn"
+                        style="height: 34px; font-size: 0.76rem;"
+                        @click="resetKuyaDexChat()"
+                        title="Clear current session messages"
+                    >
+                        Reset Chat
+                    </button>
+                </div>
+            </div>
+
+            {{-- Chat Messages Stream --}}
+            <div class="kuya-dex-stream" id="kuya-dex-chat-scroll" aria-live="polite">
+                <template x-for="(msg, mIdx) in kuyaDexMessages" :key="msg.id">
+                    <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                        <div class="kuya-dex-msg-row" :class="msg.sender === 'user' ? 'is-user' : 'is-assistant'">
+                            {{-- Kuya DEX Sparkle Avatar for Assistant Messages --}}
+                            <template x-if="msg.sender === 'assistant'">
+                                <div class="kuya-dex-avatar-sm" aria-hidden="true" title="Kuya DEX">
+                                    <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/>
+                                    </svg>
+                                </div>
+                            </template>
+
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 3px;" :style="msg.sender === 'user' ? 'justify-content: flex-end;' : ''">
+                                    <span style="font-size: 0.7rem; font-weight: 700; color: var(--color-muted);" x-text="msg.sender === 'user' ? 'You' : 'Kuya DEX'"></span>
+                                    <span style="font-size: 0.68rem; color: var(--color-muted); opacity: 0.8;" x-text="msg.time"></span>
+                                </div>
+                                <div
+                                    class="kuya-dex-bubble"
+                                    :class="msg.sender === 'user' ? 'is-user' : 'is-assistant'"
+                                    x-html="formatKuyaDexMessage(msg.text)"
+                                ></div>
+                            </div>
+                        </div>
+
+                        {{-- Sample Chats Shown Below the Initial Greeting --}}
+                        <template x-if="mIdx === 0 && msg.sender === 'assistant'">
+                            <div class="kuya-dex-samples-wrap">
+                                <span style="font-size: 0.72rem; font-weight: 600; color: var(--color-muted);">
+                                    Suggested inquiries (click to fill message box):
+                                </span>
+                                <div class="kuya-dex-samples-grid">
+                                    <template x-for="(sample, sIdx) in kuyaDexSamplePrompts" :key="'kd-sample-' + sIdx">
+                                        <button
+                                            type="button"
+                                            class="kuya-dex-sample-btn"
+                                            @click="selectKuyaDexSamplePrompt(sample)"
+                                        >
+                                            <svg style="width: 13px; height: 13px; flex-shrink: 0; opacity: 0.8;" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                                            </svg>
+                                            <span x-text="sample"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                {{-- 3-Dot Typing Animation When Kuya DEX is Loading a Reply --}}
+                <div
+                    x-show="kuyaDexIsTyping"
+                    x-transition.opacity
+                    class="kuya-dex-msg-row is-assistant"
+                    aria-label="Kuya DEX is typing"
+                >
+                    <div class="kuya-dex-avatar-sm" aria-hidden="true">
+                        <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 3px;">
+                            <span style="font-size: 0.7rem; font-weight: 700; color: var(--color-muted);">Kuya DEX</span>
+                            <span style="font-size: 0.68rem; color: var(--color-muted); opacity: 0.8;">typing...</span>
+                        </div>
+                        <div class="kuya-dex-typing-bubble" role="status" aria-label="Typing indicator">
+                            <span class="kuya-dex-dot"></span>
+                            <span class="kuya-dex-dot"></span>
+                            <span class="kuya-dex-dot"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Decision Prompt When User Sends a Message While Kuya DEX Is Still Typing --}}
+            <div
+                x-show="kuyaDexPendingChoiceText !== ''"
+                x-cloak
+                x-transition.opacity
+                class="kuya-dex-choice-banner"
+                role="region"
+                aria-label="Kuya DEX is still typing"
+            >
+                <div style="flex: 1 1 280px; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.78rem; font-weight: 700; color: var(--color-ink);">
+                        <svg style="width: 15px; height: 15px; color: var(--color-accent); flex-shrink: 0;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>Kuya DEX is still typing a reply. How would you like to handle this new inquiry?</span>
+                    </div>
+                    <div
+                        style="font-size: 0.76rem; color: var(--color-muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                        x-text="`“${kuyaDexPendingChoiceText}”`"
+                    ></div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                    <button
+                        type="button"
+                        class="btn btn-primary btn-sm dss-btn"
+                        style="height: 32px; font-size: 0.76rem; border-radius: 999px;"
+                        @click="sendKuyaDexPendingNow()"
+                        id="btn-kuya-dex-send-now"
+                        title="Interrupt current reply and answer this new inquiry immediately"
+                    >
+                        <span>⚡ Send It Now</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-secondary btn-sm dss-btn"
+                        style="height: 32px; font-size: 0.76rem; border-radius: 999px;"
+                        @click="queueKuyaDexPendingMessage()"
+                        id="btn-kuya-dex-queue-message"
+                        title="Queue this inquiry and send it automatically after Kuya DEX finishes replying"
+                    >
+                        <span>⏳ Queue It Up</span>
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-secondary btn-sm dss-btn"
+                        style="height: 32px; padding: 0 0.6rem; font-size: 0.75rem; border-radius: 999px;"
+                        @click="cancelKuyaDexPendingChoice()"
+                        title="Cancel and return message to input box"
+                    >
+                        <span>Cancel</span>
+                    </button>
+                </div>
+            </div>
+
+            {{-- Queued Messages Bar (Automatically Sent After Kuya DEX Replies) --}}
+            <div
+                x-show="kuyaDexQueue.length > 0"
+                x-cloak
+                x-transition.opacity
+                class="kuya-dex-queue-bar"
+                role="region"
+                aria-label="Queued messages for Kuya DEX"
+            >
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-muted);">
+                    <span>Queued Inquiries (<span x-text="kuyaDexQueue.length"></span>) — Will send automatically after Kuya DEX replies</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                    <template x-for="(qItem, qIdx) in kuyaDexQueue" :key="qItem.id">
+                        <div class="kuya-dex-queue-item">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1;">
+                                <span class="font-mono" style="font-size: 0.68rem; font-weight: 700; color: var(--color-accent);" x-text="`#${qIdx + 1}`"></span>
+                                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-ink);" x-text="qItem.text"></span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary btn-sm dss-btn"
+                                    style="height: 24px; padding: 0 0.55rem; font-size: 0.7rem; border-radius: 999px;"
+                                    @click="promoteQueuedMessageNow(qIdx)"
+                                    title="Send this inquiry right now instead of waiting"
+                                >
+                                    Send Now
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary btn-sm dss-btn"
+                                    style="height: 24px; padding: 0 0.45rem; font-size: 0.72rem; color: var(--color-danger); border-radius: 999px;"
+                                    @click="removeQueuedMessage(qIdx)"
+                                    title="Remove from queue"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            {{-- Message Input Composer (Text Messaging Only — No File or Image Uploads) --}}
+            <form class="kuya-dex-composer" @submit.prevent="sendKuyaDexMessage()">
+                <div class="kuya-dex-input-row">
+                    <input
+                        id="kuya-dex-message-input"
+                        type="text"
+                        x-model="kuyaDexInput"
+                        class="kuya-dex-input"
+                        placeholder="Ask Kuya DEX about materials, projects, costing, manpower, or elevator construction..."
+                        maxlength="1000"
+                        autocomplete="off"
+                        aria-label="Message Kuya DEX"
+                    >
+                    <button
+                        type="submit"
+                        class="btn btn-primary dss-btn"
+                        style="height: 42px; padding: 0 1.25rem; border-radius: 999px;"
+                        :disabled="!kuyaDexInput.trim()"
+                        :style="!kuyaDexInput.trim() ? 'opacity: 0.55; cursor: not-allowed;' : ''"
+                        id="btn-send-kuya-dex"
+                    >
+                        <span>Send</span>
+                        <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                        </svg>
+                    </button>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0 0.35rem; font-size: 0.7rem; color: var(--color-muted);">
+                    <span>Messaging only · Scoped strictly to DEX PMS &amp; Elevator Construction</span>
+                    <span>Chats are not saved and clear automatically when you reload or leave the session</span>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 @endsection

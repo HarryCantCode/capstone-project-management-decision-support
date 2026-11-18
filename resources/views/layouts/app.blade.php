@@ -1078,16 +1078,34 @@
                                                 <template x-if="!activeReviewItem.data.status || activeReviewItem.data.status === 'pending'">
                                                     <div>
                                                         <div class="form-group" style="margin-bottom: var(--space-3);">
-                                                            <label for="notif-reviewer-notes-input" class="form-label" style="font-size: 0.8125rem;">Reviewer Notes (Optional)</label>
+                                                            <label 
+                                                                for="notif-reviewer-notes-input" 
+                                                                class="form-label" 
+                                                                style="font-size: 0.8125rem; font-weight: 600; display: inline-block; transition: all 0.2s ease;"
+                                                                :style="reviewNotesError ? 'color: var(--color-danger); text-decoration: underline; text-decoration-color: var(--color-danger); text-decoration-thickness: 2px; text-underline-offset: 4px;' : ''"
+                                                            >
+                                                                Reason for the verdict <span style="color: var(--color-danger);" aria-hidden="true">*</span>
+                                                            </label>
                                                             <input
                                                                 type="text"
                                                                 id="notif-reviewer-notes-input"
+                                                                x-ref="notifReviewerNotesInput"
                                                                 x-model="reviewNotes"
+                                                                @input="if (reviewNotes.trim()) reviewNotesError = false"
                                                                 class="form-control form-control--compact"
-                                                                placeholder="Add an optional note or reason for the staff member..."
+                                                                :style="reviewNotesError ? 'border-color: var(--color-danger); box-shadow: 0 0 0 1px var(--color-danger);' : ''"
+                                                                placeholder="Enter the reason for the verdict..."
                                                                 style="width: 100%; height: 34px; font-size: 0.8125rem;"
                                                                 autocomplete="off"
+                                                                required
                                                             >
+                                                            <div 
+                                                                x-show="reviewNotesError" 
+                                                                x-cloak 
+                                                                style="color: var(--color-danger); font-size: 0.75rem; margin-top: 4px; font-weight: 500;"
+                                                            >
+                                                                Please provide a reason for the verdict before proceeding.
+                                                            </div>
                                                         </div>
 
                                                         <div style="background: var(--color-accent-light); border-left: 3px solid var(--color-accent); padding: var(--space-3); border-radius: 0 var(--radius-md) var(--radius-md) 0; margin-bottom: var(--space-4); font-size: 0.8125rem;">
@@ -1581,6 +1599,7 @@
                 reviewError: null,
                 activeReviewItem: null,
                 reviewNotes: '',
+                reviewNotesError: false,
 
                 init() {
                     this.pollInterval = setInterval(() => {
@@ -1702,6 +1721,7 @@
                 openReviewModal(notification) {
                     this.activeReviewItem = JSON.parse(JSON.stringify(notification));
                     this.reviewNotes = '';
+                    this.reviewNotesError = false;
                     this.reviewError = null;
                     this.reviewModalOpen = true;
                     this.open = false;
@@ -1735,6 +1755,7 @@
                     this.reviewModalOpen = false;
                     this.activeReviewItem = null;
                     this.reviewNotes = '';
+                    this.reviewNotesError = false;
                     this.reviewError = null;
                 },
 
@@ -1742,6 +1763,16 @@
                     if (!this.activeReviewItem || !this.activeReviewItem.data) return;
                     const actionId = this.activeReviewItem.data.pending_action_id;
                     if (!actionId) return;
+
+                    if (!this.reviewNotes || this.reviewNotes.trim() === '') {
+                        this.reviewNotesError = true;
+                        this.$nextTick(() => {
+                            const inputEl = document.getElementById('notif-reviewer-notes-input');
+                            if (inputEl) inputEl.focus();
+                        });
+                        return;
+                    }
+                    this.reviewNotesError = false;
 
                     this.reviewLoading = true;
                     this.reviewError = null;
@@ -1784,6 +1815,16 @@
                     if (!this.activeReviewItem || !this.activeReviewItem.data) return;
                     const actionId = this.activeReviewItem.data.pending_action_id;
                     if (!actionId) return;
+
+                    if (!this.reviewNotes || this.reviewNotes.trim() === '') {
+                        this.reviewNotesError = true;
+                        this.$nextTick(() => {
+                            const inputEl = document.getElementById('notif-reviewer-notes-input');
+                            if (inputEl) inputEl.focus();
+                        });
+                        return;
+                    }
+                    this.reviewNotesError = false;
 
                     this.reviewLoading = true;
                     this.reviewError = null;

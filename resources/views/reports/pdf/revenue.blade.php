@@ -362,6 +362,9 @@
                     <div class="mono"><strong>Ref No:</strong> {{ $referenceNo }}</div>
                     <div><strong>Prepared By:</strong> {{ $generatedBy }} ({{ $generatedByRole }})</div>
                     <div class="mono"><strong>Generated:</strong> {{ $generatedAt }}</div>
+                    @if (!empty($hasMonthRange))
+                        <div class="mono" style="margin-top: 2px;"><strong>Range:</strong> {{ $monthRangeLabel }}</div>
+                    @endif
                 </td>
             </tr>
         </table>
@@ -402,7 +405,7 @@
     {{-- Section 01: Monthly / Yearly Graphical Plot Chart & Comparison Table --}}
     <div class="section-header">
         <span class="section-number">01</span>
-        <span class="section-title">{{ $comparisonMode === 'yearly' ? 'Yearly Revenue Comparison (Multi-Year)' : 'Monthly Revenue Comparison (' . ($yearFilter === 'all' ? 'All Years' : $yearFilter) . ')' }} — Without Taxes</span>
+        <span class="section-title">{{ $comparisonMode === 'yearly' ? 'Yearly Revenue Comparison (Multi-Year)' : ('Monthly Revenue Comparison (' . ($yearFilter === 'all' ? 'All Years' : $yearFilter) . (!empty($hasMonthRange) ? ' · ' . $monthRangeLabel : '') . ')') }} — Without Taxes</span>
     </div>
 
     @php
@@ -496,8 +499,8 @@
         }
 
         // 3-Bar Grouped Graph + X-axis labels
-        $barWidth = $bucketCount <= 4 ? 11.0 : 6.2;
-        $barGap = $bucketCount <= 4 ? 2.5 : 1.4;
+        $barWidth = $bucketCount <= 3 ? 13.0 : ($bucketCount <= 6 ? 9.2 : ($bucketCount <= 8 ? 7.6 : 6.2));
+        $barGap = $bucketCount <= 3 ? 2.8 : ($bucketCount <= 6 ? 2.0 : ($bucketCount <= 8 ? 1.6 : 1.4));
         $groupHalfWidth = (($barWidth * 3) + ($barGap * 2)) / 2.0;
 
         foreach ($chartItems as $item) {
