@@ -527,7 +527,7 @@ class KuyaDexChatService
 
         $breakdownByExpertise = $allExpertiseNames->map(function (string $expName) use ($allPersonnel): array {
             $matching = $allPersonnel->filter(
-                fn (Personnel $p): bool => strcasecmp(trim((string) $p->expertise), trim($expName)) === 0
+                fn (Personnel $p): bool => strcasecmp(trim((string) $p->expertise), trim($expName)) === 0,
             );
             $availGroup = $matching->filter(fn (Personnel $p): bool => $p->project_id === null);
             $assignedGroup = $matching->filter(fn (Personnel $p): bool => $p->project_id !== null);

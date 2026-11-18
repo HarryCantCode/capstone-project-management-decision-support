@@ -1714,6 +1714,19 @@
             if (this.activeAllocProject) {
                 this.applySpecTemplate('auto_spec');
             }
+
+            if (this.activeTab === 'kuya_dex') {
+                this.triggerKuyaDexGreeting(1600);
+            }
+
+            this.$watch('activeTab', (newTab) => {
+                if (newTab === 'kuya_dex') {
+                    this.scrollKuyaDexToBottom();
+                    if (!this.kuyaDexGreetingInitialized && this.kuyaDexMessages.length === 0 && !this.kuyaDexIsTyping) {
+                        this.triggerKuyaDexGreeting(1600);
+                    }
+                }
+            });
         },
 
         get activeAllocProject() {
@@ -2059,6 +2072,23 @@
             return '#10B981';
         },
 
+        /* ── Tab Navigation Helper ── */
+        switchDssTab(tabName) {
+            this.activeTab = tabName;
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', tabName);
+                window.history.replaceState(null, '', url.toString());
+            } catch (e) {}
+
+            if (tabName === 'kuya_dex') {
+                this.scrollKuyaDexToBottom();
+                if (!this.kuyaDexGreetingInitialized && this.kuyaDexMessages.length === 0 && !this.kuyaDexIsTyping) {
+                    this.triggerKuyaDexGreeting(1600);
+                }
+            }
+        },
+
         /* ── Tab 3: Kuya DEX (Personal AI Assistant) Volatile Session State ── */
         kuyaDexConnected: @js((bool) ($kuyaDexConnected ?? false)),
         kuyaDexProjectId: {{ $selectedProject ? (int) $selectedProject->id : ($matrix[0]['id'] ?? 'null') }},
@@ -2068,19 +2098,38 @@
         kuyaDexQueue: [],
         kuyaDexActiveRequestId: 0,
         kuyaDexAbortController: null,
+        kuyaDexGreetingTimeout: null,
+        kuyaDexGreetingInitialized: false,
         kuyaDexSamplePrompts: [
             'Who are my available manpower?',
             'How much is the total progress of my project x',
             'How much is the total spend on this project'
         ],
-        kuyaDexMessages: [
-            {
-                id: 'kd-msg-welcome',
-                sender: 'assistant',
-                text: 'Hi, I am **Kuya DEX**. Your personal AI buddy, I can help you about your inquiries about your projects and provide you answers to help you with your decision-making. Just send your question and I will try to answer that!',
-                time: 'Now'
+        kuyaDexMessages: [],
+
+        triggerKuyaDexGreeting(delay = 1600) {
+            if (this.kuyaDexGreetingTimeout) {
+                clearTimeout(this.kuyaDexGreetingTimeout);
+                this.kuyaDexGreetingTimeout = null;
             }
-        ],
+            this.kuyaDexGreetingInitialized = true;
+            this.kuyaDexIsTyping = true;
+            this.scrollKuyaDexToBottom();
+
+            this.kuyaDexGreetingTimeout = setTimeout(() => {
+                this.kuyaDexGreetingTimeout = null;
+                this.kuyaDexIsTyping = false;
+                if (this.kuyaDexMessages.length === 0) {
+                    this.kuyaDexMessages.push({
+                        id: 'kd-msg-welcome-' + Date.now(),
+                        sender: 'assistant',
+                        text: 'Hi, I am **Kuya DEX**. Your personal AI buddy, I can help you about your inquiries about your projects and provide you answers to help you with your decision-making. Just send your question and I will try to answer that!',
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    });
+                    this.scrollKuyaDexToBottom();
+                }
+            }, delay);
+        },
 
         scrollKuyaDexToBottom() {
             this.$nextTick(() => {
@@ -2142,20 +2191,17 @@
                 try { this.kuyaDexAbortController.abort(); } catch (e) {}
                 this.kuyaDexAbortController = null;
             }
+            if (this.kuyaDexGreetingTimeout) {
+                clearTimeout(this.kuyaDexGreetingTimeout);
+                this.kuyaDexGreetingTimeout = null;
+            }
             this.kuyaDexActiveRequestId++;
             this.kuyaDexIsTyping = false;
             this.kuyaDexInput = '';
             this.kuyaDexPendingChoiceText = '';
             this.kuyaDexQueue = [];
-            this.kuyaDexMessages = [
-                {
-                    id: 'kd-msg-welcome-' + Date.now(),
-                    sender: 'assistant',
-                    text: 'Hi, I am **Kuya DEX**. Your personal AI buddy, I can help you about your inquiries about your projects and provide you answers to help you with your decision-making. Just send your question and I will try to answer that!',
-                    time: 'Now'
-                }
-            ];
-            this.scrollKuyaDexToBottom();
+            this.kuyaDexMessages = [];
+            this.triggerKuyaDexGreeting(1600);
         },
 
         sendKuyaDexMessage(presetText = null) {
@@ -2165,6 +2211,21 @@
 
             if (presetText === null) {
                 this.kuyaDexInput = '';
+            }
+
+            // If greeting animation is still typing, finish greeting immediately before handling the user inquiry
+            if (this.kuyaDexGreetingTimeout) {
+                clearTimeout(this.kuyaDexGreetingTimeout);
+                this.kuyaDexGreetingTimeout = null;
+                this.kuyaDexIsTyping = false;
+                if (this.kuyaDexMessages.length === 0) {
+                    this.kuyaDexMessages.push({
+                        id: 'kd-msg-welcome-' + Date.now(),
+                        sender: 'assistant',
+                        text: 'Hi, I am **Kuya DEX**. Your personal AI buddy, I can help you about your inquiries about your projects and provide you answers to help you with your decision-making. Just send your question and I will try to answer that!',
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    });
+                }
             }
 
             // If Kuya DEX is currently typing, let the user choose between "Send It Now" or "Queue It Up"
@@ -3562,7 +3623,7 @@
                 :aria-selected="activeTab === 'simulator'"
                 class="btn dss-tab-btn"
                 :class="activeTab === 'simulator' ? 'btn-primary' : 'btn-secondary'"
-                @click="activeTab = 'simulator'"
+                @click="switchDssTab('simulator')"
                 id="tab-btn-dss-simulator"
             >
                 <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -3578,7 +3639,7 @@
                 :aria-selected="activeTab === 'allocation'"
                 class="btn dss-tab-btn"
                 :class="activeTab === 'allocation' ? 'btn-primary' : 'btn-secondary'"
-                @click="activeTab = 'allocation'"
+                @click="switchDssTab('allocation')"
                 id="tab-btn-dss-allocation"
             >
                 <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -3594,7 +3655,7 @@
                 :aria-selected="activeTab === 'kuya_dex'"
                 class="btn dss-tab-btn"
                 :class="activeTab === 'kuya_dex' ? 'btn-primary' : 'btn-secondary'"
-                @click="activeTab = 'kuya_dex'; scrollKuyaDexToBottom()"
+                @click="switchDssTab('kuya_dex')"
                 id="tab-btn-dss-kuya-dex"
             >
                 {{-- AI Stars / Glimmers Icon --}}
