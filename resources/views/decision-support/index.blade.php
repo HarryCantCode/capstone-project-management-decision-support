@@ -2103,7 +2103,8 @@
         kuyaDexSamplePrompts: [
             'Who are my available manpower?',
             'How much is the total progress of my project x',
-            'How much is the total spend on this project'
+            'How much is the total spend on this project',
+            'Forecast our project revenues, shortcomings, and roadblocks'
         ],
         kuyaDexMessages: [],
 
@@ -2166,7 +2167,76 @@
             // 5. Convert `inline code` to <code class="font-mono">
             safe = safe.replace(/`([^`\n]+)`/g, '<code class="font-mono">$1</code>');
 
-            // 6. Convert markdown bullet lines (* item or - item) to clean bullets
+            // 6. Convert Markdown tables to responsive HTML tables
+            const lines = safe.split('\n');
+            const parsedLines = [];
+            let lineIdx = 0;
+
+            const isDelimiter = (line) => {
+                const trimmed = line.trim();
+                if (!trimmed.includes('|')) return false;
+                const inner = trimmed.replace(/^\|/, '').replace(/\|$/, '').trim();
+                const parts = inner.split('|');
+                return parts.length >= 1 && parts.every(p => /^[\s\-:]+$/.test(p.trim()) && p.trim().includes('-'));
+            };
+
+            const isTableRow = (line) => {
+                const trimmed = line.trim();
+                return trimmed.includes('|') && trimmed.length > 1;
+            };
+
+            const parseCells = (line) => {
+                let trimmed = line.trim();
+                if (trimmed.startsWith('|')) trimmed = trimmed.substring(1);
+                if (trimmed.endsWith('|')) trimmed = trimmed.substring(0, trimmed.length - 1);
+                return trimmed.split('|').map(c => c.trim());
+            };
+
+            while (lineIdx < lines.length) {
+                if (isTableRow(lines[lineIdx]) && lineIdx + 1 < lines.length && isDelimiter(lines[lineIdx + 1])) {
+                    const headerCells = parseCells(lines[lineIdx]);
+                    const delimiterCells = parseCells(lines[lineIdx + 1]);
+                    const alignments = delimiterCells.map(c => {
+                        const s = c.startsWith(':');
+                        const e = c.endsWith(':');
+                        if (s && e) return 'center';
+                        if (e) return 'right';
+                        return 'left';
+                    });
+
+                    lineIdx += 2;
+                    const bodyRows = [];
+                    while (lineIdx < lines.length && isTableRow(lines[lineIdx]) && !isDelimiter(lines[lineIdx])) {
+                        bodyRows.push(parseCells(lines[lineIdx]));
+                        lineIdx++;
+                    }
+
+                    let tableHtml = '<div class="kuya-dex-table-wrapper"><table class="kuya-dex-table"><thead><tr>';
+                    headerCells.forEach((h, idx) => {
+                        const align = alignments[idx] || 'left';
+                        tableHtml += '<th style="text-align: ' + align + ';">' + h + '</th>';
+                    });
+                    tableHtml += '</tr></thead><tbody>';
+
+                    bodyRows.forEach(row => {
+                        tableHtml += '<tr>';
+                        headerCells.forEach((_, idx) => {
+                            const cell = row[idx] !== undefined ? row[idx] : '';
+                            const align = alignments[idx] || 'left';
+                            tableHtml += '<td style="text-align: ' + align + ';">' + cell + '</td>';
+                        });
+                        tableHtml += '</tr>';
+                    });
+                    tableHtml += '</tbody></table></div>';
+                    parsedLines.push(tableHtml);
+                } else {
+                    parsedLines.push(lines[lineIdx]);
+                    lineIdx++;
+                }
+            }
+            safe = parsedLines.join('\n');
+
+            // 7. Convert markdown bullet lines (* item or - item) to clean bullets
             safe = safe.replace(/^\s*[\*\-]\s+/gm, '• ');
 
             return safe;
@@ -3320,14 +3390,16 @@
             display: flex;
             align-items: flex-start;
             gap: 0.75rem;
-            max-width: 82%;
+            max-width: 88%;
         }
         .dss-module .kuya-dex-msg-row.is-user {
             align-self: flex-end;
             flex-direction: row-reverse;
+            max-width: 80%;
         }
         .dss-module .kuya-dex-msg-row.is-assistant {
             align-self: flex-start;
+            max-width: 92%;
         }
 
         .dss-module .kuya-dex-avatar-sm {
@@ -3358,6 +3430,8 @@
             word-break: break-word;
             white-space: pre-line;
             position: relative;
+            min-width: 0;
+            max-width: 100%;
         }
         .dss-module .kuya-dex-bubble.is-assistant {
             background: var(--color-surface);
@@ -3371,6 +3445,76 @@
             background: #151F30;
             color: #F1F5F9;
             border-color: #26354D;
+        }
+
+        /* Kuya DEX Formatted Markdown Tables */
+        .dss-module .kuya-dex-bubble .kuya-dex-table-wrapper {
+            margin: 0.75rem 0;
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+            white-space: normal;
+            background: var(--color-surface);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            -webkit-overflow-scrolling: touch;
+        }
+        .dss-module .kuya-dex-bubble .kuya-dex-table {
+            width: 100%;
+            min-width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            text-align: left;
+            white-space: normal;
+        }
+        .dss-module .kuya-dex-bubble .kuya-dex-table th {
+            background: rgba(0, 0, 0, 0.04);
+            font-weight: 700;
+            padding: 0.55rem 0.85rem;
+            border-bottom: 1px solid var(--color-border);
+            color: var(--color-ink);
+            white-space: nowrap;
+        }
+        .dss-module .kuya-dex-bubble .kuya-dex-table td {
+            padding: 0.5rem 0.85rem;
+            border-bottom: 1px solid var(--color-border);
+            color: inherit;
+        }
+        .dss-module .kuya-dex-bubble .kuya-dex-table tr:last-child td {
+            border-bottom: none;
+        }
+        .dss-module .kuya-dex-bubble .kuya-dex-table tr:nth-child(even) td {
+            background: rgba(0, 0, 0, 0.018);
+        }
+        .dss-module .kuya-dex-bubble .kuya-dex-table tr:hover td {
+            background: rgba(0, 0, 0, 0.035);
+        }
+
+        /* Dark Mode Support for Tables */
+        [data-theme="dark"] .dss-module .kuya-dex-bubble .kuya-dex-table-wrapper,
+        .dark .dss-module .kuya-dex-bubble .kuya-dex-table-wrapper {
+            background: #111A29;
+            border-color: #26354D;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-bubble .kuya-dex-table th,
+        .dark .dss-module .kuya-dex-bubble .kuya-dex-table th {
+            background: #182438;
+            color: #F8FAFC;
+            border-color: #26354D;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-bubble .kuya-dex-table td,
+        .dark .dss-module .kuya-dex-bubble .kuya-dex-table td {
+            border-color: #26354D;
+            color: #E2E8F0;
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-bubble .kuya-dex-table tr:nth-child(even) td,
+        .dark .dss-module .kuya-dex-bubble .kuya-dex-table tr:nth-child(even) td {
+            background: rgba(255, 255, 255, 0.025);
+        }
+        [data-theme="dark"] .dss-module .kuya-dex-bubble .kuya-dex-table tr:hover td,
+        .dark .dss-module .kuya-dex-bubble .kuya-dex-table tr:hover td {
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .dss-module .kuya-dex-bubble.is-user {
