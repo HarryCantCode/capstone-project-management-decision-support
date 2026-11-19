@@ -16,6 +16,8 @@
         $currentModule = 'projects.show';
     } elseif (request()->routeIs('projects.*')) {
         $currentModule = 'projects';
+    } elseif (request()->routeIs('costing.show')) {
+        $currentModule = 'costing.show';
     } elseif (request()->routeIs('costing.*')) {
         $currentModule = 'costing';
     } elseif (request()->routeIs('pending-actions.*') || request()->is('pending-actions*')) {
@@ -1131,38 +1133,320 @@
         ],
         'costing': [
             {
-                target: '[data-tour-nav="costing"]',
-                title: 'Costing Module',
-                moduleName: 'Costing',
-                placement: 'right',
-                padding: 4,
-                content: '<p><strong>Costing module</strong> — Where you can track your expenses and budget for a project.</p>'
-            },
-            {
-                target: '.costing-kpi-grid, .page-header, main',
-                title: 'Budget & Cost Tracking',
+                target: '[data-tour="costing-kpi-allocated"]',
+                title: 'Total Allocated Contract Value',
                 moduleName: 'Costing',
                 placement: 'bottom',
                 padding: 8,
-                content: '<p>Monitor contracted budgets, actual logged expenses (materials, labor, equipment), and calculate variances to prevent cost overruns.</p>'
+                content: '<p>Represents the combined contract baseline value across all active and registered projects in your portfolio, along with the total project count.</p>'
+            },
+            {
+                target: '[data-tour="costing-kpi-spend"]',
+                title: 'Total Actual Spend',
+                moduleName: 'Costing',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Aggregates all cumulative expenses recorded for materials, labor, and operations across every project, displaying the overall portfolio spend percentage.</p>'
+            },
+            {
+                target: '[data-tour="costing-kpi-remaining"]',
+                title: 'Total Remaining Budget',
+                moduleName: 'Costing',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Shows the net available capital remaining across your portfolio before reaching contract limits, along with the percentage of total budget still unspent.</p>'
+            },
+            {
+                target: '[data-tour="costing-ledger-card"]',
+                title: 'Project Budget & Costing Ledger',
+                moduleName: 'Costing',
+                placement: 'top',
+                padding: 8,
+                content: '<p>Centralized financial directory of all registered projects. Use the search bar and status filter to quickly locate specific projects and inspect their itemized expense breakdowns.</p>'
+            },
+            {
+                target: '[data-tour="costing-col-allocated"]',
+                title: 'Allocated Budget',
+                moduleName: 'Costing',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Displays the total contracted budget baseline assigned to each individual project upon initialization.</p>'
+            },
+            {
+                target: '[data-tour="costing-col-spend"]',
+                title: 'Actual Spend',
+                moduleName: 'Costing',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Shows the cumulative approved expenditures logged for materials, labor, equipment, and operations on that specific project.</p>'
+            },
+            {
+                target: '[data-tour="costing-col-remaining"]',
+                title: 'Remaining Budget',
+                moduleName: 'Costing',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Indicates the net available balance (Allocated Budget minus Actual Spend), helping you track remaining funds or projected gross margin before reaching contract limits.</p>'
+            },
+            {
+                target: '[data-tour="costing-col-utilization"]',
+                title: 'Budget Utilization Percentage',
+                moduleName: 'Costing',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Visualizes the proportion of the allocated budget consumed so far with color-coded health indicators (Healthy, High Spend at 85%+, or Over Budget above 100%).</p>'
+            }
+        ],
+        'costing.show': [
+            {
+                target: '[data-tour="costing-show-financial-overview"]',
+                title: 'Financial Overview',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Summarizes the overall financial health and budget utilization rate for this specific project.</p>'
+            },
+            {
+                target: '[data-tour="costing-show-allocated-budget"]',
+                title: 'Allocated Budget',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>Displays the total contract budget allocated to this project.</p>'
+            },
+            {
+                target: '[data-tour="costing-show-actual-spend"]',
+                title: 'Total Actual Spend',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>Shows the cumulative approved expenditures logged across all cost categories for this project.</p>'
+            },
+            {
+                target: '[data-tour="costing-show-remaining-budget"]',
+                title: 'Remaining Budget',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                content: '<p>Indicates the remaining unspent budget balance (or deficit if expenditures exceed the allocated contract price).</p>'
+            },
+            {
+                target: '[data-tour="costing-show-category-spending"]',
+                title: 'Spending by Category',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 8,
+                content: '<p>Breaks down total project expenditures across key cost categories — <strong>Materials</strong>, <strong>Equipment Rental</strong>, <strong>Labor / Overtime</strong>, <strong>Subcontractor</strong>, and <strong>Other / Misc</strong> — showing item counts and percentage share.</p>'
+            },
+            {
+                target: '[data-tour="costing-show-ledger-card"]',
+                title: 'Itemized Expense Ledger',
+                moduleName: 'Costing Breakdown',
+                placement: 'top',
+                padding: 8,
+                content: '<p>Complete chronological register of all approved project expenditures and any pending staff expense submissions awaiting review.</p>'
+            },
+            {
+                target: '[data-tour="costing-show-col-description"]',
+                title: 'Description (What this is for)',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Details the specific purpose, material item, or service covered by the expense entry.</p>'
+            },
+            {
+                target: '[data-tour="costing-show-col-category"]',
+                title: 'Category',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Identifies the cost classification assigned to the expense (Materials, Equipment, Labor, Subcontractor, or Other).</p>'
+            },
+            {
+                target: '[data-tour="costing-show-col-qty"]',
+                title: 'Qty',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Shows the quantity of units purchased or utilized for the logged expenditure.</p>'
+            },
+            {
+                target: '[data-tour="costing-show-col-amount"]',
+                title: 'Amount (PHP)',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Displays the total monetary cost of the line item in Philippine Pesos (₱).</p>'
+            },
+            {
+                target: '[data-tour="costing-show-col-date"]',
+                title: 'Incurred Date',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Records the date when the expense was incurred or logged into the project ledger.</p>'
+            },
+            {
+                target: '[data-tour="costing-show-col-logged-by"]',
+                title: 'Logged By',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Identifies the user (Admin, Manager, or Staff member) who recorded the expenditure.</p>'
+            },
+            {
+                target: '[data-tour="costing-show-col-actions"]',
+                title: 'Actions',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Allows authorized users to review pending staff expense submissions or delete erroneous cost entries.</p>'
+            },
+            {
+                target: '[data-tour="costing-show-log-expense-btn"]',
+                title: 'Log New Expense / Cost',
+                moduleName: 'Costing Breakdown',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Click this button to record a new project expenditure — either by selecting an item directly from the Materials Catalog or by entering a custom expense.</p>'
             }
         ],
         'pending-actions': [
             {
-                target: '[data-tour-nav="pending-actions"]',
-                title: 'Staff Request Module',
-                moduleName: 'Staff Requests',
-                placement: 'right',
-                padding: 4,
-                content: '<p><strong>Staff request module (for admin/manager)</strong> — You can see the request that was made by your staff related to progression of a project.</p>'
-            },
-            {
-                target: '.pending-actions-table, .card, main',
-                title: 'Review & Action Queue',
+                target: '[data-tour="staff-req-kpi-total"]',
+                title: 'Total Requests',
                 moduleName: 'Staff Requests',
                 placement: 'bottom',
                 padding: 8,
-                content: '<p>Inspect pending staff submissions, examine task justifications or resource requests, and approve or reject with audit notes.</p>'
+                beforeEnter: function() { switchStaffRequestsTab('list'); },
+                content: '<p>Displays the cumulative number of staff submissions across all active projects and the total number of contributing staff members.</p>'
+            },
+            {
+                target: '[data-tour="staff-req-kpi-unexamined"]',
+                title: 'Unexamined Requests',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchStaffRequestsTab('list'); },
+                content: '<p>Shows the queue of pending requests awaiting Admin or Manager verification. Click this card anytime to filter the list to unexamined items.</p>'
+            },
+            {
+                target: '[data-tour="staff-req-kpi-approved"]',
+                title: 'Approved Requests',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchStaffRequestsTab('list'); },
+                content: '<p>Tracks all verified staff submissions that have been approved and applied to project timelines, budgets, and document ledgers.</p>'
+            },
+            {
+                target: '[data-tour="staff-req-kpi-rejected"]',
+                title: 'Rejected Requests',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchStaffRequestsTab('list'); },
+                content: '<p>Counts declined submissions that were returned to staff members with reviewer remarks and feedback.</p>'
+            },
+            {
+                target: '[data-tour="staff-req-tab-approvals"]',
+                title: 'Request Approvals Tab',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchStaffRequestsTab('list'); },
+                content: '<p>Where you can see all of the requests that were submitted by staff and need to be reviewed by you (Admin/Manager).</p>'
+            },
+            {
+                target: '[data-tour="staff-req-tab-staff"]',
+                title: 'View from Staff List Tab',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchStaffRequestsTab('list'); },
+                content: '<p>Switch to a list of requests organized based off your staff directory to inspect submission activity per staff member.</p>'
+            },
+            {
+                target: '[data-tour="staff-req-col-details"]',
+                title: 'Request Details',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchStaffRequestsTab('list'); },
+                content: '<p>See what type of request was submitted by staff — such as a <strong>Timeline Task Completion</strong>, <strong>Expense Entry</strong>, or <strong>File Upload</strong> — along with a summary of the submission.</p>'
+            },
+            {
+                target: '[data-tour="staff-req-col-project"]',
+                title: 'Project',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchStaffRequestsTab('list'); },
+                content: '<p>Shows the associated project code and project name where the staff request will be applied once approved.</p>'
+            },
+            {
+                target: '[data-tour="staff-req-col-status"]',
+                title: 'Status',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchStaffRequestsTab('list'); },
+                content: '<p>Indicates the current review status of the request (<strong>Unexamined</strong>, <strong>Approved</strong>, or <strong>Rejected</strong>) and who reviewed it.</p>'
+            },
+            {
+                target: '[data-tour="staff-req-col-actions"]',
+                title: 'Actions (Request Approvals)',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchStaffRequestsTab('list'); },
+                content: '<p>Click <strong>Verdict</strong> on pending requests to inspect proof attachments and approve or reject with mandatory notes, or click <strong>Review</strong> on processed items.</p>'
+            },
+            {
+                target: '[data-tour="staff-dir-col-member"]',
+                title: 'Staff Member (Staff Directory)',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchStaffRequestsTab('staff'); },
+                content: '<p>In the <strong>Staff Directory &amp; Request Summary</strong> tab, this column lists each staff member along with their avatar initials and email address.</p>'
+            },
+            {
+                target: '[data-tour="staff-dir-col-breakdown"]',
+                title: 'Request Status Breakdown',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchStaffRequestsTab('staff'); },
+                content: '<p>Provides an instant breakdown of each staff member\'s <strong>Unexamined</strong>, <strong>Approved</strong>, and <strong>Rejected</strong> request counts.</p>'
+            },
+            {
+                target: '[data-tour="staff-dir-col-actions"]',
+                title: 'Actions (Staff Directory)',
+                moduleName: 'Staff Requests',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchStaffRequestsTab('staff'); },
+                content: '<p>Click <strong>View Requests</strong> to open a dedicated modal listing all requests submitted by that specific staff member for focused review.</p>'
             }
         ],
         'approval-list': [
@@ -1177,74 +1461,777 @@
         ],
         'resources': [
             {
-                target: '[data-tour-nav="resources"]',
-                title: 'Materials Catalog Module',
-                moduleName: 'Materials',
-                placement: 'right',
-                padding: 4,
-                content: '<p><strong>Materials catalog module</strong> — Monitor your the changes from your material list.</p>'
-            },
-            {
-                target: '.table-responsive, .card, main',
-                title: 'Catalog Inventory & Stock',
-                moduleName: 'Materials',
+                target: '[data-tour="materials-searchbar"]',
+                title: 'Materials Catalog Searchbar',
+                moduleName: 'Materials Catalog',
                 placement: 'bottom',
                 padding: 8,
-                content: '<p>Manage physical materials, track remaining balances, set low-stock warning thresholds, and update unit pricing.</p>'
+                content: '<p>Quickly search and filter your catalog inventory by item code, material name, model, or technical specifications.</p>'
+            },
+            {
+                target: '[data-tour="materials-col-code"]',
+                title: 'Item Code',
+                moduleName: 'Materials Catalog',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Unique reference code assigned to each elevator part or material for fast identification and inventory tracking.</p>'
+            },
+            {
+                target: '[data-tour="materials-col-name"]',
+                title: 'Item Name & Description',
+                moduleName: 'Materials Catalog',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Displays the primary name of the component along with a brief description of its function or category.</p>'
+            },
+            {
+                target: '[data-tour="materials-col-specs"]',
+                title: 'Model / Specs',
+                moduleName: 'Materials Catalog',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Specifies the technical model, dimensions, rating, or engineering specifications required for compatibility.</p>'
+            },
+            {
+                target: '[data-tour="materials-col-qty"]',
+                title: 'QTY (Available Stock)',
+                moduleName: 'Materials Catalog',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Tracks current quantity on hand in central stock, with automatic warning indicators when stock drops to low-stock or out-of-stock levels.</p>'
+            },
+            {
+                target: '[data-tour="materials-col-price"]',
+                title: 'Price (DEX Selling Price)',
+                moduleName: 'Materials Catalog',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Represents the DEX selling price per unit used when quoting or billing materials to client projects.</p>'
+            },
+            {
+                target: '[data-tour="materials-col-unit-cost"]',
+                title: 'Unit Cost (Procurement / Supplier Price)',
+                moduleName: 'Materials Catalog',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Records the procurement or supplier acquisition cost per unit to help monitor margins and actual supply expenses.</p>'
+            },
+            {
+                target: '[data-tour="materials-col-demand"]',
+                title: 'Demand Status',
+                moduleName: 'Materials Catalog',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Classifies items as <strong>Fast-moving</strong> or <strong>Slow-moving</strong> based on project usage frequency over the last 3 months.</p>'
+            },
+            {
+                target: '[data-tour="materials-col-configure"]',
+                title: 'Configure & Actions',
+                moduleName: 'Materials Catalog',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Click <strong>Configure</strong> on any row to update stock quantities, adjust selling or supplier pricing, edit specifications, or remove an entry.</p>'
+            },
+            {
+                target: '[data-tour="materials-add-btn"]',
+                title: 'Add Material',
+                moduleName: 'Materials Catalog',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Click this button to register a new elevator part or material into the central catalog with its initial stock, specifications, and pricing.</p>'
             }
         ],
         'scheduling': [
             {
-                target: '[data-tour-nav="scheduling"]',
-                title: 'Manpower Module',
-                moduleName: 'Manpower',
-                placement: 'right',
-                padding: 4,
-                content: '<p><strong>Manpower module</strong> — List of all your active available people that you may assign from each project.</p>'
+                target: '[data-tour="manpower-col-emp-id"]',
+                title: 'Employee ID',
+                moduleName: 'Manpower Management',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Unique employee identification number assigned to each registered field worker or technical staff member.</p>'
             },
             {
-                target: '.schedule-grid, .card, main',
-                title: 'Personnel Roster & Deployments',
-                moduleName: 'Manpower',
+                target: '[data-tour="manpower-col-name"]',
+                title: 'Full Name',
+                moduleName: 'Manpower Management',
                 placement: 'bottom',
-                padding: 8,
-                content: '<p>Review available personnel, assign skilled tradespeople to project tasks, and prevent double-booking.</p>'
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Displays the full registered name of the personnel in your active manpower roster.</p>'
+            },
+            {
+                target: '[data-tour="manpower-col-role"]',
+                title: 'Role',
+                moduleName: 'Manpower Management',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Indicates the personnel\'s trade specialization or technical expertise (such as Project Engineer, Safety Officer, or Installation Personnel).</p>'
+            },
+            {
+                target: '[data-tour="manpower-col-project"]',
+                title: 'Assigned Project',
+                moduleName: 'Manpower Management',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Shows the current project code and project name where the personnel is deployed, or a dash if they are currently unassigned.</p>'
+            },
+            {
+                target: '[data-tour="manpower-col-status"]',
+                title: 'Status',
+                moduleName: 'Manpower Management',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Reflects real-time deployment availability — whether the personnel is currently <strong>Assigned</strong> to an active project or <strong>Not Assigned</strong> and available for deployment.</p>'
+            },
+            {
+                target: '[data-tour="manpower-col-date"]',
+                title: 'Date Assigned',
+                moduleName: 'Manpower Management',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Records the exact date when the personnel was deployed to their current project assignment.</p>'
+            },
+            {
+                target: '[data-tour="manpower-col-actions"]',
+                title: 'Actions',
+                moduleName: 'Manpower Management',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Use <strong>Reassign</strong> to deploy or unassign a worker to a different project, or click <strong>Configure</strong> to edit their personal details, role, and profile status.</p>'
+            },
+            {
+                target: '[data-tour="manpower-add-btn"]',
+                title: 'Add New Personnel',
+                moduleName: 'Manpower Management',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                content: '<p>Click this button to register new field personnel into your workforce roster and optionally assign them directly to an active project.</p>'
             }
         ],
         'reports': [
             {
-                target: '[data-tour-nav="reports"]',
-                title: 'Reports Module',
-                moduleName: 'Reports',
-                placement: 'right',
-                padding: 4,
-                content: '<p><strong>Reports module</strong> — Generate an exportable information about your project, materials, revenue, and manpower.</p>'
-            },
-            {
-                target: '.reports-form, .card, main',
-                title: 'Exportable Analytics & Reports',
+                target: '[data-tour="reports-kpi-projects"]',
+                title: 'Projects Register KPI',
                 moduleName: 'Reports',
                 placement: 'bottom',
                 padding: 8,
-                content: '<p>Configure custom date ranges and export publication-ready PDF and Excel reports for projects, financials, materials, and labor.</p>'
+                beforeEnter: function() { switchReportsTab('projects'); },
+                content: '<p>Summarizes total registered projects across ongoing, completed, and pending statuses. Click this card anytime to jump directly to Project Data Export.</p>'
+            },
+            {
+                target: '[data-tour="reports-kpi-contract"]',
+                title: 'Contract Portfolio KPI (Without Taxes)',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchReportsTab('projects'); },
+                content: '<p>Displays total portfolio contract value, cumulative actual spend, remaining budget (without taxes), and overall budget utilization percentage.</p>'
+            },
+            {
+                target: '[data-tour="reports-kpi-materials"]',
+                title: 'Materials Catalog KPI',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchReportsTab('projects'); },
+                content: '<p>Shows total catalog materials, cumulative units in stock, and the breakdown between fast-moving and slow-moving inventory items.</p>'
+            },
+            {
+                target: '[data-tour="reports-kpi-manpower"]',
+                title: 'Field Manpower KPI',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchReportsTab('projects'); },
+                content: '<p>Tracks active field personnel, currently deployed workers on site, available pool count, and overall workforce deployment percentage.</p>'
+            },
+            {
+                target: '[data-tour="reports-tab-projects"]',
+                title: 'Project Data Export Tab',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('projects'); },
+                content: '<p>Compile and export comprehensive A4 PDF project dossiers for any active or archived project in your portfolio.</p>'
+            },
+            {
+                target: '[data-tour="reports-customize-template-card"]',
+                title: 'Customize Project Data Template',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchReportsTab('projects'); },
+                content: '<p>Configure which project sections are included in your exported PDF report and quickly generate a dossier for a specific project.</p>'
+            },
+            {
+                target: '[data-tour="reports-template-checkboxes"]',
+                title: 'Customize Exported Project Data Sections',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('projects'); },
+                content: '<p>Toggle these checkboxes to customize which sections — <strong>Project Overview</strong>, <strong>Elevator Technical Specs</strong>, <strong>Financials &amp; Budget</strong>, <strong>Expenditures</strong>, and <strong>Assigned Manpower</strong> — are included in your exported project PDF.</p>'
+            },
+            {
+                target: '[data-tour="reports-generate-template-dropdown"]',
+                title: 'Generate Customized Project Data Template',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('projects'); },
+                content: '<p>Select a project directly from this dropdown to immediately <strong>Download PDF</strong> or open a live <strong>Preview</strong> using your customized template settings.</p>'
+            },
+            {
+                target: '[data-tour="reports-projects-list-card"]',
+                title: 'Select Project to Export as PDF',
+                moduleName: 'Reports',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchReportsTab('projects'); },
+                content: '<p>Browse, search, and filter your full project directory by scope or status, and click <strong>Preview</strong> or <strong>Export PDF</strong> on any individual project row.</p>'
+            },
+            {
+                target: '[data-tour="reports-tab-revenue"]',
+                title: 'Revenue Data Export Tab',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('revenue'); },
+                content: '<p>Switch to the Revenue Data Export tab to analyze and export portfolio revenue performance, contract values, and remaining budgets (without taxes).</p>'
+            },
+            {
+                target: '[data-tour="reports-revenue-section"]',
+                title: 'Revenue Status & Financial Performance (Without Taxes)',
+                moduleName: 'Reports',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchReportsTab('revenue'); },
+                content: '<p>Compare project contract prices (without taxes), actual spends, and total remaining budgets across months or years with interactive visual analytics.</p>'
+            },
+            {
+                target: '[data-tour="reports-revenue-btn-monthly"]',
+                title: 'Monthly Comparison Button',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('revenue'); },
+                content: '<p>Analyze financial performance month-by-month within a selected year or custom month/date range.</p>'
+            },
+            {
+                target: '[data-tour="reports-revenue-btn-yearly"]',
+                title: 'Yearly Comparison Button',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('revenue'); },
+                content: '<p>Switch to a multi-year comparison view to evaluate annual contract values, expenditures, and net revenue trends across years.</p>'
+            },
+            {
+                target: '[data-tour="reports-rev-card-contract"]',
+                title: 'Total Contract Value',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('revenue'); },
+                content: '<p>Displays the combined contract value across all projects matching your active period and status filters.</p>'
+            },
+            {
+                target: '[data-tour="reports-rev-card-spends"]',
+                title: 'Total Actual Spends',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('revenue'); },
+                content: '<p>Shows the cumulative actual expenditures recorded across the filtered projects along with the percentage of contract budget spent.</p>'
+            },
+            {
+                target: '[data-tour="reports-rev-card-remaining"]',
+                title: 'Total Revenue / Remaining Budget (Without Tax)',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('revenue'); },
+                content: '<p>Calculates the net revenue balance / remaining unspent budget (without taxes) for the selected period.</p>'
+            },
+            {
+                target: '[data-tour="reports-rev-card-comparison"]',
+                title: 'Period Comparison',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('revenue'); },
+                content: '<p>Compares current period revenue performance against the previous baseline period (e.g., vs. previous year) with variance amount and percentage change.</p>'
+            },
+            {
+                target: '[data-tour="reports-revenue-chart"]',
+                title: 'Financial Performance Graphical Chart',
+                moduleName: 'Reports',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchReportsTab('revenue'); },
+                content: '<p>Visualizes <strong>Total Contract Value</strong>, <strong>Actual Spends</strong>, and <strong>Total Revenue / Remaining Budget</strong> side-by-side per month or year. Click any period bar to inspect its summary.</p>'
+            },
+            {
+                target: '[data-tour="reports-revenue-pdf-btn"]',
+                title: 'Generate Revenue PDF Button',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('revenue'); },
+                content: '<p>Click this button to generate and download an official PDF report of the revenue status and project-by-project financial breakdown (without taxes).</p>'
+            },
+            {
+                target: '[data-tour="reports-tab-materials"]',
+                title: 'Materials List Export Tab',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('materials'); },
+                content: '<p>Switch to the Materials List Export tab to filter and export catalog inventory and demand movement reports.</p>'
+            },
+            {
+                target: '[data-tour="reports-materials-list-card"]',
+                title: 'Materials Catalog Selection & Movement List',
+                moduleName: 'Reports',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchReportsTab('materials'); },
+                content: '<p>Review catalog items, filter by Fast-Moving or Slow-Moving demand status or stock level, and tick checkboxes to select specific materials for export.</p>'
+            },
+            {
+                target: '[data-tour="reports-materials-pdf-btn"]',
+                title: 'Export Selected to PDF (Materials)',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('materials'); },
+                content: '<p>Click this button to download a formatted PDF inventory report containing your selected or filtered catalog materials.</p>'
+            },
+            {
+                target: '[data-tour="reports-tab-manpower"]',
+                title: 'Manpower List Export Tab',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('manpower'); },
+                content: '<p>Switch to the Manpower List Export tab to generate workforce deployment and expertise roster reports.</p>'
+            },
+            {
+                target: '[data-tour="reports-manpower-list-card"]',
+                title: 'Manpower Roster Selection & Expertise List',
+                moduleName: 'Reports',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchReportsTab('manpower'); },
+                content: '<p>Filter personnel by expertise role or deployment status, optionally include recent project history, and select specific workers to include in your report.</p>'
+            },
+            {
+                target: '[data-tour="reports-manpower-pdf-btn"]',
+                title: 'Export Selected to PDF (Manpower)',
+                moduleName: 'Reports',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchReportsTab('manpower'); },
+                content: '<p>Click this button to export your selected or filtered manpower roster and deployment history as an official PDF document.</p>'
             }
         ],
         'decision-support': [
             {
-                target: '[data-tour-nav="decision-support"]',
-                title: 'Decision Support Module',
+                target: '[data-tour="dss-tab-simulator"]',
+                title: 'What-If Simulator Tab',
                 moduleName: 'Decision Support',
-                placement: 'right',
-                padding: 4,
-                content: '<p><strong>Decision Support module</strong> — Helps you strategize and provides informed choices guiding you toward the best possible action for your business.</p>'
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('simulator', 'feasibility'); },
+                content: '<p>Run in-memory what-if simulations to evaluate project feasibility, schedule delay impacts, and supplier procurement trade-offs without modifying live records.</p>'
             },
             {
-                target: '.decision-support-grid, .card, main',
-                title: 'Strategic Insights & Recommendations',
+                target: '[data-tour="dss-sim-tab-feasibility"]',
+                title: 'Project Feasibility Tab',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('simulator', 'feasibility'); },
+                content: '<p>Assess whether your current workforce and catalog inventory can support taking on a proposed new project.</p>'
+            },
+            {
+                target: '[data-tour="dss-feasibility-section"]',
+                title: 'Project Feasibility Simulator',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchDssTourView('simulator', 'feasibility'); },
+                content: '<p>Enter a proposed project budget, configure required manpower roles and catalog materials, and immediately view a color-coded feasibility verdict.</p>'
+            },
+            {
+                target: '[data-tour="dss-feas-roles"]',
+                title: 'Required Manpower Roles',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('simulator', 'feasibility'); },
+                content: '<p>Specify the trade roles and headcount needed for the proposed project to test against your available and releasable personnel pool.</p>'
+            },
+            {
+                target: '[data-tour="dss-feas-materials"]',
+                title: 'Required Catalog Materials',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('simulator', 'feasibility'); },
+                content: '<p>Add the catalog materials and quantities required for the project to verify stock sufficiency and estimated material cost.</p>'
+            },
+            {
+                target: '[data-tour="dss-feas-manpower-chart"]',
+                title: 'Manpower Role Readiness Chart',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchDssTourView('simulator', 'feasibility'); },
+                content: '<p>Visualizes available and releasable headcount versus required headcount for each role, highlighting any staffing deficits.</p>'
+            },
+            {
+                target: '[data-tour="dss-feas-materials-chart"]',
+                title: 'Materials Stock & Budget Allocation Chart',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchDssTourView('simulator', 'feasibility'); },
+                content: '<p>Compares required material quantities against current catalog stock, recommends reorder quantities for shortages, and calculates your remaining budget margin.</p>'
+            },
+            {
+                target: '[data-tour="dss-sim-tab-delay"]',
+                title: 'Project Delay Simulation Tab',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('simulator', 'delay'); },
+                content: '<p>Switch to the Project Delay Simulation view to model timeline slips and detect schedule collisions across your portfolio.</p>'
+            },
+            {
+                target: '[data-tour="dss-delay-control-card"]',
+                title: 'Project Delay Simulation Section',
                 moduleName: 'Decision Support',
                 placement: 'bottom',
                 padding: 8,
-                content: '<p>Leverage algorithmic forecasting and risk modeling to uncover project bottlenecks and optimize business decisions.</p>'
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('simulator', 'delay'); },
+                content: '<p>Configure which active project is experiencing a schedule delay and simulate how the extension shifts completion dates and locks assigned crew.</p>'
+            },
+            {
+                target: '[data-tour="dss-delay-project-select"]',
+                title: 'Target Project to Delay Dropdown',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('simulator', 'delay'); },
+                content: '<p>Choose the target project whose timeline you want to test for schedule slippage.</p>'
+            },
+            {
+                target: '[data-tour="dss-delay-slider"]',
+                title: 'Simulated Delay Duration Control Slider',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('simulator', 'delay'); },
+                content: '<p>Drag the slider or enter the exact number of slip days (or use the quick preset buttons) to simulate the delay duration in real time.</p>'
+            },
+            {
+                target: '[data-tour="dss-delay-calendar-card"]',
+                title: 'Portfolio Schedule Calendar',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('simulator', 'delay'); },
+                content: '<p>Interactive Gantt-style portfolio timeline displaying scheduled project durations, simulated delay extensions, and downstream overlap conflicts.</p>'
+            },
+            {
+                target: '[data-tour="dss-delay-col-project"]',
+                title: 'Project Column',
+                moduleName: 'Decision Support',
+                placement: 'right',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('simulator', 'delay'); },
+                content: '<p>Lists every project in the timeline along with its color indicator, status badge, and scheduled date window. Click any row to simulate a delay on that project.</p>'
+            },
+            {
+                target: '[data-tour="dss-delay-legend"]',
+                title: 'Project Color Legend & Calendar Key',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('simulator', 'delay'); },
+                content: '<p>Explains the visual timeline bars — <strong>Scheduled Duration</strong>, <strong>Simulated Delay (+X days)</strong>, <strong>Run-Over Overlap Zone</strong>, and <strong>Today</strong> marker — and lets you quickly select projects by color chip.</p>'
+            },
+            {
+                target: '[data-tour="dss-delay-runover-card"]',
+                title: 'Projects Run Over by Schedule Slip',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('simulator', 'delay'); },
+                content: '<p>Identifies downstream projects whose schedules overlap with the simulated delay window and shows the exact number of conflicting overlap days.</p>'
+            },
+            {
+                target: '[data-tour="dss-delay-held-crew-card"]',
+                title: 'Held Field Personnel',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('simulator', 'delay'); },
+                content: '<p>Lists all field personnel currently assigned to the delayed project who will remain locked until the new extended target completion date.</p>'
+            },
+            {
+                target: '[data-tour="dss-sim-tab-supplier"]',
+                title: 'Supplier Procurement Trade-Off Tab',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('simulator', 'supplier'); },
+                content: '<p>Switch to the Supplier Procurement Trade-Off simulator to compare supplier unit costs, shipping lead times, and payment terms side-by-side.</p>'
+            },
+            {
+                target: '[data-tour="dss-supplier-canvas"]',
+                title: 'Drag and Drop Playground for Profiles',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchDssTourView('simulator', 'supplier'); },
+                content: '<p>Interactive node canvas where you can drag supplier profile cards and connect profiles that supply the same material to compare price and delivery lead time.</p>'
+            },
+            {
+                target: '[data-tour="dss-supplier-btn-add"]',
+                title: 'Add Profile Button',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('simulator', 'supplier'); },
+                content: '<p>Places a new blank supplier profile card directly onto the canvas for quick ad-hoc comparison.</p>'
+            },
+            {
+                target: '[data-tour="dss-supplier-btn-choose"]',
+                title: 'Choose From Existing Profiles Button',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('simulator', 'supplier'); },
+                content: '<p>Opens your saved supplier library and catalog material baselines so you can add existing supplier profiles onto the comparison canvas.</p>'
+            },
+            {
+                target: '[data-tour="dss-supplier-btn-create"]',
+                title: 'Create Profile Button',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('simulator', 'supplier'); },
+                content: '<p>Create and save a new supplier profile with its material item, unit cost, shipping lead days, and payment terms, and place it onto the canvas.</p>'
+            },
+            {
+                target: '[data-tour="dss-supplier-result-card"]',
+                title: 'Graphical View / Result Section',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchDssTourView('simulator', 'supplier'); },
+                content: '<p>Displays the side-by-side comparison results for connected supplier profiles, highlighting the recommended supplier, cost savings, shipment lead-time difference, and latest order cutoff dates.</p>'
+            },
+            {
+                target: '[data-tour="dss-tab-allocation"]',
+                title: 'Generate Resource Allocation Tab',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Switch to Generate Resource Allocation to build specification-driven manpower and material packages and allocate them directly to a target project.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-selector-card"]',
+                title: 'Project Specification & Scenario Template Selector',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 8,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Inspect the target project\'s elevator technical specifications, select or customize a scenario template, and validate pre-flight readiness.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-target-project"]',
+                title: 'Target Project Dropdown',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Select the active project that will receive the manpower and material resource allocation.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-template-select"]',
+                title: 'Material & Manpower Scenario Template Dropdown',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Choose an auto-derived specification template, a standard rise preset (Low-Rise, Mid-Rise, High-Rise), or one of your saved custom scenario templates.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-btn-match"]',
+                title: 'Match Project Specs Button',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Automatically recalculates recommended manpower roles and catalog material quantities based on the selected project\'s elevator specifications and missing core roles.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-btn-save-tpl"]',
+                title: 'Save as Custom Template Button',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Save your current combination of manpower roles and catalog materials as a reusable custom scenario template for future projects.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-manpower-card"]',
+                title: 'Manpower Allocation Builder',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Configure the manpower roles and headcount to deploy to the project, automatically ranking unassigned personnel by lowest historical workload.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-live-pool"]',
+                title: 'Live Pool Availability & Auto-Matched Crew',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Displays real-time unassigned pool availability per role and previews the exact personnel who will be auto-assigned to the project.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-material-card"]',
+                title: 'Material Assignment Template Builder',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Select the catalog materials and quantities to allocate, which automatically deducts central stock and logs itemized project expenditures upon submission.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-stock-sufficiency"]',
+                title: 'Catalog Stock Sufficiency',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Verifies that requested material quantities are available in central catalog stock and calculates the total template material cost.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-post-impact-card"]',
+                title: 'Post-Allocation Project Budget Impact',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Reviews pre-flight budget guardrails, showing how the allocation affects total project spend, utilization percentage, and remaining contract budget.</p>'
+            },
+            {
+                target: '[data-tour="dss-alloc-submit-btn"]',
+                title: 'Allocate Resource to Project Button',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('allocation'); },
+                content: '<p>Commits the validated manpower assignments and material expenditures directly to the target project in a single atomic action.</p>'
+            },
+            {
+                target: '[data-tour="dss-tab-kuya-dex"]',
+                title: 'Kuya DEX Personal Assistant Tab',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('kuya_dex'); },
+                content: '<p>Switch to <strong>Kuya DEX</strong>, your personal AI assistant for project inquiries, materials, costing, manpower, and decision support.</p>'
+            },
+            {
+                target: '[data-tour="dss-kuya-dex-window"]',
+                title: 'Kuya DEX Chat Window',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchDssTourView('kuya_dex'); },
+                content: '<p>Interactive chat workspace where Kuya DEX answers questions about your projects, available workforce, expenditures, and strategic forecasts.</p>'
+            },
+            {
+                target: '[data-tour="dss-kuya-dex-context"]',
+                title: 'Project Context Dropdown',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchDssTourView('kuya_dex'); },
+                content: '<p>Select which active project Kuya DEX should use as reference context when answering project-specific questions.</p>'
+            },
+            {
+                target: '[data-tour="dss-kuya-dex-input"]',
+                title: 'Message Text Box',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('kuya_dex'); },
+                content: '<p>Type your question here — or click any of the suggested inquiry chips inside the chat stream — to ask Kuya DEX for insights.</p>'
+            },
+            {
+                target: '[data-tour="dss-kuya-dex-send"]',
+                title: 'Send Button',
+                moduleName: 'Decision Support',
+                placement: 'top',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('kuya_dex'); },
+                content: '<p>Click <strong>Send</strong> (or press Enter) to submit your inquiry to Kuya DEX.</p>'
+            },
+            {
+                target: '[data-tour="dss-kuya-dex-reset"]',
+                title: 'Reset Chat Button',
+                moduleName: 'Decision Support',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchDssTourView('kuya_dex'); },
+                content: '<p>Clears the current conversation history and resets the Kuya DEX chat session.</p>'
             }
         ],
         'account': [
@@ -1361,6 +2348,67 @@
     }
 
     /**
+     * Switch tab in Staff Requests module ('list' = Request Approvals, 'staff' = View from Staff List)
+     */
+    function switchStaffRequestsTab(mode) {
+        if (window.__staffRequestsComponent && typeof window.__staffRequestsComponent.switchView === 'function') {
+            if (window.__staffRequestsComponent.viewMode !== mode) {
+                window.__staffRequestsComponent.switchView(mode);
+            }
+        } else {
+            const selector = mode === 'staff'
+                ? '[data-tour="staff-req-tab-staff"]'
+                : '[data-tour="staff-req-tab-approvals"]';
+            const tabBtn = document.querySelector(selector);
+            if (tabBtn) tabBtn.click();
+        }
+    }
+
+    /**
+     * Switch tab in Reports module ('projects', 'revenue', 'materials', 'manpower')
+     */
+    function switchReportsTab(tab) {
+        if (window.__reportsModuleComponent) {
+            if (window.__reportsModuleComponent.activeTab !== tab) {
+                window.__reportsModuleComponent.activeTab = tab;
+            }
+        } else {
+            const tabBtn = document.getElementById(`tab-btn-${tab}`);
+            if (tabBtn) tabBtn.click();
+        }
+    }
+
+    /**
+     * Switch tab and optional simulator sub-mode in Decision Support module
+     */
+    function switchDssTourView(tab, simMode = null) {
+        if (window.__dssModuleComponent) {
+            if (window.__dssModuleComponent.activeTab !== tab) {
+                if (typeof window.__dssModuleComponent.switchDssTab === 'function') {
+                    window.__dssModuleComponent.switchDssTab(tab);
+                } else {
+                    window.__dssModuleComponent.activeTab = tab;
+                }
+            }
+            if (simMode && window.__dssModuleComponent.simMode !== simMode) {
+                window.__dssModuleComponent.simMode = simMode;
+            }
+        } else {
+            const tabBtnMap = {
+                'simulator': 'tab-btn-dss-simulator',
+                'allocation': 'tab-btn-dss-allocation',
+                'kuya_dex': 'tab-btn-dss-kuya-dex'
+            };
+            const tabBtn = document.getElementById(tabBtnMap[tab]);
+            if (tabBtn) tabBtn.click();
+            if (simMode) {
+                const simBtn = document.getElementById(`btn-sim-mode-${simMode}`);
+                if (simBtn) simBtn.click();
+            }
+        }
+    }
+
+    /**
      * Start the tour for a specific module
      */
     function startTour(moduleKey, isManual = false) {
@@ -1370,6 +2418,12 @@
         // In project view, expand collapsible sections (specific tasks, expenditures, manpower, audit logs)
         if (key === 'projects.show') {
             maximizeProjectShowSections();
+        } else if (key === 'pending-actions') {
+            switchStaffRequestsTab('list');
+        } else if (key === 'reports') {
+            switchReportsTab('projects');
+        } else if (key === 'decision-support') {
+            switchDssTourView('simulator', 'feasibility');
         }
 
         const candidateSteps = modulesConfig[key] || modulesConfig['dashboard'];
@@ -1455,6 +2509,12 @@
 
         currentStepIdx = index;
         const step = activeSteps[index];
+
+        // Execute pre-step hook (e.g. switching tabs before spotlighting element)
+        if (typeof step.beforeEnter === 'function') {
+            step.beforeEnter();
+        }
+
         let el = document.querySelector(step.target);
 
         // If target is missing, skip or fallback
@@ -1475,13 +2535,13 @@
 
         // Smooth scroll to element while unlocking transition
         isTransitioning = true;
-        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-
-        // Update UI
         renderStepContent(step, index);
 
-        // Synchronize spotlight position after scroll starts and settles
-        requestAnimationFrame(() => updatePositions(el, step));
+        // Synchronize spotlight position after Alpine DOM updates and scroll settles
+        requestAnimationFrame(() => {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            updatePositions(el, step);
+        });
         setTimeout(() => updatePositions(el, step), 150);
         setTimeout(() => {
             updatePositions(el, step);
@@ -1841,6 +2901,15 @@
 
         // Restore previous minimized/collapsible states in project view
         restoreProjectShowSections();
+
+        // In Staff Requests module, automatically return to the Request Approvals tab when finished, skipped, or cancelled
+        if (currentModuleKey === 'pending-actions') {
+            switchStaffRequestsTab('list');
+        } else if (currentModuleKey === 'reports') {
+            switchReportsTab('projects');
+        } else if (currentModuleKey === 'decision-support') {
+            switchDssTourView('simulator', 'feasibility');
+        }
 
         const container = document.getElementById('dex-tour-container');
         if (container) container.style.display = 'none';

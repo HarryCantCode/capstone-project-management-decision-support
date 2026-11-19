@@ -136,7 +136,7 @@
                 </svg>
                 Manage Roster
             </a>
-            <a href="{{ route('scheduling.create') }}" class="btn btn-primary" id="btn-add-personnel">+ Add New Personnel</a>
+            <a href="{{ route('scheduling.create') }}" class="btn btn-primary" id="btn-add-personnel" data-tour="manpower-add-btn">+ Add New Personnel</a>
         </div>
     </div>
 
@@ -300,13 +300,13 @@
                                     aria-label="Select all visible personnel"
                                 >
                             </th>
-                            <th scope="col">Employee ID</th>
-                            <th scope="col">Full Name</th>
-                            <th scope="col">Role</th>
-                            <th scope="col">Assigned Project</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">Date Assigned</th>
-                            <th scope="col" class="text-right">Actions</th>
+                            <th scope="col" data-tour="manpower-col-emp-id">Employee ID</th>
+                            <th scope="col" data-tour="manpower-col-name">Full Name</th>
+                            <th scope="col" data-tour="manpower-col-role">Role</th>
+                            <th scope="col" data-tour="manpower-col-project">Assigned Project</th>
+                            <th scope="col" data-tour="manpower-col-status">Status</th>
+                            <th scope="col" data-tour="manpower-col-date">Date Assigned</th>
+                            <th scope="col" class="text-right" data-tour="manpower-col-actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody>

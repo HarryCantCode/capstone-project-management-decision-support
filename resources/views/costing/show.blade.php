@@ -42,25 +42,25 @@
     <div class="project-detail-grid mb-6">
         
         {{-- Financial Metrics Card --}}
-        <section class="card card-glass" aria-labelledby="project-finances-heading">
+        <section class="card card-glass" aria-labelledby="project-finances-heading" data-tour="costing-show-financial-overview">
             <div class="card-header">
                 <h2 id="project-finances-heading">Financial Overview</h2>
             </div>
             <div class="card-body" style="display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-4);">
                 <div class="financial-stats-grid">
-                    <div class="financial-stat-card">
+                    <div class="financial-stat-card" data-tour="costing-show-allocated-budget">
                         <span class="financial-stat-card__label" title="Allocated Budget">Allocated Budget</span>
                         <div class="financial-stat-card__value text-success" title="₱{{ number_format($project->contract_price, 2) }}">
                             ₱{{ number_format($project->contract_price, 2) }}
                         </div>
                     </div>
-                    <div class="financial-stat-card">
+                    <div class="financial-stat-card" data-tour="costing-show-actual-spend">
                         <span class="financial-stat-card__label" title="Total Actual Spend">Total Actual Spend</span>
                         <div class="financial-stat-card__value" style="color: var(--color-ink);" title="₱{{ number_format($project->actual_spend, 2) }}">
                             ₱{{ number_format($project->actual_spend, 2) }}
                         </div>
                     </div>
-                    <div class="financial-stat-card">
+                    <div class="financial-stat-card" data-tour="costing-show-remaining-budget">
                         <span class="financial-stat-card__label" title="Remaining Budget">Remaining Budget</span>
                         <div class="financial-stat-card__value {{ $project->remaining_budget >= 0 ? 'text-success' : 'text-danger' }}" title="₱{{ number_format($project->remaining_budget, 2) }}">
                             ₱{{ number_format($project->remaining_budget, 2) }}
@@ -81,7 +81,7 @@
         </section>
 
         {{-- Category Breakdown Summary Card --}}
-        <section class="card card-glass" aria-labelledby="category-spending-heading">
+        <section class="card card-glass" aria-labelledby="category-spending-heading" data-tour="costing-show-category-spending">
             <div class="card-header">
                 <h2 id="category-spending-heading">Spending by Category</h2>
                 <span class="text-muted" style="font-size: 0.8125rem;">{{ $project->costs->count() }} total entries</span>
@@ -226,7 +226,7 @@
     </div>
 
     {{-- Full Costing & Expenditures Breakdown Table --}}
-    <div class="card card-glass">
+    <div class="card card-glass" data-tour="costing-show-ledger-card">
         <div class="card-header">
             <div>
                 <span style="font-weight: 700; font-size: 1rem;">Itemized Expense Ledger</span>
@@ -236,11 +236,11 @@
             </div>
             @if(Auth::user()->hasAnyRole(['Admin', 'Manager', 'Staff']))
                 @if ($isProjectReadOnly)
-                    <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}">
+                    <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot log expenses on an archived project' : 'Cannot log expenses on a completed project unless reactivated' }}" data-tour="costing-show-log-expense-btn">
                         + Log New Expense / Cost
                     </button>
                 @else
-                    <button type="button" class="btn btn-primary btn-sm" @click="openAddCostModal()">
+                    <button type="button" class="btn btn-primary btn-sm" @click="openAddCostModal()" data-tour="costing-show-log-expense-btn">
                         + Log New Expense / Cost
                     </button>
                 @endif
@@ -293,13 +293,13 @@
                     <caption class="visually-hidden">Complete cost breakdown for {{ $project->name }}</caption>
                     <thead>
                         <tr>
-                            <th scope="col">Description (What this is for)</th>
-                            <th scope="col">Category</th>
-                            <th scope="col" class="text-center">Qty</th>
-                            <th scope="col" class="text-right">Amount (PHP)</th>
-                            <th scope="col">Incurred Date</th>
-                            <th scope="col">Logged By</th>
-                            <th scope="col" class="text-right">Actions</th>
+                            <th scope="col" data-tour="costing-show-col-description">Description (What this is for)</th>
+                            <th scope="col" data-tour="costing-show-col-category">Category</th>
+                            <th scope="col" class="text-center" data-tour="costing-show-col-qty">Qty</th>
+                            <th scope="col" class="text-right" data-tour="costing-show-col-amount">Amount (PHP)</th>
+                            <th scope="col" data-tour="costing-show-col-date">Incurred Date</th>
+                            <th scope="col" data-tour="costing-show-col-logged-by">Logged By</th>
+                            <th scope="col" class="text-right" data-tour="costing-show-col-actions">Actions</th>
                         </tr>
                     </thead>
                     <tbody>

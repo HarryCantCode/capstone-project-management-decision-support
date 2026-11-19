@@ -17,9 +17,9 @@
     </div>
 
     {{-- Financial Summary KPI Cards --}}
-    <div class="costing-kpi-grid">
+    <div class="costing-kpi-grid" data-tour="costing-kpi-cards">
         {{-- Card 1: Total Allocated Contract Value --}}
-        <div class="costing-kpi-card costing-kpi-card--contract">
+        <div class="costing-kpi-card costing-kpi-card--contract" data-tour="costing-kpi-allocated">
             {{-- Background Watermark Icon --}}
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
@@ -68,7 +68,7 @@
         </div>
 
         {{-- Card 2: Total Actual Spend --}}
-        <div class="costing-kpi-card costing-kpi-card--spend">
+        <div class="costing-kpi-card costing-kpi-card--spend" data-tour="costing-kpi-spend">
             {{-- Background Watermark Icon --}}
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <line x1="12" y1="1" x2="12" y2="23"></line>
@@ -119,7 +119,7 @@
         </div>
 
         {{-- Card 3: Total Remaining Budget --}}
-        <div class="costing-kpi-card {{ $totalRemaining >= 0 ? 'costing-kpi-card--remaining-positive' : 'costing-kpi-card--remaining-negative' }}">
+        <div class="costing-kpi-card {{ $totalRemaining >= 0 ? 'costing-kpi-card--remaining-positive' : 'costing-kpi-card--remaining-negative' }}" data-tour="costing-kpi-remaining">
             {{-- Background Watermark Icon --}}
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
@@ -170,7 +170,7 @@
     </div>
 
     {{-- Costing Projects Table --}}
-    <div class="card card-glass">
+    <div class="card card-glass" data-tour="costing-ledger-card">
         <div class="card-header">
             <span>Project Budget &amp; Costing Ledger</span>
             <form method="GET" action="{{ route('costing.index') }}" class="project-header-actions" role="search">
@@ -250,10 +250,10 @@
                         <tr>
                             <th scope="col">Project Code & Name</th>
                             <th scope="col">Client</th>
-                            <th scope="col" class="text-right">Allocated Budget</th>
-                            <th scope="col" class="text-right">Actual Spend</th>
-                            <th scope="col" class="text-right">Remaining</th>
-                            <th scope="col" style="min-width: 170px;">Budget Utilization Percentage</th>
+                            <th scope="col" class="text-right" data-tour="costing-col-allocated">Allocated Budget</th>
+                            <th scope="col" class="text-right" data-tour="costing-col-spend">Actual Spend</th>
+                            <th scope="col" class="text-right" data-tour="costing-col-remaining">Remaining</th>
+                            <th scope="col" style="min-width: 170px;" data-tour="costing-col-utilization">Budget Utilization Percentage</th>
                             <th scope="col" class="text-right">Actions</th>
                         </tr>
                     </thead>

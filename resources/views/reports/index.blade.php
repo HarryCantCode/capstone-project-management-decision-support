@@ -89,6 +89,9 @@
 <div
     class="reports-module"
     x-data="{
+        init() {
+            window.__reportsModuleComponent = this;
+        },
         activeTab: 'projects',
 
         /* ── 1. Project Report State ── */
@@ -882,6 +885,7 @@
         {{-- Card 1: Projects Register --}}
         <div
             class="costing-kpi-card costing-kpi-card--interactive costing-kpi-card--contract"
+            data-tour="reports-kpi-projects"
             role="button"
             tabindex="0"
             @click="activeTab = 'projects'"
@@ -935,6 +939,7 @@
         {{-- Card 2: Contract Portfolio (Without Taxes) --}}
         <div
             class="costing-kpi-card costing-kpi-card--interactive costing-kpi-card--completed"
+            data-tour="reports-kpi-contract"
             role="button"
             tabindex="0"
             @click="activeTab = 'revenue'; document.getElementById('revenue-chart-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })"
@@ -992,6 +997,7 @@
         {{-- Card 3: Materials Catalog --}}
         <div
             class="costing-kpi-card costing-kpi-card--interactive costing-kpi-card--pending"
+            data-tour="reports-kpi-materials"
             role="button"
             tabindex="0"
             @click="activeTab = 'materials'"
@@ -1044,6 +1050,7 @@
         {{-- Card 4: Field Manpower --}}
         <div
             class="costing-kpi-card costing-kpi-card--interactive costing-kpi-card--ongoing"
+            data-tour="reports-kpi-manpower"
             role="button"
             tabindex="0"
             @click="activeTab = 'manpower'"
@@ -1100,6 +1107,7 @@
             <button
                 type="button"
                 role="tab"
+                data-tour="reports-tab-projects"
                 :aria-selected="(activeTab === 'projects').toString()"
                 class="btn btn-sm reports-tab-btn"
                 :class="activeTab === 'projects' ? 'btn-primary' : 'btn-secondary'"
@@ -1116,6 +1124,7 @@
             <button
                 type="button"
                 role="tab"
+                data-tour="reports-tab-revenue"
                 :aria-selected="(activeTab === 'revenue').toString()"
                 class="btn btn-sm reports-tab-btn"
                 :class="activeTab === 'revenue' ? 'btn-primary' : 'btn-secondary'"
@@ -1131,6 +1140,7 @@
             <button
                 type="button"
                 role="tab"
+                data-tour="reports-tab-materials"
                 :aria-selected="(activeTab === 'materials').toString()"
                 class="btn btn-sm reports-tab-btn"
                 :class="activeTab === 'materials' ? 'btn-primary' : 'btn-secondary'"
@@ -1147,6 +1157,7 @@
             <button
                 type="button"
                 role="tab"
+                data-tour="reports-tab-manpower"
                 :aria-selected="(activeTab === 'manpower').toString()"
                 class="btn btn-sm reports-tab-btn"
                 :class="activeTab === 'manpower' ? 'btn-primary' : 'btn-secondary'"
@@ -1170,7 +1181,7 @@
     <div x-show="activeTab === 'projects'" x-transition.opacity id="panel-projects-report">
 
         {{-- Project PDF Configuration & Quick Export Card --}}
-        <div class="card card-glass mb-6">
+        <div class="card card-glass mb-6" data-tour="reports-customize-template-card">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
                 <div style="display: flex; align-items: center; gap: var(--space-2);">
                     <span style="font-weight: 700;">Customize project data template</span>
@@ -1183,7 +1194,7 @@
                         <p class="text-muted" style="font-size: 0.8125rem; margin-bottom: var(--space-3);">
                             Exported project PDFs are structured chronologically and hierarchically by importance level. Toggle sections to include in your download:
                         </p>
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;" data-tour="reports-template-checkboxes">
                             <label style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 0.8125rem; cursor: pointer;">
                                 <input type="checkbox" class="form-check-input" x-model="sections.overview">
                                 <span class="font-mono text-muted" style="font-size: 0.7rem; font-weight: 700;">01</span>
@@ -1213,7 +1224,7 @@
                     </div>
 
                     {{-- Right: Direct Quick-Select Exporter --}}
-                    <div style="background: var(--color-surface-alt); padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border);">
+                    <div style="background: var(--color-surface-alt); padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border);" data-tour="reports-generate-template-dropdown">
                         <label for="quick-project-select" class="form-label" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 6px;">
                             Generate customized project data template
                         </label>
@@ -1308,7 +1319,7 @@
         </div>
 
         {{-- Projects Export Table --}}
-        <div class="card card-glass">
+        <div class="card card-glass" data-tour="reports-projects-list-card">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-weight: 700;">Select Project to Export as PDF</span>
@@ -1413,7 +1424,7 @@
     <div x-show="activeTab === 'revenue'" x-cloak x-transition.opacity id="panel-revenue-report">
 
         {{-- Revenue Status & Financial Performance Graphical Section (Without Taxes) --}}
-        <div class="card card-glass mb-6" id="revenue-chart-section" style="margin-bottom: 1.5rem;">
+        <div class="card card-glass mb-6" id="revenue-chart-section" data-tour="reports-revenue-section" style="margin-bottom: 1.5rem;">
             {{-- Hidden Form for Submitting Revenue Export --}}
             <form x-ref="revenueExportForm" method="POST" action="{{ route('reports.revenue.export') }}" style="display: none;">
                 @csrf
@@ -1453,6 +1464,7 @@
                             :class="revenueMode === 'monthly' ? 'btn-primary' : 'btn-secondary'"
                             @click="revenueMode = 'monthly'; selectedChartBucket = null;"
                             id="btn-revenue-mode-monthly"
+                            data-tour="reports-revenue-btn-monthly"
                         >
                             Monthly Comparison
                         </button>
@@ -1462,6 +1474,7 @@
                             :class="revenueMode === 'yearly' ? 'btn-primary' : 'btn-secondary'"
                             @click="revenueMode = 'yearly'; selectedChartBucket = null;"
                             id="btn-revenue-mode-yearly"
+                            data-tour="reports-revenue-btn-yearly"
                         >
                             Yearly Comparison
                         </button>
@@ -1671,6 +1684,7 @@
                             class="btn btn-primary btn-sm reports-btn"
                             @click="submitRevenueExport('pdf', 'download')"
                             id="btn-export-revenue-pdf"
+                            data-tour="reports-revenue-pdf-btn"
                             title="Download Revenue Data Report (Without Taxes) as PDF"
                         >
                             <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -1702,7 +1716,7 @@
             <div class="card-body" style="padding: var(--space-5) var(--space-6);">
                 {{-- 4 Revenue Summary Strip Cards (Without Taxes) --}}
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-5);">
-                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid #10B981; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
+                    <div data-tour="reports-rev-card-contract" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid #10B981; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
                         <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted);">
                             Total Contract Value
                         </div>
@@ -1712,7 +1726,7 @@
                         </div>
                     </div>
 
-                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid #D97706; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
+                    <div data-tour="reports-rev-card-spends" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid #D97706; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
                         <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted);">
                             Total Actual Spends
                         </div>
@@ -1722,7 +1736,7 @@
                         </div>
                     </div>
 
-                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid #2563EB; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
+                    <div data-tour="reports-rev-card-remaining" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid #2563EB; border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
                         <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted);">
                             Total revenue / remaining budget (without tax)
                         </div>
@@ -1737,7 +1751,7 @@
                         </div>
                     </div>
 
-                    <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid var(--color-accent); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
+                    <div data-tour="reports-rev-card-comparison" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-left: 3px solid var(--color-accent); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);">
                         <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted);" x-text="`Period Comparison (${revenueSummary.compTitle})`"></div>
                         <div
                             class="font-mono"
@@ -1757,7 +1771,7 @@
                 </div>
 
                 {{-- Graphical 3-Bar Chart (X-Axis: Year/Months, Y-Axis: Value/Amounts) --}}
-                <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4) var(--space-5);">
+                <div data-tour="reports-revenue-chart" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4) var(--space-5);">
                     {{-- Chart Legend & Title Row --}}
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: var(--space-4);">
                         <div style="font-size: 0.8125rem; font-weight: 700; color: var(--color-ink);">
@@ -1990,6 +2004,7 @@
                             class="btn btn-primary btn-sm reports-btn"
                             @click="submitMaterialsExport(selectedMaterialIds.length > 0 ? 'selected' : 'filtered', 'pdf', 'download')"
                             id="btn-export-selected-materials-pdf"
+                            data-tour="reports-materials-pdf-btn"
                         >
                             <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M3 17a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1zm3.293-7.707a1 1 0 0 1 1.414 0L9 10.586V3a1 1 0 1 1 2 0v7.586l1.293-1.293a1 1 0 1 1 1.414 1.414l-3 3a1 1 0 0 1-1.414 0l-3-3a1 1 0 0 1 0-1.414z" clip-rule="evenodd"/>
@@ -2082,7 +2097,7 @@
         </div>
 
         {{-- Materials Inventory Table --}}
-        <div class="card card-glass">
+        <div class="card card-glass" data-tour="reports-materials-list-card">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-weight: 700;">Materials Catalog Selection &amp; Movement List</span>
@@ -2213,6 +2228,7 @@
                             class="btn btn-primary btn-sm reports-btn"
                             @click="submitManpowerExport(selectedPersonnelIds.length > 0 ? 'selected' : 'filtered', 'pdf', 'download')"
                             id="btn-export-selected-manpower-pdf"
+                            data-tour="reports-manpower-pdf-btn"
                         >
                             <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M3 17a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1zm3.293-7.707a1 1 0 0 1 1.414 0L9 10.586V3a1 1 0 1 1 2 0v7.586l1.293-1.293a1 1 0 1 1 1.414 1.414l-3 3a1 1 0 0 1-1.414 0l-3-3a1 1 0 0 1 0-1.414z" clip-rule="evenodd"/>
@@ -2307,7 +2323,7 @@
         </div>
 
         {{-- Manpower Selection & Preview Table --}}
-        <div class="card card-glass">
+        <div class="card card-glass" data-tour="reports-manpower-list-card">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2);">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-weight: 700;">Manpower Roster Selection &amp; Expertise List</span>

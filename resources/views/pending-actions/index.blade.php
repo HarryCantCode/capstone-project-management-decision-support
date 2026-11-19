@@ -16,7 +16,7 @@
     {{-- Summary KPI Cards (4-Column Grid matching Dashboard & Costing) --}}
     <div class="costing-kpi-grid dashboard-stats-grid">
         {{-- Card 1: Total Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--contract costing-kpi-card--interactive" @click="setStatusFilter('all')" role="button" tabindex="0" @keydown.enter="setStatusFilter('all')">
+        <div class="costing-kpi-card costing-kpi-card--contract costing-kpi-card--interactive" data-tour="staff-req-kpi-total" @click="setStatusFilter('all')" role="button" tabindex="0" @keydown.enter="setStatusFilter('all')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
@@ -55,7 +55,7 @@
         </div>
 
         {{-- Card 2: Unexamined Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--pending costing-kpi-card--interactive" @click="setStatusFilter('unexamined')" role="button" tabindex="0" @keydown.enter="setStatusFilter('unexamined')">
+        <div class="costing-kpi-card costing-kpi-card--pending costing-kpi-card--interactive" data-tour="staff-req-kpi-unexamined" @click="setStatusFilter('unexamined')" role="button" tabindex="0" @keydown.enter="setStatusFilter('unexamined')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"></circle>
                 <polyline points="12 6 12 12 16 14"></polyline>
@@ -93,7 +93,7 @@
         </div>
 
         {{-- Card 3: Approved Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--completed costing-kpi-card--interactive" @click="setStatusFilter('approved')" role="button" tabindex="0" @keydown.enter="setStatusFilter('approved')">
+        <div class="costing-kpi-card costing-kpi-card--completed costing-kpi-card--interactive" data-tour="staff-req-kpi-approved" @click="setStatusFilter('approved')" role="button" tabindex="0" @keydown.enter="setStatusFilter('approved')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
@@ -129,7 +129,7 @@
         </div>
 
         {{-- Card 4: Rejected Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--remaining-negative costing-kpi-card--interactive" @click="setStatusFilter('rejected')" role="button" tabindex="0" @keydown.enter="setStatusFilter('rejected')">
+        <div class="costing-kpi-card costing-kpi-card--remaining-negative costing-kpi-card--interactive" data-tour="staff-req-kpi-rejected" @click="setStatusFilter('rejected')" role="button" tabindex="0" @keydown.enter="setStatusFilter('rejected')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="15" y1="9" x2="9" y2="15"></line>
@@ -174,6 +174,7 @@
             <button
                 type="button"
                 role="tab"
+                data-tour="staff-req-tab-approvals"
                 :aria-selected="(viewMode === 'list').toString()"
                 class="switch-pill-btn"
                 :class="{ 'switch-pill-btn--active': viewMode === 'list' }"
@@ -196,6 +197,7 @@
             <button
                 type="button"
                 role="tab"
+                data-tour="staff-req-tab-staff"
                 :aria-selected="(viewMode === 'staff').toString()"
                 class="switch-pill-btn"
                 :class="{ 'switch-pill-btn--active': viewMode === 'staff' }"
@@ -361,11 +363,11 @@
                         <thead>
                             <tr>
                                 <th scope="col">Staff Member</th>
-                                <th scope="col">Request Details</th>
-                                <th scope="col">Project</th>
+                                <th scope="col" data-tour="staff-req-col-details">Request Details</th>
+                                <th scope="col" data-tour="staff-req-col-project">Project</th>
                                 <th scope="col">Submitted</th>
-                                <th scope="col">Status</th>
-                                <th scope="col" class="text-right">Actions</th>
+                                <th scope="col" data-tour="staff-req-col-status">Status</th>
+                                <th scope="col" class="text-right" data-tour="staff-req-col-actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -553,12 +555,12 @@
                         <caption class="visually-hidden">Staff members and their request counts</caption>
                         <thead>
                             <tr>
-                                <th scope="col">Staff Member</th>
+                                <th scope="col" data-tour="staff-dir-col-member">Staff Member</th>
                                 <th scope="col">Role &amp; Employee ID</th>
                                 <th scope="col" class="text-right">Total Requests</th>
-                                <th scope="col">Request Status Breakdown</th>
+                                <th scope="col" data-tour="staff-dir-col-breakdown">Request Status Breakdown</th>
                                 <th scope="col">Most Recent Request</th>
-                                <th scope="col" class="text-right">Actions</th>
+                                <th scope="col" class="text-right" data-tour="staff-dir-col-actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1130,6 +1132,9 @@
 <script>
 function staffRequestsModule() {
     return {
+        init() {
+            window.__staffRequestsComponent = this;
+        },
         viewMode: @json($view ?? 'list'),
         actionsMap: @json($actionsMap ?? []),
         staffRequestsMap: @json($staffRequestsMap ?? []),

@@ -1700,6 +1700,7 @@
         ),
 
         init() {
+            window.__dssModuleComponent = this;
             try {
                 const saved = localStorage.getItem('dex_dss_alloc_templates_v1');
                 if (saved) {
@@ -3764,6 +3765,7 @@
             <button
                 type="button"
                 role="tab"
+                data-tour="dss-tab-simulator"
                 :aria-selected="activeTab === 'simulator'"
                 class="btn dss-tab-btn"
                 :class="activeTab === 'simulator' ? 'btn-primary' : 'btn-secondary'"
@@ -3780,6 +3782,7 @@
             <button
                 type="button"
                 role="tab"
+                data-tour="dss-tab-allocation"
                 :aria-selected="activeTab === 'allocation'"
                 class="btn dss-tab-btn"
                 :class="activeTab === 'allocation' ? 'btn-primary' : 'btn-secondary'"
@@ -3796,6 +3799,7 @@
             <button
                 type="button"
                 role="tab"
+                data-tour="dss-tab-kuya-dex"
                 :aria-selected="activeTab === 'kuya_dex'"
                 class="btn dss-tab-btn"
                 :class="activeTab === 'kuya_dex' ? 'btn-primary' : 'btn-secondary'"
@@ -3827,6 +3831,7 @@
                             :class="simMode === 'feasibility' ? 'btn-primary' : 'btn-secondary'"
                             @click="simMode = 'feasibility'"
                             id="btn-sim-mode-feasibility"
+                            data-tour="dss-sim-tab-feasibility"
                         >
                             1. Project Feasibility ("Can we take this project?")
                         </button>
@@ -3836,6 +3841,7 @@
                             :class="simMode === 'delay' ? 'btn-primary' : 'btn-secondary'"
                             @click="simMode = 'delay'"
                             id="btn-sim-mode-delay"
+                            data-tour="dss-sim-tab-delay"
                         >
                             2. Project delay simulation
                         </button>
@@ -3845,6 +3851,7 @@
                             :class="simMode === 'supplier' ? 'btn-primary' : 'btn-secondary'"
                             @click="simMode = 'supplier'"
                             id="btn-sim-mode-supplier"
+                            data-tour="dss-sim-tab-supplier"
                         >
                             3. Supplier Procurement Trade-Off ("Compare Price &amp; Lead-Time")
                         </button>
@@ -3857,7 +3864,7 @@
              SIMULATOR 1: PROJECT FEASIBILITY (Visual Capacity Bars & Inputs)
              ───────────────────────────────────────────────────────────────────── --}}
         <div x-show="simMode === 'feasibility'" id="sim-panel-feasibility">
-            <div class="card card-glass mb-6">
+            <div class="card card-glass mb-6" data-tour="dss-feasibility-section">
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                     <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
                         <h2 class="card-header__title" style="margin: 0; font-size: 1rem;">Project Feasibility Simulator</h2>
@@ -3889,7 +3896,7 @@
 
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;">
                             {{-- Required Roles Builder --}}
-                            <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.85rem;">
+                            <div data-tour="dss-feas-roles" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.85rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                     <span style="font-size: 0.78rem; font-weight: 700;">Required Manpower Roles</span>
                                     <button type="button" class="btn btn-secondary btn-sm dss-btn" style="height: 28px; font-size: 0.72rem;" @click="addFeasRole()">+ Add Role</button>
@@ -3910,7 +3917,7 @@
                             </div>
 
                             {{-- Required Materials Builder --}}
-                            <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.85rem;">
+                            <div data-tour="dss-feas-materials" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.85rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                     <span style="font-size: 0.78rem; font-weight: 700;">Required Catalog Materials</span>
                                     <button type="button" class="btn btn-secondary btn-sm dss-btn" style="height: 28px; font-size: 0.72rem;" @click="addFeasMaterial()">+ Add Material</button>
@@ -3935,7 +3942,7 @@
                     {{-- Visual Feasibility Output Charts (Manpower Capacity Bars & Material Stock Bars) --}}
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.25rem;">
                         {{-- Left Visual Chart: Manpower Role Capacity vs Requirement --}}
-                        <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.15rem;">
+                        <div data-tour="dss-feas-manpower-chart" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.15rem;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                                 <strong style="font-size: 0.84rem;">Manpower Role Readiness Chart</strong>
                                 <span class="font-mono text-muted" style="font-size: 0.72rem;" x-text="`${feasibilityResult.totalManpowerDeficit} Deficit`"></span>
@@ -3957,7 +3964,7 @@
                         </div>
 
                         {{-- Right Visual Chart: Material Stock vs Requirement & Budget Margin --}}
-                        <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.15rem;">
+                        <div data-tour="dss-feas-materials-chart" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.15rem;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                                 <strong style="font-size: 0.84rem;">Materials Stock &amp; Budget Allocation Chart</strong>
                                 <span class="font-mono font-bold" :class="feasibilityResult.remainingMargin >= 0 ? 'text-completed' : 'text-danger'" style="font-size: 0.75rem;" x-text="`Margin: ${formatCurrency(feasibilityResult.remainingMargin)}`"></span>
@@ -3989,7 +3996,7 @@
             <template x-if="delaySimResult && calendarSchedule">
                 <div>
                     {{-- Control Bar Card --}}
-                    <div class="card card-glass mb-4" style="margin-bottom: 1rem;">
+                    <div class="card card-glass mb-4" data-tour="dss-delay-control-card" style="margin-bottom: 1rem;">
                         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding: 1rem 1.35rem;">
                             <div>
                                 <h2 class="card-header__title" style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--color-ink);">Project delay simulation</h2>
@@ -4003,7 +4010,7 @@
                         <div class="card-body" style="padding: 1.15rem 1.35rem;">
                             <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 1.25rem; flex-wrap: wrap;">
                                 {{-- Target Project Selector --}}
-                                <div style="display: flex; flex-direction: column; gap: 6px; min-width: 260px; flex: 1 1 260px;">
+                                <div data-tour="dss-delay-project-select" style="display: flex; flex-direction: column; gap: 6px; min-width: 260px; flex: 1 1 260px;">
                                     <label for="sim-delay-project" style="font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink);">
                                         Target Project to Delay
                                     </label>
@@ -4021,7 +4028,7 @@
                                 </div>
 
                                 {{-- Slider Control for Slip Days --}}
-                                <div style="display: flex; flex-direction: column; gap: 6px; flex: 2 1 340px; min-width: 270px;">
+                                <div data-tour="dss-delay-slider" style="display: flex; flex-direction: column; gap: 6px; flex: 2 1 340px; min-width: 270px;">
                                     <div style="font-size: 0.8125rem;">
                                         <span style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink);">
                                             Simulated Delay Duration
@@ -4081,7 +4088,7 @@
                     </div>
 
                     {{-- Interactive Calendar Schedule View --}}
-                    <div class="card card-glass mb-4" style="margin-bottom: 1rem; overflow: hidden;">
+                    <div class="card card-glass mb-4" data-tour="dss-delay-calendar-card" style="margin-bottom: 1rem; overflow: hidden;">
                         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.85rem 1.35rem;">
                             <div>
                                 <h3 class="card-header__title" style="margin: 0; font-size: 0.975rem; font-weight: 700; color: var(--color-ink);">Portfolio Schedule Calendar</h3>
@@ -4099,7 +4106,7 @@
                                 <div class="dss-delay-calendar-grid">
                                     {{-- Calendar Month Header Row --}}
                                     <div class="dss-delay-calendar-header">
-                                        <div class="dss-delay-cal-left-header">
+                                        <div class="dss-delay-cal-left-header" data-tour="dss-delay-col-project">
                                             <span>Project</span>
                                             <span style="font-size: 0.72rem; color: var(--color-muted); text-transform: none; font-weight: 600;">Status</span>
                                         </div>
@@ -4209,7 +4216,7 @@
                         </div>
 
                         {{-- Project Color Legend & Timeline Key (Dark Mode Adaptive) --}}
-                        <div class="dss-legend-container">
+                        <div class="dss-legend-container" data-tour="dss-delay-legend">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.75rem;">
                                 <span style="font-size: 0.875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-ink);">
                                     Project Color Legend &amp; Calendar Key
@@ -4262,7 +4269,7 @@
                     {{-- Bottom Impact Breakdown Grid (Minimalist & Professional & Dark Mode Adaptive) --}}
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.25rem;">
                         {{-- Left Card: Projects Run Over by Schedule Slip --}}
-                        <div class="dss-delay-card-alt">
+                        <div class="dss-delay-card-alt" data-tour="dss-delay-runover-card">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.95rem;">
                                 <div>
                                     <strong style="font-size: 0.95rem; font-weight: 700; color: var(--color-ink); display: block;">Projects Run Over by Schedule Slip</strong>
@@ -4305,7 +4312,7 @@
                         </div>
 
                         {{-- Right Card: Held Field Personnel --}}
-                        <div class="dss-delay-card-alt">
+                        <div class="dss-delay-card-alt" data-tour="dss-delay-held-crew-card">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.95rem;">
                                 <div>
                                     <strong style="font-size: 0.95rem; font-weight: 700; color: var(--color-ink); display: block;">Held Field Personnel</strong>
@@ -4356,6 +4363,7 @@
                             type="button"
                             class="btn btn-secondary btn-sm dss-btn"
                             @click="addBlankSupplierProfile()"
+                            data-tour="dss-supplier-btn-add"
                             style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; display: flex; align-items: center; gap: 0.35rem;"
                         >
                             <svg style="width: 13px; height: 13px;" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
@@ -4366,6 +4374,7 @@
                             type="button"
                             class="btn btn-secondary btn-sm dss-btn"
                             @click="openPickSupplierModal()"
+                            data-tour="dss-supplier-btn-choose"
                             style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; display: flex; align-items: center; gap: 0.35rem;"
                         >
                             <svg style="width: 13px; height: 13px;" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/></svg>
@@ -4376,6 +4385,7 @@
                             type="button"
                             class="btn btn-primary btn-sm dss-btn"
                             @click="openCreateSupplierModal()"
+                            data-tour="dss-supplier-btn-create"
                             style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; display: flex; align-items: center; gap: 0.35rem;"
                         >
                             <svg style="width: 13px; height: 13px;" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
@@ -4423,6 +4433,7 @@
                 {{-- Interactive Canvas Area (Light & Dark Mode Adaptive, Height 500px) --}}
                 <div
                     x-ref="supplierCanvas"
+                    data-tour="dss-supplier-canvas"
                     @mousedown="startPan($event)"
                     @mousemove="onCanvasMouseMove($event)"
                     @mouseup="onCanvasMouseUp()"
@@ -4674,7 +4685,7 @@
             </div>
 
             {{-- Bottom Section: Graphical View / Comparison Result (Multi-Material Connected Sections) --}}
-            <div class="card card-glass mb-6">
+            <div class="card card-glass mb-6" data-tour="dss-supplier-result-card">
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem;">
                     <div style="display: flex; align-items: center; gap: 0.6rem;">
                         <h2 class="card-header__title" style="margin: 0; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em;">
@@ -5271,7 +5282,7 @@
                 <input type="hidden" name="template_name" :value="allocTemplateName">
 
                 {{-- Card 1: Project Selection, Elevator Technical Specs & Scenario Templates --}}
-                <div class="card card-glass mb-6" style="margin-bottom: 1.5rem;">
+                <div class="card card-glass mb-6" data-tour="dss-alloc-selector-card" style="margin-bottom: 1.5rem;">
                     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
                         <div>
                             <h2 class="card-header__title" style="margin: 0; font-size: 1rem;">Project Specification &amp; Scenario Template Selector</h2>
@@ -5291,7 +5302,7 @@
                         {{-- Row 1: Target Project + Template Preset + Auto-Generate + Save Template --}}
                         <div class="dss-toolbar-row" style="margin-bottom: 1rem;">
                             <div class="dss-filter-group" style="flex: 1;">
-                                <div>
+                                <div data-tour="dss-alloc-target-project">
                                     <label for="alloc-project-select" class="form-label" style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; margin-bottom: 3px; display: block;">Target Project</label>
                                     <select
                                         id="alloc-project-select"
@@ -5306,7 +5317,7 @@
                                     </select>
                                 </div>
 
-                                <div>
+                                <div data-tour="dss-alloc-template-select">
                                     <label for="alloc-preset-select" class="form-label" style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; margin-bottom: 3px; display: block;">Material &amp; Manpower Scenario Template</label>
                                     <select
                                         id="alloc-preset-select"
@@ -5330,6 +5341,7 @@
                                         type="button"
                                         class="btn btn-secondary btn-sm dss-btn"
                                         @click="applySpecTemplate('auto_spec')"
+                                        data-tour="dss-alloc-btn-match"
                                         title="Re-generate recommended manpower and materials from project elevator specs"
                                     >
                                         <span>⚡ Match Project Specs</span>
@@ -5338,6 +5350,7 @@
                                         type="button"
                                         class="btn btn-secondary btn-sm dss-btn"
                                         @click="showTemplateDrawer = !showTemplateDrawer"
+                                        data-tour="dss-alloc-btn-save-tpl"
                                     >
                                         <span x-text="showTemplateDrawer ? 'Cancel Template Save' : '+ Save as Custom Template'"></span>
                                     </button>
@@ -5425,7 +5438,7 @@
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
 
                     {{-- Left Column: Manpower Resource Allocation Builder --}}
-                    <div class="card card-glass">
+                    <div class="card card-glass" data-tour="dss-alloc-manpower-card">
                         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                             <div>
                                 <h3 class="card-header__title" style="margin: 0; font-size: 0.95rem;">Manpower Allocation Builder</h3>
@@ -5482,7 +5495,7 @@
                             </div>
 
                             {{-- Live Manpower Pool Validation Bars & Auto-Selected Personnel Preview --}}
-                            <div style="border-top: 1px solid var(--color-border); padding-top: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
+                            <div data-tour="dss-alloc-live-pool" style="border-top: 1px solid var(--color-border); padding-top: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
                                 <div style="font-size: 0.74rem; font-weight: 700; text-transform: uppercase; color: var(--color-muted);">
                                     Live Pool Availability &amp; Auto-Matched Crew (<span x-text="allocValidation.totalPersonnelCount"></span> requested)
                                 </div>
@@ -5511,7 +5524,7 @@
                     </div>
 
                     {{-- Right Column: Automatic Material Assignment Template Builder --}}
-                    <div class="card card-glass">
+                    <div class="card card-glass" data-tour="dss-alloc-material-card">
                         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                             <div>
                                 <h3 class="card-header__title" style="margin: 0; font-size: 0.95rem;">Material Assignment Template Builder</h3>
@@ -5560,7 +5573,7 @@
                             </div>
 
                             {{-- Live Material Stock & Cost Validation Bars --}}
-                            <div style="border-top: 1px solid var(--color-border); padding-top: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
+                            <div data-tour="dss-alloc-stock-sufficiency" style="border-top: 1px solid var(--color-border); padding-top: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; color: var(--color-muted);">
                                     <span>Catalog Stock Sufficiency</span>
                                     <span class="font-mono text-main" x-text="`Total Template Cost: ${formatCurrency(allocValidation.totalMaterialCost)}`"></span>
@@ -5583,7 +5596,7 @@
                 </div>
 
                 {{-- Strict Validation Pre-Flight Summary & Submit Action Card --}}
-                <div class="card card-glass mb-6">
+                <div class="card card-glass mb-6" data-tour="dss-alloc-post-impact-card">
                     <div class="card-body" style="padding: var(--space-4) var(--space-5);">
                         {{-- Budget Impact Visual Bar --}}
                         <div style="margin-bottom: 1rem;">
@@ -5634,6 +5647,7 @@
                                 :disabled="allocValidation.hasErrors"
                                 :style="allocValidation.hasErrors ? 'opacity: 0.55; cursor: not-allowed;' : ''"
                                 id="btn-submit-resource-allocation"
+                                data-tour="dss-alloc-submit-btn"
                             >
                                 <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
@@ -5652,7 +5666,7 @@
          TAB 3: KUYA DEX (Personal AI Assistant for DEX Project Management System)
          ========================================================================= --}}
     <div x-show="activeTab === 'kuya_dex'" x-cloak x-transition.opacity id="panel-dss-kuya-dex">
-        <div class="kuya-dex-card mb-6">
+        <div class="kuya-dex-card mb-6" data-tour="dss-kuya-dex-window">
             {{-- Chat Window Top Header --}}
             <div class="kuya-dex-header">
                 <div class="kuya-dex-brand">
@@ -5681,7 +5695,7 @@
                 {{-- Right Controls: Active Project Reference Selector & Reset Chat --}}
                 <div class="dss-filter-group">
                     <template x-if="matrix && matrix.length > 0">
-                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                        <div data-tour="dss-kuya-dex-context" style="display: flex; align-items: center; gap: 0.45rem;">
                             <label for="kuya-dex-project-select" style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--color-muted); white-space: nowrap;">
                                 Project Context:
                             </label>
@@ -5704,6 +5718,7 @@
                         class="btn btn-secondary btn-sm dss-btn"
                         style="height: 34px; font-size: 0.76rem;"
                         @click="resetKuyaDexChat()"
+                        data-tour="dss-kuya-dex-reset"
                         title="Clear current session messages"
                     >
                         Reset Chat
@@ -5893,6 +5908,7 @@
                 <div class="kuya-dex-input-row">
                     <input
                         id="kuya-dex-message-input"
+                        data-tour="dss-kuya-dex-input"
                         type="text"
                         x-model="kuyaDexInput"
                         class="kuya-dex-input"
@@ -5908,6 +5924,7 @@
                         :disabled="!kuyaDexInput.trim()"
                         :style="!kuyaDexInput.trim() ? 'opacity: 0.55; cursor: not-allowed;' : ''"
                         id="btn-send-kuya-dex"
+                        data-tour="dss-kuya-dex-send"
                     >
                         <span>Send</span>
                         <svg style="width: 15px; height: 15px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

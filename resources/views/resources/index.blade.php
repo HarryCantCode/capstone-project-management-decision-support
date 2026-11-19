@@ -150,6 +150,7 @@
                 class="btn btn-primary btn-sm"
                 @click="openAddModal()"
                 id="btn-add-material"
+                data-tour="materials-add-btn"
                 style="display: inline-flex; align-items: center; gap: 0.4rem;"
             >
                 <svg style="width: 16px; height: 16px;" viewBox="0 0 20 20" fill="currentColor">
@@ -165,7 +166,7 @@
     <div class="card card-glass" style="margin-bottom: var(--space-4);">
         <div class="card-body" style="padding: 1rem 1.25rem;">
             <form method="GET" action="{{ route('resources.index') }}" style="display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-                <div style="display: flex; gap: 0.75rem; align-items: center; flex: 1; min-width: 280px; max-width: 460px;">
+                <div style="display: flex; gap: 0.75rem; align-items: center; flex: 1; min-width: 280px; max-width: 460px;" data-tour="materials-searchbar">
                     <div style="position: relative; width: 100%;">
                         <input
                             type="text"
@@ -243,14 +244,14 @@
                                     aria-label="Select all materials on this page"
                                 >
                             </th>
-                            <th scope="col">Item Code</th>
-                            <th scope="col" style="min-width: 180px;">Item Name & Description</th>
-                            <th scope="col" style="min-width: 220px;">Model / Specs</th>
-                            <th scope="col" class="text-right">Qty</th>
-                            <th scope="col" class="text-right">Price (PHP)</th>
-                            <th scope="col" class="text-right">Unit Cost (PHP)</th>
-                            <th scope="col" class="text-center">Demand Status</th>
-                            <th scope="col" class="text-right" style="min-width: 120px;">Actions</th>
+                            <th scope="col" data-tour="materials-col-code">Item Code</th>
+                            <th scope="col" style="min-width: 180px;" data-tour="materials-col-name">Item Name & Description</th>
+                            <th scope="col" style="min-width: 220px;" data-tour="materials-col-specs">Model / Specs</th>
+                            <th scope="col" class="text-right" data-tour="materials-col-qty">Qty</th>
+                            <th scope="col" class="text-right" data-tour="materials-col-price">Price (PHP)</th>
+                            <th scope="col" class="text-right" data-tour="materials-col-unit-cost">Unit Cost (PHP)</th>
+                            <th scope="col" class="text-center" data-tour="materials-col-demand">Demand Status</th>
+                            <th scope="col" class="text-right" style="min-width: 120px;" data-tour="materials-col-configure">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
