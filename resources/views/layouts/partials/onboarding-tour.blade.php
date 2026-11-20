@@ -1456,7 +1456,180 @@
                 moduleName: 'Approval List',
                 placement: 'right',
                 padding: 4,
-                content: '<p><strong>Approval List module</strong> — Track the review status of your submitted project requests and milestone progression updates.</p>'
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p><strong>Approval List Module</strong> — Your centralized workspace for tracking the review status of timeline task completions, expense entries, and file uploads you submitted to management, as well as viewing and completing timeline tasks assigned directly to you.</p>'
+            },
+            {
+                target: '[data-tour="approval-kpi-total"]',
+                title: 'Total Requests',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Displays the total number of requests you have submitted across all active projects. Click this card anytime to view all of your submitted requests.</p>'
+            },
+            {
+                target: '[data-tour="approval-kpi-assigned"]',
+                title: 'Assigned Tasks',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Shows the number of timeline tasks currently assigned to you across active projects. Click this card to jump directly to the <strong>Assigned Tasks</strong> tab.</p>'
+            },
+            {
+                target: '[data-tour="approval-kpi-approved"]',
+                title: 'Approved Requests',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Tracks your verified requests that have been approved by an Admin or Manager and applied to project records, along with your overall approval rate.</p>'
+            },
+            {
+                target: '[data-tour="approval-kpi-rejected"]',
+                title: 'Rejected Requests',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 8,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Counts any declined requests returned with reviewer feedback or remarks so you can inspect the reason and make necessary adjustments.</p>'
+            },
+            {
+                target: '[data-tour="approval-tab-my-requests"]',
+                title: 'My Submitted Requests Tab',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Opens your personal submission tracker where you can monitor every task completion, expense entry, and file upload you have sent for management approval.</p>'
+            },
+            {
+                target: '[data-tour="approval-my-requests-card"]',
+                title: 'My Submitted Requests List',
+                moduleName: 'Approval List',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Displays your complete register of submitted requests. Use the search bar and filter dropdowns (Status, Recency, and Request Type) to quickly locate specific submissions.</p>'
+            },
+            {
+                target: '[data-tour="approval-req-col-details"]',
+                title: 'Request Details',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Shows the type of request you submitted — <strong>Task Completion</strong>, <strong>Expense Entry</strong>, or <strong>File Upload</strong> — along with its title and summary description.</p>'
+            },
+            {
+                target: '[data-tour="approval-req-col-project"]',
+                title: 'Project',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Displays the project code and project name associated with your request, with a direct link to open the project view.</p>'
+            },
+            {
+                target: '[data-tour="approval-req-col-submitted"]',
+                title: 'Submitted',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Records the exact date and relative timestamp when you submitted the request for review.</p>'
+            },
+            {
+                target: '[data-tour="approval-req-col-status"]',
+                title: 'Status',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Indicates whether your request is currently <strong>Unexamined</strong> (pending review), <strong>Approved</strong>, or <strong>Rejected</strong>, including the name of the reviewer once processed.</p>'
+            },
+            {
+                target: '[data-tour="approval-req-col-actions"]',
+                title: 'Actions (My Submitted Requests)',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchApprovalListTab('my_requests'); },
+                content: '<p>Use <strong>Ping</strong> on pending requests to send a reminder notification to Admin and Manager (with a 15-minute cooldown), or click <strong>Details</strong> to inspect full submission attachments and reviewer remarks.</p>'
+            },
+            {
+                target: '[data-tour="approval-tab-assigned-tasks"]',
+                title: 'Assigned Tasks Tab',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                beforeEnter: function() { switchApprovalListTab('assigned_tasks'); },
+                content: '<p>Switches to your personal task assignment board showing all project timeline tasks assigned to you by your manager.</p>'
+            },
+            {
+                target: '[data-tour="approval-assigned-tasks-card"]',
+                title: 'Assigned Timeline Tasks List',
+                moduleName: 'Approval List',
+                placement: 'top',
+                padding: 8,
+                beforeEnter: function() { switchApprovalListTab('assigned_tasks'); },
+                content: '<p>Lists all timeline tasks assigned to you across active projects. Use the search input and status filter (<strong>To Complete</strong>, <strong>In Review</strong>, or <strong>Completed</strong>) to organize your workload.</p>'
+            },
+            {
+                target: '[data-tour="approval-task-col-details"]',
+                title: 'Task Details',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchApprovalListTab('assigned_tasks'); },
+                content: '<p>Displays the assigned subtask title along with its parent <strong>Major Task</strong> milestone.</p>'
+            },
+            {
+                target: '[data-tour="approval-task-col-project"]',
+                title: 'Project',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchApprovalListTab('assigned_tasks'); },
+                content: '<p>Shows the project code and project name to which the assigned timeline task belongs, linking directly to the project view.</p>'
+            },
+            {
+                target: '[data-tour="approval-task-col-target-date"]',
+                title: 'Target Date',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchApprovalListTab('assigned_tasks'); },
+                content: '<p>Indicates the scheduled target date or due date for completing the task, with an automatic <strong>Overdue</strong> badge if the deadline has passed.</p>'
+            },
+            {
+                target: '[data-tour="approval-task-col-status"]',
+                title: 'Status',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchApprovalListTab('assigned_tasks'); },
+                content: '<p>Shows the current progress state of your assigned task: <strong>To Complete</strong>, <strong>Pending Review</strong> (awaiting manager approval), or <strong>Completed</strong>.</p>'
+            },
+            {
+                target: '[data-tour="approval-task-col-action"]',
+                title: 'Action (Assigned Timeline Tasks)',
+                moduleName: 'Approval List',
+                placement: 'bottom',
+                padding: 6,
+                skipIfMissing: true,
+                beforeEnter: function() { switchApprovalListTab('assigned_tasks'); },
+                content: '<p>Click <strong>Mark as done</strong> to submit a completion approval request with optional remarks and proof attachments once you finish the task.</p>'
             }
         ],
         'resources': [
@@ -2409,6 +2582,27 @@
     }
 
     /**
+     * Switch tab in Approval List module ('my_requests' or 'assigned_tasks')
+     */
+    function switchApprovalListTab(tab) {
+        if (window.__approvalListComponent) {
+            if (window.__approvalListComponent.activeTab !== tab) {
+                if (typeof window.__approvalListComponent.setActiveTab === 'function') {
+                    window.__approvalListComponent.setActiveTab(tab);
+                } else {
+                    window.__approvalListComponent.activeTab = tab;
+                }
+            }
+        } else {
+            const tabBtnId = tab === 'assigned_tasks'
+                ? 'tab-btn-approval-assigned-tasks'
+                : 'tab-btn-approval-my-requests';
+            const tabBtn = document.getElementById(tabBtnId);
+            if (tabBtn) tabBtn.click();
+        }
+    }
+
+    /**
      * Start the tour for a specific module
      */
     function startTour(moduleKey, isManual = false) {
@@ -2420,6 +2614,8 @@
             maximizeProjectShowSections();
         } else if (key === 'pending-actions') {
             switchStaffRequestsTab('list');
+        } else if (key === 'approval-list') {
+            switchApprovalListTab('my_requests');
         } else if (key === 'reports') {
             switchReportsTab('projects');
         } else if (key === 'decision-support') {
@@ -2905,6 +3101,8 @@
         // In Staff Requests module, automatically return to the Request Approvals tab when finished, skipped, or cancelled
         if (currentModuleKey === 'pending-actions') {
             switchStaffRequestsTab('list');
+        } else if (currentModuleKey === 'approval-list') {
+            switchApprovalListTab('my_requests');
         } else if (currentModuleKey === 'reports') {
             switchReportsTab('projects');
         } else if (currentModuleKey === 'decision-support') {

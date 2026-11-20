@@ -16,7 +16,7 @@
     {{-- Summary KPI Cards (4-Column Grid matching Dashboard, Costing & Staff Requests) --}}
     <div class="costing-kpi-grid dashboard-stats-grid">
         {{-- Card 1: Total Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--contract costing-kpi-card--interactive" @click="setActiveTab('my_requests'); setStatusFilter('all')" role="button" tabindex="0" @keydown.enter="setStatusFilter('all')">
+        <div class="costing-kpi-card costing-kpi-card--contract costing-kpi-card--interactive" data-tour="approval-kpi-total" @click="setActiveTab('my_requests'); setStatusFilter('all')" role="button" tabindex="0" @keydown.enter="setStatusFilter('all')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
@@ -55,7 +55,7 @@
         </div>
 
         {{-- Card 2: Assigned Tasks (Replaces Unexamined - Same Layout & Glowing Effect) --}}
-        <div class="costing-kpi-card costing-kpi-card--assigned costing-kpi-card--interactive" @click="setActiveTab('assigned_tasks')" role="button" tabindex="0" @keydown.enter="setActiveTab('assigned_tasks')">
+        <div class="costing-kpi-card costing-kpi-card--assigned costing-kpi-card--interactive" data-tour="approval-kpi-assigned" @click="setActiveTab('assigned_tasks')" role="button" tabindex="0" @keydown.enter="setActiveTab('assigned_tasks')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <polyline points="9 11 12 14 22 4"></polyline>
                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
@@ -92,7 +92,7 @@
         </div>
 
         {{-- Card 3: Approved Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--completed costing-kpi-card--interactive" @click="setActiveTab('my_requests'); setStatusFilter('approved')" role="button" tabindex="0" @keydown.enter="setStatusFilter('approved')">
+        <div class="costing-kpi-card costing-kpi-card--completed costing-kpi-card--interactive" data-tour="approval-kpi-approved" @click="setActiveTab('my_requests'); setStatusFilter('approved')" role="button" tabindex="0" @keydown.enter="setStatusFilter('approved')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
@@ -128,7 +128,7 @@
         </div>
 
         {{-- Card 4: Rejected Requests --}}
-        <div class="costing-kpi-card costing-kpi-card--remaining-negative costing-kpi-card--interactive" @click="setActiveTab('my_requests'); setStatusFilter('rejected')" role="button" tabindex="0" @keydown.enter="setStatusFilter('rejected')">
+        <div class="costing-kpi-card costing-kpi-card--remaining-negative costing-kpi-card--interactive" data-tour="approval-kpi-rejected" @click="setActiveTab('my_requests'); setStatusFilter('rejected')" role="button" tabindex="0" @keydown.enter="setStatusFilter('rejected')">
             <svg class="costing-kpi-card__watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="15" y1="9" x2="9" y2="15"></line>
@@ -173,6 +173,8 @@
             <button 
                 type="button" 
                 role="tab"
+                id="tab-btn-approval-my-requests"
+                data-tour="approval-tab-my-requests"
                 :aria-selected="(activeTab === 'my_requests').toString()"
                 class="switch-pill-btn"
                 :class="{ 'switch-pill-btn--active': activeTab === 'my_requests' }"
@@ -193,6 +195,8 @@
             <button 
                 type="button" 
                 role="tab"
+                id="tab-btn-approval-assigned-tasks"
+                data-tour="approval-tab-assigned-tasks"
                 :aria-selected="(activeTab === 'assigned_tasks').toString()"
                 class="switch-pill-btn"
                 :class="{ 'switch-pill-btn--active': activeTab === 'assigned_tasks' }"
@@ -215,7 +219,7 @@
     <div x-show="activeTab === 'my_requests'">
 
     {{-- Main Register Card --}}
-    <div class="card card-glass">
+    <div class="card card-glass" data-tour="approval-my-requests-card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-5);">
             {{-- Left: Section Title --}}
             <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
@@ -329,39 +333,41 @@
 
         {{-- Table List View --}}
         <div>
-            @if ($actions->isEmpty())
-                <div class="card-body">
-                    <div class="empty-state">
-                        <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                        </svg>
-                        <h2 class="empty-state__title">No requests found</h2>
-                        <p class="empty-state__description">
-                            @if (!empty($search) || ($status ?? 'all') !== 'all' || ($recency ?? 'newest') !== 'newest' || ($actionType ?? 'all') !== 'all')
-                                No submitted requests matched your current search or filter criteria.
-                            @else
-                                Any timeline tasks you complete, expenses you record, or project files you upload will appear here for review tracking.
-                            @endif
-                        </p>
-                        @if (!empty($search) || ($status ?? 'all') !== 'all' || ($recency ?? 'newest') !== 'newest' || ($actionType ?? 'all') !== 'all')
-                            <a href="{{ route('approval-list.index') }}" class="btn btn-secondary btn-sm">Clear Search &amp; Filters</a>
-                        @endif
-                    </div>
-                </div>
-            @else
-                <div class="table-wrapper" style="border: none; border-radius: 0; box-shadow: none;">
-                    <table class="data-table">
-                        <caption class="visually-hidden">Staff approval requests register</caption>
-                        <thead>
+            <div class="table-wrapper" style="border: none; border-radius: 0; box-shadow: none;">
+                <table class="data-table">
+                    <caption class="visually-hidden">Staff approval requests register</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col" data-tour="approval-req-col-details">Request Details</th>
+                            <th scope="col" data-tour="approval-req-col-project">Project</th>
+                            <th scope="col" data-tour="approval-req-col-submitted">Submitted</th>
+                            <th scope="col" data-tour="approval-req-col-status">Status</th>
+                            <th scope="col" class="text-right" data-tour="approval-req-col-actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if ($actions->isEmpty())
                             <tr>
-                                <th scope="col">Request Details</th>
-                                <th scope="col">Project</th>
-                                <th scope="col">Submitted</th>
-                                <th scope="col">Status</th>
-                                <th scope="col" class="text-right">Actions</th>
+                                <td colspan="5" style="padding: 0; border-bottom: none;">
+                                    <div class="empty-state" style="padding: var(--space-8); text-align: center;">
+                                        <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                        </svg>
+                                        <h2 class="empty-state__title">No requests found</h2>
+                                        <p class="empty-state__description">
+                                            @if (!empty($search) || ($status ?? 'all') !== 'all' || ($recency ?? 'newest') !== 'newest' || ($actionType ?? 'all') !== 'all')
+                                                No submitted requests matched your current search or filter criteria.
+                                            @else
+                                                Any timeline tasks you complete, expenses you record, or project files you upload will appear here for review tracking.
+                                            @endif
+                                        </p>
+                                        @if (!empty($search) || ($status ?? 'all') !== 'all' || ($recency ?? 'newest') !== 'newest' || ($actionType ?? 'all') !== 'all')
+                                            <a href="{{ route('approval-list.index') }}" class="btn btn-secondary btn-sm">Clear Search &amp; Filters</a>
+                                        @endif
+                                    </div>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
+                        @else
                             @foreach ($actions as $action)
                                 <tr style="cursor: pointer;" @click="openActionModal({{ $action->id }})">
                                     {{-- Request Details --}}
@@ -515,16 +521,16 @@
                                     </td>
                                 </tr>
                             @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                        @endif
+                    </tbody>
+                </table>
+            </div>
 
-                {{-- Pagination Links --}}
-                @if ($actions->hasPages())
-                    <div class="card-footer pagination-wrapper">
-                        {{ $actions->links('pagination::bootstrap-5') }}
-                    </div>
-                @endif
+            {{-- Pagination Links --}}
+            @if ($actions->hasPages())
+                <div class="card-footer pagination-wrapper">
+                    {{ $actions->links('pagination::bootstrap-5') }}
+                </div>
             @endif
         </div>
     </div>
@@ -532,7 +538,7 @@
 
     {{-- ─── TAB 2: Assigned Tasks List ────────────────────────────────────────── --}}
     <div x-show="activeTab === 'assigned_tasks'" x-cloak>
-        <div class="card card-glass">
+        <div class="card card-glass" data-tour="approval-assigned-tasks-card">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-5);">
                 {{-- Left: Section Title & Count Badge --}}
                 <div style="display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0;">
@@ -580,30 +586,34 @@
             </div>
 
             <div class="card-body" style="padding: 0;">
-                @if ($assignedTasks->isEmpty())
-                    <div class="empty-state" style="padding: var(--space-8); text-align: center;">
-                        <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                        </svg>
-                        <h2 class="empty-state__title">No assigned tasks</h2>
-                        <p class="empty-state__description">
-                            You currently do not have any timeline tasks assigned to you by your manager.
-                        </p>
-                    </div>
-                @else
-                    <div class="table-wrapper" style="border: none; border-radius: 0; box-shadow: none;">
-                        <table class="data-table">
-                            <caption class="visually-hidden">Assigned timeline tasks list</caption>
-                            <thead>
+                <div class="table-wrapper" style="border: none; border-radius: 0; box-shadow: none;">
+                    <table class="data-table">
+                        <caption class="visually-hidden">Assigned timeline tasks list</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col" style="min-width: 280px;" data-tour="approval-task-col-details">Task Details</th>
+                                <th scope="col" style="min-width: 200px;" data-tour="approval-task-col-project">Project</th>
+                                <th scope="col" style="min-width: 140px;" data-tour="approval-task-col-target-date">Target Date</th>
+                                <th scope="col" style="min-width: 120px;" data-tour="approval-task-col-status">Status</th>
+                                <th scope="col" class="text-right" style="min-width: 140px;" data-tour="approval-task-col-action">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if ($assignedTasks->isEmpty())
                                 <tr>
-                                    <th scope="col" style="min-width: 280px;">Task Details</th>
-                                    <th scope="col" style="min-width: 200px;">Project</th>
-                                    <th scope="col" style="min-width: 140px;">Target Date</th>
-                                    <th scope="col" style="min-width: 120px;">Status</th>
-                                    <th scope="col" class="text-right" style="min-width: 140px;">Action</th>
+                                    <td colspan="5" style="padding: 0; border-bottom: none;">
+                                        <div class="empty-state" style="padding: var(--space-8); text-align: center;">
+                                            <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                            </svg>
+                                            <h2 class="empty-state__title">No assigned tasks</h2>
+                                            <p class="empty-state__description">
+                                                You currently do not have any timeline tasks assigned to you by your manager.
+                                            </p>
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
+                            @else
                                 @foreach ($assignedTasks as $task)
                                     @php
                                         $isPendingReview = in_array((int) $task->id, $pendingSubtaskIdsForStaff, true);
@@ -751,10 +761,10 @@
                                         </td>
                                     </tr>
                                 @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
+                            @endif
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>{{-- End of Tab 2: Assigned Tasks --}}
@@ -1239,6 +1249,7 @@ function approvalListModule() {
         },
 
         init() {
+            window.__approvalListComponent = this;
             // Live countdown timer ticking every 1 second
             this.timerInterval = setInterval(() => {
                 for (const id in this.cooldowns) {
