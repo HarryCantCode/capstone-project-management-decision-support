@@ -154,6 +154,7 @@ test('material demand status automatically syncs to fast-moving or slow-moving b
         'amount' => '15,000.00',
         'quantity' => 1,
         'incurred_date' => now()->subDays(10)->toDateString(),
+        'invoice' => \Illuminate\Http\UploadedFile::fake()->create('mat-invoice-1.pdf', 50, 'application/pdf'),
     ])->assertRedirect();
 
     $costEntry = \App\Models\ProjectCost::where('project_id', $projectA->id)->first();
@@ -168,6 +169,7 @@ test('material demand status automatically syncs to fast-moving or slow-moving b
         'amount' => '15,000.00',
         'quantity' => 1,
         'incurred_date' => now()->subDays(5)->toDateString(),
+        'invoice' => \Illuminate\Http\UploadedFile::fake()->create('mat-invoice-2.pdf', 50, 'application/pdf'),
     ])->assertRedirect();
 
     expect($material->fresh()->demand_status)->toBe('fast-moving');

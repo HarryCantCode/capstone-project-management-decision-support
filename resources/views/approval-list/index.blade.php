@@ -1030,6 +1030,36 @@
                                             </div>
                                         </template>
                                     </div>
+
+                                    {{-- Attached Invoice Details for Reviewer / Approver --}}
+                                    <template x-if="selectedAction.invoice_url || selectedAction.payload?.invoice_path">
+                                        <div style="margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px dashed var(--color-border);">
+                                            <span class="text-muted font-bold" style="display: block; font-size: 0.6875rem; text-transform: uppercase; margin-bottom: 6px;">Attached Invoice / Receipt</span>
+                                            <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: 8px 12px; background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-sm);">
+                                                <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #FB923C; flex-shrink: 0;">
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                                        <polyline points="10 9 9 9 8 9"></polyline>
+                                                    </svg>
+                                                    <div style="min-width: 0;">
+                                                        <div style="font-weight: 600; font-size: 0.8125rem; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" x-text="selectedAction.invoice_name || selectedAction.payload?.invoice_original_name || 'Invoice File'"></div>
+                                                        <template x-if="selectedAction.invoice_size || selectedAction.payload?.invoice_size">
+                                                            <span class="text-muted font-mono" style="font-size: 0.6875rem;" x-text="typeof selectedAction.invoice_size === 'number' ? (selectedAction.invoice_size > 1048576 ? (selectedAction.invoice_size/1048576).toFixed(2) + ' MB' : (selectedAction.invoice_size/1024).toFixed(1) + ' KB') : (selectedAction.invoice_size || (selectedAction.payload?.invoice_size > 1048576 ? (selectedAction.payload.invoice_size/1048576).toFixed(2) + ' MB' : (selectedAction.payload.invoice_size/1024).toFixed(1) + ' KB'))"></span>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                                <template x-if="selectedAction.status !== 'rejected'">
+                                                    <a :href="selectedAction.invoice_url || ('/storage/' + selectedAction.payload?.invoice_path)" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                                        View Invoice
+                                                    </a>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
 

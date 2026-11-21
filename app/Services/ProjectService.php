@@ -158,14 +158,31 @@ class ProjectService
             if (!empty($validated['expenses']) && is_array($validated['expenses'])) {
                 foreach ($validated['expenses'] as $expenseData) {
                     if (!empty($expenseData['description']) && !empty($expenseData['amount'])) {
+                        $invPath = null;
+                        $invName = null;
+                        $invSize = null;
+                        $invMime = null;
+
+                        if (!empty($expenseData['invoice']) && $expenseData['invoice'] instanceof \Illuminate\Http\UploadedFile) {
+                            $invFile = $expenseData['invoice'];
+                            $invPath = $invFile->store('cost-invoices', 'public');
+                            $invName = $invFile->getClientOriginalName();
+                            $invSize = $invFile->getSize();
+                            $invMime = $invFile->getClientMimeType();
+                        }
+
                         $this->addCost($project, [
-                            'resource_id'   => !empty($expenseData['resource_id']) ? (int) $expenseData['resource_id'] : null,
-                            'description'   => $expenseData['description'],
-                            'cost_type'     => !empty($expenseData['resource_id']) ? 'materials' : ($expenseData['cost_type'] ?? 'materials'),
-                            'amount'        => $expenseData['amount'],
-                            'quantity'      => !empty($expenseData['quantity']) ? (int) $expenseData['quantity'] : 1,
-                            'incurred_date' => $startDate ?? now()->toDateString(),
-                            'created_by'    => $user->id,
+                            'resource_id'           => !empty($expenseData['resource_id']) ? (int) $expenseData['resource_id'] : null,
+                            'description'           => $expenseData['description'],
+                            'cost_type'             => !empty($expenseData['resource_id']) ? 'materials' : ($expenseData['cost_type'] ?? 'materials'),
+                            'amount'                => $expenseData['amount'],
+                            'quantity'              => !empty($expenseData['quantity']) ? (int) $expenseData['quantity'] : 1,
+                            'incurred_date'         => $startDate ?? now()->toDateString(),
+                            'created_by'            => $user->id,
+                            'invoice_path'          => $invPath,
+                            'invoice_original_name' => $invName,
+                            'invoice_size'          => $invSize,
+                            'invoice_mime_type'     => $invMime,
                         ]);
                     }
                 }
@@ -348,15 +365,33 @@ class ProjectService
             $rawAmount = is_string($data['amount'] ?? null) ? str_replace(',', '', $data['amount']) : ($data['amount'] ?? 0);
 
             $cost = $project->costs()->create([
-                'resource_id' => $resourceId,
-                'description' => $data['description'],
-                'cost_type' => $resourceId ? 'materials' : ($data['cost_type'] ?? 'materials'),
-                'amount' => $rawAmount,
-                'quantity' => $qty,
-                'incurred_date' => $data['incurred_date'] ?? now()->toDateString(),
-                'created_by' => $data['created_by'] ?? $user->id,
-                'updated_by' => $user->id,
+                'resource_id'           => $resourceId,
+                'description'           => $data['description'],
+                'cost_type'             => $resourceId ? 'materials' : ($data['cost_type'] ?? 'materials'),
+                'amount'                => $rawAmount,
+                'quantity'              => $qty,
+                'incurred_date'         => $data['incurred_date'] ?? now()->toDateString(),
+                'invoice_path'          => $data['invoice_path'] ?? null,
+                'invoice_original_name' => $data['invoice_original_name'] ?? null,
+                'invoice_size'          => $data['invoice_size'] ?? null,
+                'invoice_mime_type'     => $data['invoice_mime_type'] ?? null,
+                'created_by'            => $data['created_by'] ?? $user?->id,
+                'updated_by'            => $user?->id ?? ($data['created_by'] ?? null),
             ]);
+
+            // If an invoice file was attached, also store in the ProjectFile document repository
+            if (!empty($data['invoice_path'])) {
+                \App\Models\ProjectFile::create([
+                    'project_id'  => $project->id,
+                    'uploaded_by' => $data['created_by'] ?? $user?->id,
+                    'file_type'   => \App\Models\ProjectFile::TYPE_PROJECT_INVOICE,
+                    'file_name'   => $data['invoice_original_name'] ?? basename($data['invoice_path']),
+                    'file_path'   => $data['invoice_path'],
+                    'mime_type'   => $data['invoice_mime_type'] ?? 'application/octet-stream',
+                    'file_size'   => $data['invoice_size'] ?? 0,
+                    'description' => "Invoice for expense: {$data['description']} (₱" . number_format((float) $rawAmount, 2) . ")",
+                ]);
+            }
 
             // If selected from catalog, validate stock, deduct stock and record in ResourceAllocation history
             if ($resourceId) {

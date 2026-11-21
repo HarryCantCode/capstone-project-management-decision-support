@@ -413,6 +413,12 @@ class StaffPendingActionService
             ];
         }
 
+        $invoicePath = $payload['invoice_path'] ?? ($action->action_type === 'add_expense' ? ($payload['file_path'] ?? null) : null);
+        $invoiceExists = !empty($invoicePath) && $action->status !== 'rejected' && Storage::disk('public')->exists($invoicePath);
+        $invoiceUrl = $invoiceExists ? asset('storage/' . $invoicePath) : null;
+        $invoiceName = $payload['invoice_original_name'] ?? $payload['file_name'] ?? 'Attached Invoice';
+        $invoiceSize = !empty($payload['invoice_size']) ? number_format($payload['invoice_size'] / 1048576, 2) . ' MB' : (!empty($payload['file_size']) ? number_format($payload['file_size'] / 1048576, 2) . ' MB' : null);
+
         return [
             'id' => $action->id,
             'action_type' => $action->action_type,
@@ -433,6 +439,10 @@ class StaffPendingActionService
             'file_exists' => $fileExists,
             'file_url' => $fileExists ? asset('storage/' . $payload['file_path']) : null,
             'files' => $filesList,
+            'invoice_exists' => $invoiceExists,
+            'invoice_url' => $invoiceUrl,
+            'invoice_name' => $invoiceName,
+            'invoice_size' => $invoiceSize,
             'submitted_at' => $action->created_at?->format('M j, Y · g:i A') ?? 'N/A',
             'submitted_diff' => $action->created_at?->diffForHumans() ?? '',
             'submitted_timestamp' => $action->created_at?->timestamp ?? 0,
@@ -532,17 +542,17 @@ class StaffPendingActionService
                 ];
             }
 
-            if (in_array($lockedAction->action_type, ['add_file', 'complete_subtask'], true)) {
+            if (in_array($lockedAction->action_type, ['add_file', 'complete_subtask', 'add_expense'], true)) {
                 if (!empty($lockedAction->payload['files']) && is_array($lockedAction->payload['files'])) {
                     foreach ($lockedAction->payload['files'] as $fItem) {
                         if (!empty($fItem['file_path']) && Storage::disk('public')->exists($fItem['file_path'])) {
                             Storage::disk('public')->delete($fItem['file_path']);
                         }
                     }
-                } elseif (!empty($lockedAction->payload['file_path'])) {
-                    if (Storage::disk('public')->exists($lockedAction->payload['file_path'])) {
-                        Storage::disk('public')->delete($lockedAction->payload['file_path']);
-                    }
+                } elseif (!empty($lockedAction->payload['invoice_path']) && Storage::disk('public')->exists($lockedAction->payload['invoice_path'])) {
+                    Storage::disk('public')->delete($lockedAction->payload['invoice_path']);
+                } elseif (!empty($lockedAction->payload['file_path']) && Storage::disk('public')->exists($lockedAction->payload['file_path'])) {
+                    Storage::disk('public')->delete($lockedAction->payload['file_path']);
                 }
             }
 
@@ -625,13 +635,17 @@ class StaffPendingActionService
     private function executeAddExpense($project, int $staffUserId, array $payload): void
     {
         $costData = [
-            'description' => $payload['description'] ?? 'Expense',
-            'cost_type' => $payload['cost_type'] ?? 'materials',
-            'amount' => (float) ($payload['amount'] ?? 0),
-            'quantity' => !empty($payload['quantity']) ? (int) $payload['quantity'] : null,
-            'resource_id' => $payload['resource_id'] ?? null,
-            'incurred_date' => $payload['incurred_date'] ?? now()->toDateString(),
-            'created_by' => $staffUserId,
+            'description'           => $payload['description'] ?? 'Expense',
+            'cost_type'             => $payload['cost_type'] ?? 'materials',
+            'amount'                => (float) ($payload['amount'] ?? 0),
+            'quantity'              => !empty($payload['quantity']) ? (int) $payload['quantity'] : null,
+            'resource_id'           => $payload['resource_id'] ?? null,
+            'incurred_date'         => $payload['incurred_date'] ?? now()->toDateString(),
+            'created_by'            => $staffUserId,
+            'invoice_path'          => $payload['invoice_path'] ?? $payload['file_path'] ?? null,
+            'invoice_original_name' => $payload['invoice_original_name'] ?? $payload['file_name'] ?? null,
+            'invoice_size'          => $payload['invoice_size'] ?? $payload['file_size'] ?? null,
+            'invoice_mime_type'     => $payload['invoice_mime_type'] ?? null,
         ];
 
         $this->projectService->addCost($project, $costData);

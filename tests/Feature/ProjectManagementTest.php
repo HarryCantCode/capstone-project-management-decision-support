@@ -457,6 +457,7 @@ test('manager can add and delete itemized project costs with automatic spend rec
             'cost_type' => 'materials',
             'amount' => 250000.00,
             'incurred_date' => now()->format('Y-m-d'),
+            'invoice' => \Illuminate\Http\UploadedFile::fake()->create('cost-invoice-1.pdf', 100, 'application/pdf'),
         ])
         ->assertRedirect(route('projects.show', $project));
 
@@ -471,6 +472,7 @@ test('manager can add and delete itemized project costs with automatic spend rec
             'cost_type' => 'equipment',
             'amount' => 100000.00,
             'incurred_date' => now()->format('Y-m-d'),
+            'invoice' => \Illuminate\Http\UploadedFile::fake()->create('cost-invoice-2.pdf', 100, 'application/pdf'),
         ])
         ->assertRedirect(route('projects.show', $project));
 

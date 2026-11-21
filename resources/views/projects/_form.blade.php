@@ -961,6 +961,8 @@
             x-data="{
                 catalogMaterials: {{ Js::from($catalogData) }},
                 expenses: {{ Js::from($oldExpenses) }},
+                activePickingIndex: null,
+                dragOverExpenseIndex: null,
                 addCatalogItem() {
                     this.expenses.push({
                         mode: 'catalog',
@@ -969,8 +971,13 @@
                         cost_type: 'materials',
                         quantity: 1,
                         unit_price: 0,
-                        amount: '0.00'
+                        amount: '0.00',
+                        invoiceFile: null,
+                        invoiceFileName: '',
+                        invoiceFileSize: '',
+                        invoiceError: false
                     });
+                    this.syncExpenseInputs();
                     this.updateSpendPreview();
                 },
                 addManualItem() {
@@ -981,13 +988,93 @@
                         cost_type: 'materials',
                         quantity: 1,
                         unit_price: 0,
-                        amount: ''
+                        amount: '',
+                        invoiceFile: null,
+                        invoiceFileName: '',
+                        invoiceFileSize: '',
+                        invoiceError: false
                     });
+                    this.syncExpenseInputs();
                     this.updateSpendPreview();
                 },
                 removeExpense(index) {
                     this.expenses.splice(index, 1);
+                    this.syncExpenseInputs();
                     this.updateSpendPreview();
+                },
+                triggerExpenseInvoicePick(index) {
+                    this.activePickingIndex = index;
+                    if (this.$refs.expenseSinglePicker) {
+                        this.$refs.expenseSinglePicker.value = '';
+                        this.$refs.expenseSinglePicker.click();
+                    }
+                },
+                onExpenseSinglePicked(event) {
+                    const files = event.target.files;
+                    if (files && files.length > 0 && this.activePickingIndex !== null && this.expenses[this.activePickingIndex]) {
+                        this.setExpenseInvoice(this.activePickingIndex, files[0]);
+                    }
+                },
+                setExpenseInvoice(index, file) {
+                    if (!file || !this.expenses[index]) return;
+                    const maxSize = 20 * 1024 * 1024;
+                    if (file.size > maxSize) {
+                        window.dispatchEvent(new CustomEvent('show-toast', {
+                            detail: {
+                                type: 'error',
+                                title: 'File Too Large',
+                                message: `Invoice '${file.name}' exceeds the 20MB limit.`,
+                                duration: 5000
+                            }
+                        }));
+                        return;
+                    }
+                    this.expenses[index].invoiceFile = file;
+                    this.expenses[index].invoiceFileName = file.name;
+                    this.expenses[index].invoiceFileSize = this.formatSize(file.size);
+                    this.expenses[index].invoiceError = false;
+                    this.syncExpenseInputs();
+                },
+                removeExpenseInvoice(index) {
+                    if (!this.expenses[index]) return;
+                    this.expenses[index].invoiceFile = null;
+                    this.expenses[index].invoiceFileName = '';
+                    this.expenses[index].invoiceFileSize = '';
+                    this.syncExpenseInputs();
+                },
+                handleExpenseInvoiceDrop(event, index) {
+                    this.dragOverExpenseIndex = null;
+                    const files = event.dataTransfer ? event.dataTransfer.files : null;
+                    if (files && files.length > 0) {
+                        this.setExpenseInvoice(index, files[0]);
+                    }
+                },
+                formatSize(bytes) {
+                    if (!bytes) return '';
+                    if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+                    if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                    return bytes + ' B';
+                },
+                syncExpenseInputs() {
+                    const container = document.getElementById('expense_invoices_form_inputs');
+                    if (!container) return;
+                    container.innerHTML = '';
+                    this.expenses.forEach((item, idx) => {
+                        if (item.invoiceFile) {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.name = `expenses[${idx}][invoice]`;
+                            input.style.display = 'none';
+                            try {
+                                const dt = new DataTransfer();
+                                dt.items.add(item.invoiceFile);
+                                input.files = dt.files;
+                            } catch (err) {
+                                console.error('DataTransfer error', err);
+                            }
+                            container.appendChild(input);
+                        }
+                    });
                 },
                 onSelectCatalogMaterial(index) {
                     const item = this.expenses[index];
@@ -1035,7 +1122,10 @@
                     }
                 },
                 init() {
-                    this.$watch('expenses', () => this.updateSpendPreview());
+                    this.$watch('expenses', () => {
+                        this.syncExpenseInputs();
+                        this.updateSpendPreview();
+                    });
                     this.updateSpendPreview();
                 }
             }"
@@ -1130,11 +1220,74 @@
                                             <label class="form-label" style="font-size: 0.75rem; margin-bottom: 4px;">Item Total</label>
                                             <div style="height: 34px; display: flex; align-items: center; font-weight: 700; color: var(--color-ink); font-family: var(--font-mono); font-size: 0.875rem;" x-text="formatCurrency(item.amount)"></div>
                                         </div>
+
+                                        {{-- Invoice Attachment beside Item Total --}}
+                                        <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                                            <label class="form-label" style="font-size: 0.75rem; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                                                <span>Invoice <span class="text-danger">*</span></span>
+                                            </label>
+
+                                            <template x-if="!item.invoiceFileName">
+                                                <div
+                                                    class="pms-expense-invoice-dropzone"
+                                                    :class="{ 'is-invalid-highlight': item.invoiceError, 'is-dragging': dragOverExpenseIndex === index }"
+                                                    @dragover.prevent="dragOverExpenseIndex = index"
+                                                    @dragleave.prevent="dragOverExpenseIndex = null"
+                                                    @drop.prevent="handleExpenseInvoiceDrop($event, index)"
+                                                    @click="triggerExpenseInvoicePick(index)"
+                                                    title="Attach invoice (PDF, DOCX, Image) - Click or Drag & Drop"
+                                                >
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                                        <line x1="12" y1="18" x2="12" y2="12"></line>
+                                                        <line x1="9" y1="15" x2="15" y2="15"></line>
+                                                    </svg>
+                                                    <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Attach File</span>
+                                                </div>
+                                            </template>
+
+                                            <template x-if="item.invoiceFileName">
+                                                <div class="pms-expense-invoice-attached">
+                                                    <div style="display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1;">
+                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+                                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                                        </svg>
+                                                        <span style="font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.75rem;" :title="item.invoiceFileName" x-text="item.invoiceFileName"></span>
+                                                    </div>
+                                                    <div style="display: flex; align-items: center; gap: 3px; flex-shrink: 0;">
+                                                        <button
+                                                            type="button"
+                                                            @click.stop="triggerExpenseInvoicePick(index)"
+                                                            title="Change invoice"
+                                                            style="background: transparent; border: none; cursor: pointer; padding: 2px; color: var(--color-accent); display: flex; align-items: center;"
+                                                        >
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            @click.stop="removeExpenseInvoice(index)"
+                                                            title="Remove invoice"
+                                                            style="background: transparent; border: none; cursor: pointer; padding: 2px; color: var(--color-danger); font-size: 0.75rem; font-weight: bold; line-height: 1;"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
                                     </div>
 
                                     <template x-if="item.resource_id && catalogMaterials.find(m => m.id == item.resource_id) && item.quantity > catalogMaterials.find(m => m.id == item.resource_id).quantity_available">
                                         <p class="form-hint" style="color: var(--color-danger); margin-top: 4px; margin-bottom: 0; font-size: 0.75rem;">
                                             Warning: Requested quantity (<span x-text="item.quantity"></span>) exceeds stock (<span x-text="catalogMaterials.find(m => m.id == item.resource_id).quantity_available"></span>).
+                                        </p>
+                                    </template>
+
+                                    <template x-if="item.invoiceError">
+                                        <p class="form-hint" style="color: var(--color-danger); margin-top: 4px; margin-bottom: 0; font-size: 0.75rem;">
+                                            ⚠️ Invoice attachment is required for this expense item.
                                         </p>
                                     </template>
 
@@ -1197,12 +1350,85 @@
                                                 required
                                             >
                                         </div>
+
+                                        {{-- Invoice Attachment beside Amount --}}
+                                        <div class="form-group form-group-premium" style="margin-bottom: 0;">
+                                            <label class="form-label" style="font-size: 0.75rem; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                                                <span>Invoice <span class="text-danger">*</span></span>
+                                            </label>
+
+                                            <template x-if="!item.invoiceFileName">
+                                                <div
+                                                    class="pms-expense-invoice-dropzone"
+                                                    :class="{ 'is-invalid-highlight': item.invoiceError, 'is-dragging': dragOverExpenseIndex === index }"
+                                                    @dragover.prevent="dragOverExpenseIndex = index"
+                                                    @dragleave.prevent="dragOverExpenseIndex = null"
+                                                    @drop.prevent="handleExpenseInvoiceDrop($event, index)"
+                                                    @click="triggerExpenseInvoicePick(index)"
+                                                    title="Attach invoice (PDF, DOCX, Image) - Click or Drag & Drop"
+                                                >
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                                        <line x1="12" y1="18" x2="12" y2="12"></line>
+                                                        <line x1="9" y1="15" x2="15" y2="15"></line>
+                                                    </svg>
+                                                    <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Attach File</span>
+                                                </div>
+                                            </template>
+
+                                            <template x-if="item.invoiceFileName">
+                                                <div class="pms-expense-invoice-attached">
+                                                    <div style="display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1;">
+                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+                                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                                        </svg>
+                                                        <span style="font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.75rem;" :title="item.invoiceFileName" x-text="item.invoiceFileName"></span>
+                                                    </div>
+                                                    <div style="display: flex; align-items: center; gap: 3px; flex-shrink: 0;">
+                                                        <button
+                                                            type="button"
+                                                            @click.stop="triggerExpenseInvoicePick(index)"
+                                                            title="Change invoice"
+                                                            style="background: transparent; border: none; cursor: pointer; padding: 2px; color: var(--color-accent); display: flex; align-items: center;"
+                                                        >
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            @click.stop="removeExpenseInvoice(index)"
+                                                            title="Remove invoice"
+                                                            style="background: transparent; border: none; cursor: pointer; padding: 2px; color: var(--color-danger); font-size: 0.75rem; font-weight: bold; line-height: 1;"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
                                     </div>
+
+                                    <template x-if="item.invoiceError">
+                                        <p class="form-hint" style="color: var(--color-danger); margin-top: 4px; margin-bottom: 0; font-size: 0.75rem;">
+                                            ⚠️ Invoice attachment is required for this expense item.
+                                        </p>
+                                    </template>
                                 </div>
                             </template>
                         </div>
                     </template>
                 </div>
+
+                {{-- Hidden file picker and dynamic inputs for form POST --}}
+                <input
+                    type="file"
+                    x-ref="expenseSinglePicker"
+                    @change="onExpenseSinglePicked($event)"
+                    accept=".pdf,.doc,.docx,image/*"
+                    style="display: none;"
+                >
+                <div id="expense_invoices_form_inputs" style="display: none;"></div>
 
                 {{-- Summary Footer --}}
                 <template x-if="expenses.length > 0">
@@ -1975,17 +2201,59 @@
             }
             .pms-expense-grid-catalog {
                 display: grid !important;
-                grid-template-columns: minmax(0, 2fr) 90px 120px !important;
+                grid-template-columns: minmax(0, 1.8fr) 80px 110px 150px !important;
                 gap: 10px !important;
                 align-items: end !important;
                 width: 100% !important;
             }
             .pms-expense-grid-manual {
                 display: grid !important;
-                grid-template-columns: 130px minmax(0, 1.8fr) 80px 120px !important;
+                grid-template-columns: 120px minmax(0, 1.5fr) 65px 105px 150px !important;
                 gap: 10px !important;
                 align-items: end !important;
                 width: 100% !important;
+            }
+            .pms-expense-invoice-dropzone {
+                height: 34px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 6px !important;
+                padding: 0 8px !important;
+                border: 1.5px dashed var(--color-border) !important;
+                border-radius: var(--radius-sm) !important;
+                background: var(--color-surface) !important;
+                cursor: pointer !important;
+                transition: all 0.15s ease !important;
+                font-size: 0.75rem !important;
+                color: var(--color-accent) !important;
+                user-select: none !important;
+                box-sizing: border-box !important;
+            }
+            .pms-expense-invoice-dropzone:hover,
+            .pms-expense-invoice-dropzone.is-dragging {
+                border-color: var(--color-accent) !important;
+                background: var(--color-accent-light) !important;
+            }
+            .pms-expense-invoice-dropzone.is-invalid-highlight {
+                border-color: #ef4444 !important;
+                background-color: #fef2f2 !important;
+                color: #dc2626 !important;
+                box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25) !important;
+                animation: pms-pulse-error 0.5s ease-in-out !important;
+            }
+            .pms-expense-invoice-attached {
+                height: 34px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                gap: 6px !important;
+                padding: 0 8px !important;
+                border: 1px solid rgba(34, 197, 94, 0.4) !important;
+                border-radius: var(--radius-sm) !important;
+                background: rgba(34, 197, 94, 0.08) !important;
+                font-size: 0.75rem !important;
+                box-sizing: border-box !important;
             }
             @media (max-width: 768px) {
                 .pms-expense-grid-catalog,
@@ -2805,6 +3073,41 @@
                             manpowerCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }
                         return false;
+                    }
+
+                    // Check initial expenses for required invoice attachments
+                    const expenseSection = document.getElementById('project-expenses-section');
+                    if (expenseSection && window.Alpine) {
+                        try {
+                            const expData = Alpine.$data(expenseSection);
+                            if (expData && Array.isArray(expData.expenses) && expData.expenses.length > 0) {
+                                let hasMissingInvoice = false;
+                                expData.expenses.forEach((exp) => {
+                                    const hasValue = (exp.mode === 'catalog' && exp.resource_id) || (exp.mode !== 'catalog' && (exp.description || exp.amount));
+                                    if (hasValue && !exp.invoiceFile) {
+                                        exp.invoiceError = true;
+                                        hasMissingInvoice = true;
+                                    } else {
+                                        exp.invoiceError = false;
+                                    }
+                                });
+                                if (hasMissingInvoice) {
+                                    e.preventDefault();
+                                    window.dispatchEvent(new CustomEvent('show-toast', {
+                                        detail: {
+                                            type: 'error',
+                                            title: 'Invoice Required',
+                                            message: 'An invoice attachment is required for each logged initial expense. Please attach the invoice file before proceeding.',
+                                            duration: 6000
+                                        }
+                                    }));
+                                    expenseSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    return false;
+                                }
+                            }
+                        } catch (err) {
+                            console.error('Error validating expenses invoice:', err);
+                        }
                     }
                 }
             });

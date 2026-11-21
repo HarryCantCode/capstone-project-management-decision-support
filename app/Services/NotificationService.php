@@ -224,6 +224,8 @@ class NotificationService
             'amount' => $cost->amount,
             'description' => $cost->description,
             'cost_type' => $cost->cost_type,
+            'invoice_path' => $cost->invoice_path,
+            'invoice_name' => $cost->invoice_original_name,
             'url' => route('costing.show', $project->id),
         ];
 

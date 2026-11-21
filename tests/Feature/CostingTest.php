@@ -5,6 +5,7 @@ use App\Models\ProjectCost;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 
 uses(RefreshDatabase::class);
 
@@ -143,6 +144,7 @@ test('adding or deleting an expense from costing breakdown redirects back to cos
         'cost_type' => 'materials',
         'amount' => 150000.00,
         'incurred_date' => now()->format('Y-m-d'),
+        'invoice' => UploadedFile::fake()->create('receipt.pdf', 120, 'application/pdf'),
         'redirect_to' => 'costing',
     ]);
 

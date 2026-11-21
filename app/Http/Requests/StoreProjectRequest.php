@@ -38,7 +38,7 @@ class StoreProjectRequest extends FormRequest
 
         if ($this->has('expenses') && is_array($this->input('expenses'))) {
             $cleanExpenses = [];
-            foreach ($this->input('expenses') as $exp) {
+            foreach ($this->input('expenses') as $idx => $exp) {
                 if (!is_array($exp)) {
                     continue;
                 }
@@ -52,7 +52,7 @@ class StoreProjectRequest extends FormRequest
                 if (is_string($rawAmt)) {
                     $exp['amount'] = str_replace(',', '', $rawAmt);
                 }
-                $cleanExpenses[] = $exp;
+                $cleanExpenses[$idx] = $exp;
             }
             $this->merge([
                 'expenses' => $cleanExpenses,
@@ -148,6 +148,7 @@ class StoreProjectRequest extends FormRequest
             'expenses.*.cost_type' => ['required_with:expenses.*.description', 'nullable', 'string', 'in:materials,equipment,labor,subcontractor,other'],
             'expenses.*.quantity' => ['nullable', 'integer', 'min:1'],
             'expenses.*.amount' => ['required_with:expenses.*.description', 'nullable', 'numeric', 'min:0.01', 'max:999999999.99'],
+            'expenses.*.invoice' => ['nullable', 'file', 'mimes:pdf,docx,jpg,jpeg,png,webp', 'max:20480'],
             'attachments' => ['nullable', 'array'],
             'attachments.*.file' => ['required', 'file', 'mimes:pdf,docx,doc,jpg,jpeg,png,webp', 'max:20480'],
             'attachments.*.category' => ['required', 'string', 'max:100'],
@@ -184,6 +185,16 @@ class StoreProjectRequest extends FormRequest
 
             if ($this->has('expenses') && is_array($this->input('expenses'))) {
                 foreach ($this->input('expenses') as $idx => $exp) {
+                    $hasDesc = !empty($exp['description']);
+                    $hasAmt = !empty($exp['amount']);
+                    $hasRes = !empty($exp['resource_id']);
+                    if ($hasDesc || $hasAmt || $hasRes) {
+                        $hasInvoice = $this->hasFile("expenses.{$idx}.invoice");
+                        if (!$hasInvoice) {
+                            $validator->errors()->add("expenses.{$idx}.invoice", "An invoice attachment (PDF, DOCX, or Image) is required for each initial expense.");
+                        }
+                    }
+
                     if (!empty($exp['resource_id'])) {
                         $res = \App\Models\Resource::find($exp['resource_id']);
                         $qty = !empty($exp['quantity']) && (int) $exp['quantity'] > 0 ? (int) $exp['quantity'] : 1;
@@ -255,6 +266,9 @@ class StoreProjectRequest extends FormRequest
             'expenses.*.amount.required_with' => 'Expenditure amount is required when a description is provided.',
             'expenses.*.amount.numeric' => 'Expenditure amount must be a valid number.',
             'expenses.*.cost_type.in' => 'Cost type must be materials, equipment, labor, subcontractor, or other.',
+            'expenses.*.invoice.file' => 'The expense invoice must be a valid uploaded file.',
+            'expenses.*.invoice.mimes' => 'The expense invoice must be of type: PDF, DOCX, or Image (JPG, PNG, WEBP).',
+            'expenses.*.invoice.max' => 'The expense invoice file may not exceed 20MB.',
             'attachments.*.file.required' => 'The attachment file is required.',
             'attachments.*.file.mimes' => 'Attachments must be PDF, DOCX, DOC, or Image (JPG, PNG, WEBP) files.',
             'attachments.*.file.max' => 'Attachment files may not exceed 20MB.',

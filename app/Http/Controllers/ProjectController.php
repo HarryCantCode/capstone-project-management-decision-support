@@ -524,8 +524,13 @@ class ProjectController extends Controller
             'amount' => ['required', 'numeric', 'min:100', 'max:999999999.99'],
             'quantity' => ['nullable', 'integer', 'min:1'],
             'incurred_date' => ['nullable', 'date'],
+            'invoice' => ['required', 'file', 'mimes:pdf,docx,jpg,jpeg,png,webp', 'max:20480'],
         ], [
             'amount.min' => 'Expenditure amount cannot be less than ₱100.00.',
+            'invoice.required' => 'An invoice attachment (PDF, DOCX, or Image) is required to log an expense.',
+            'invoice.file' => 'The invoice must be a valid uploaded file.',
+            'invoice.mimes' => 'The invoice must be a file of type: PDF, DOCX, or Image (JPG, JPEG, PNG, WEBP).',
+            'invoice.max' => 'The invoice file may not be greater than 20MB.',
         ]);
 
         if (!empty($validated['resource_id'])) {
@@ -537,6 +542,13 @@ class ProjectController extends Controller
                     ->with('error', "Requested quantity ({$requestedQty}) exceeds the available quantity ({$resource->quantity_available}) for {$resource->name}.");
             }
         }
+
+        // Store invoice file securely on public disk
+        $invoiceFile = $request->file('invoice');
+        $invoicePath = $invoiceFile ? $invoiceFile->store('cost-invoices', 'public') : null;
+        $invoiceOriginalName = $invoiceFile ? $invoiceFile->getClientOriginalName() : null;
+        $invoiceSize = $invoiceFile ? $invoiceFile->getSize() : null;
+        $invoiceMime = $invoiceFile ? $invoiceFile->getClientMimeType() : null;
 
         // Staff submissions must be reviewed and accepted by Admin or Manager before reflecting
         if (Auth::user()->hasRole('Staff')) {
@@ -552,6 +564,13 @@ class ProjectController extends Controller
                     'resource_id' => $validated['resource_id'] ?? null,
                     'resource_name' => !empty($validated['resource_id']) ? \App\Models\Resource::find($validated['resource_id'])?->name : null,
                     'incurred_date' => $validated['incurred_date'] ?? now()->toDateString(),
+                    'invoice_path' => $invoicePath,
+                    'invoice_original_name' => $invoiceOriginalName,
+                    'invoice_size' => $invoiceSize,
+                    'invoice_mime_type' => $invoiceMime,
+                    'file_path' => $invoicePath,
+                    'file_name' => $invoiceOriginalName,
+                    'file_size' => $invoiceSize,
                     'redirect_to' => $request->input('redirect_to'),
                 ],
                 'status' => 'pending',
@@ -563,10 +582,15 @@ class ProjectController extends Controller
                 ->with('staff_submitted', 'Your action has been submitted successfully and will be reviewed by your manager or admin to take effect.');
         }
 
+        $validated['invoice_path'] = $invoicePath;
+        $validated['invoice_original_name'] = $invoiceOriginalName;
+        $validated['invoice_size'] = $invoiceSize;
+        $validated['invoice_mime_type'] = $invoiceMime;
+
         $this->projectService->addCost($project, $validated);
 
         return redirect($this->getCostRedirectUrl($request, $project))
-            ->with('status', "Cost entry '{$validated['description']}' of ₱" . number_format((float) $validated['amount'], 2) . " logged successfully.");
+            ->with('status', "Cost entry '{$validated['description']}' of ₱" . number_format((float) $validated['amount'], 2) . " logged successfully with attached invoice.");
     }
 
     /**
