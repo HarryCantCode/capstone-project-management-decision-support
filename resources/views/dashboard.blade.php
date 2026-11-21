@@ -7,8 +7,8 @@
     <div class="page-header">
         <div>
             <h1>Dashboard</h1>
-            <p class="page-header__description">
-                Good {{ now()->format('g:i A') }} — here's what's happening today.
+            <p class="page-header__description" x-data="dashboardClock()" x-init="init()">
+                Good <span x-text="timeText">{{ now()->format('g:i A') }}</span> — here's what's happening today.
             </p>
         </div>
         <div class="page-actions" data-tour="page-actions">
@@ -16,6 +16,7 @@
         </div>
     </div>
 
+    <div id="dashboard-live-root">
     {{-- Retained Status summary cards (Clickable to Projects module with optional status filter) --}}
     <div class="costing-kpi-grid dashboard-stats-grid mb-6" data-tour="dashboard-kpis" x-data="dashboardStats({{ json_encode($stats) }})">
         {{-- Card 1: Total Projects --}}
@@ -439,6 +440,7 @@
             </div>
         </div>
 
+    </div>
     </div>
 @endsection
 
@@ -980,6 +982,35 @@
 
 <script>
     document.addEventListener('alpine:init', () => {
+        Alpine.data('dashboardClock', () => ({
+            timeText: '{{ now()->format("g:i A") }}',
+            intervalId: null,
+            init() {
+                this.updateTime();
+                this.intervalId = setInterval(() => this.updateTime(), 1000);
+            },
+            destroy() {
+                if (this.intervalId) clearInterval(this.intervalId);
+            },
+            updateTime() {
+                try {
+                    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    this.timeText = new Date().toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                        ...(tz ? { timeZone: tz } : {}),
+                    });
+                } catch (e) {
+                    this.timeText = new Date().toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                    });
+                }
+            }
+        }));
+
         Alpine.data('dashboardStats', (initialStats) => ({
             stats: initialStats,
             init() {
@@ -994,6 +1025,29 @@
                 }
             }
         }));
+    });
+
+    window.addEventListener('live-sync:changed', async (event) => {
+        const changed = event.detail?.changed || [];
+        if (!changed.some(d => ['projects', 'pending_actions', 'resources'].includes(d))) {
+            return;
+        }
+        event.preventDefault();
+
+        try {
+            const response = await fetch('{{ route("dashboard") }}', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                cache: 'no-store'
+            });
+            if (!response.ok) return;
+            const html = await response.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const freshRoot = doc.getElementById('dashboard-live-root');
+            const currentRoot = document.getElementById('dashboard-live-root');
+            if (freshRoot && currentRoot) {
+                currentRoot.innerHTML = freshRoot.innerHTML;
+            }
+        } catch (_) {}
     });
 </script>
 @endpush

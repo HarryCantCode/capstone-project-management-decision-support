@@ -802,5 +802,7 @@ class NotificationService
                 Notification::insert($chunk);
             }
         });
+
+        app(LiveUpdateService::class)->bumpNotifications($recipients->pluck('id')->all());
     }
 }

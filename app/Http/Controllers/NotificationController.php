@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Notification;
+use App\Services\LiveUpdateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -98,6 +99,8 @@ class NotificationController extends Controller
         Notification::where('user_id', $user->id)
             ->unread()
             ->update(['read_at' => now()]);
+
+        app(LiveUpdateService::class)->bumpNotifications($user->id);
 
         return response()->json([
             'success' => true,

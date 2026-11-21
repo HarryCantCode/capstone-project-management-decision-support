@@ -3,7 +3,13 @@
 namespace App\Providers;
 
 use App\Http\Middleware\EnsureTwoFactorVerified;
+use App\Models\Notification;
+use App\Models\Personnel;
 use App\Models\Project;
+use App\Models\ProjectCost;
+use App\Models\ProjectFile;
+use App\Models\ProjectSubtask;
+use App\Models\ProjectTask;
 use App\Models\Resource;
 use App\Models\StaffPendingAction;
 use App\Models\User;
@@ -11,6 +17,7 @@ use App\Policies\ProjectPolicy;
 use App\Policies\ResourcePolicy;
 use App\Policies\StaffPendingActionPolicy;
 use App\Policies\UserPolicy;
+use App\Services\LiveUpdateService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -55,5 +62,40 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(Resource::class, ResourcePolicy::class);
         Gate::policy(StaffPendingAction::class, StaffPendingActionPolicy::class);
+
+        $this->registerLiveUpdateHooks();
+    }
+
+    /**
+     * Automatically bump live-update version tokens when core models change.
+     */
+    private function registerLiveUpdateHooks(): void
+    {
+        $bump = static function (string $domain): void {
+            app(LiveUpdateService::class)->bump($domain);
+        };
+
+        foreach ([Project::class, ProjectCost::class] as $softDeleteModel) {
+            $softDeleteModel::saved(fn () => $bump('projects'));
+            $softDeleteModel::deleted(fn () => $bump('projects'));
+            $softDeleteModel::restored(fn () => $bump('projects'));
+        }
+
+        foreach ([ProjectTask::class, ProjectSubtask::class, ProjectFile::class] as $projectModel) {
+            $projectModel::saved(fn () => $bump('projects'));
+            $projectModel::deleted(fn () => $bump('projects'));
+        }
+
+        StaffPendingAction::saved(fn () => $bump('pending_actions'));
+        StaffPendingAction::deleted(fn () => $bump('pending_actions'));
+
+        foreach ([Resource::class, Personnel::class] as $resourceModel) {
+            $resourceModel::saved(fn () => $bump('resources'));
+            $resourceModel::deleted(fn () => $bump('resources'));
+            $resourceModel::restored(fn () => $bump('resources'));
+        }
+
+        Notification::saved(fn (Notification $n) => app(LiveUpdateService::class)->bumpNotifications($n->user_id));
+        Notification::deleted(fn (Notification $n) => app(LiveUpdateService::class)->bumpNotifications($n->user_id));
     }
 }

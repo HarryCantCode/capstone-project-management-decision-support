@@ -661,6 +661,7 @@
                         @click.outside="open = false"
                         @keydown.escape.window="open = false"
                         @refresh-notifications.window="fetchUnreadCount()"
+                        @live-sync-notifications.window="handleLiveUpdate($event.detail)"
                     >
                         <button
                             type="button"
@@ -1602,15 +1603,21 @@
                 reviewNotesError: false,
 
                 init() {
-                    this.pollInterval = setInterval(() => {
-                        if (!this.open && document.visibilityState === 'visible') {
-                            this.fetchUnreadCount();
-                        }
-                    }, 15000);
+                    this.fetchActive();
                 },
 
                 destroy() {
                     if (this.pollInterval) clearInterval(this.pollInterval);
+                },
+
+                handleLiveUpdate(detail) {
+                    if (!detail) return;
+                    if (typeof detail.unread_notifications === 'number') {
+                        this.unreadCount = detail.unread_notifications;
+                    }
+                    if (detail.notifications_changed) {
+                        this.fetchActive(true);
+                    }
                 },
 
                 toggle() {
@@ -1643,8 +1650,8 @@
                     }
                 },
 
-                async fetchActive() {
-                    this.loading = true;
+                async fetchActive(silent = false) {
+                    if (!silent) this.loading = true;
                     try {
                         const response = await fetch('{{ route("notifications.index") }}?filter=active', {
                             headers: {
@@ -1660,7 +1667,7 @@
                     } catch (err) {
                         console.error('Active notifications fetch error:', err);
                     } finally {
-                        this.loading = false;
+                        if (!silent) this.loading = false;
                     }
                 },
 
@@ -2003,6 +2010,192 @@
     </script>
 
     <script src="{{ asset('js/philippine-address.js') }}"></script>
+    @auth
+    <script>
+        (function() {
+            const POLL_URL = '{{ route("live-updates.poll") }}';
+            const POLL_INTERVAL_MS = 3000;
+
+            let initialized = false;
+            let isPolling = false;
+            let lastPollAt = 0;
+            let lastVersions = null;
+            let lastPendingCount = null;
+            let lastNotificationId = null;
+            let pendingReloadDomains = new Set();
+            let suppressSelfReloadUntil = 0;
+
+            // Track local mutations so the current tab does not reload itself
+            // immediately after its own AJAX POST/PUT/PATCH/DELETE request.
+            const originalFetch = window.fetch;
+            window.fetch = function(input, init) {
+                const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+                const url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+                if (method !== 'GET' && method !== 'HEAD' && !url.includes('/live-updates/poll')) {
+                    suppressSelfReloadUntil = Date.now() + 4000;
+                }
+                return originalFetch.apply(this, arguments);
+            };
+
+            document.addEventListener('submit', () => {
+                suppressSelfReloadUntil = Date.now() + 5000;
+            }, true);
+
+            function isUserBusy() {
+                const active = document.activeElement;
+                if (active && active !== document.body) {
+                    const tag = active.tagName;
+                    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || active.isContentEditable) {
+                        return true;
+                    }
+                }
+
+                // Check for any open modal/dialog other than the notification dropdown
+                const openModals = document.querySelectorAll('.modal.show, .reassign-modal-overlay, [role="dialog"]:not(#notification-modal)');
+                for (const el of openModals) {
+                    const style = window.getComputedStyle(el);
+                    if (style.display !== 'none' && style.visibility !== 'hidden' && el.offsetParent !== null) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function relevantDomainsForPath(pathname) {
+                if (pathname.startsWith('/pending-actions') || pathname.startsWith('/approval-list')) {
+                    return ['pending_actions'];
+                }
+                if (pathname.startsWith('/projects') || pathname.startsWith('/costing') || pathname.startsWith('/scheduling') || pathname.startsWith('/reports')) {
+                    return ['projects', 'pending_actions'];
+                }
+                if (pathname.startsWith('/resources') || pathname.startsWith('/manpower')) {
+                    return ['resources', 'projects'];
+                }
+                if (pathname.startsWith('/dashboard')) {
+                    return ['projects', 'pending_actions', 'resources'];
+                }
+                return [];
+            }
+
+            function tryFlushPendingReload() {
+                if (pendingReloadDomains.size === 0) return;
+                if (Date.now() < suppressSelfReloadUntil) return;
+                if (isUserBusy()) return;
+
+                const changed = Array.from(pendingReloadDomains);
+                pendingReloadDomains.clear();
+
+                const event = new CustomEvent('live-sync:changed', {
+                    cancelable: true,
+                    detail: { changed }
+                });
+                const notPrevented = window.dispatchEvent(event);
+                if (!notPrevented) {
+                    return; // Handled in-place by the active page
+                }
+
+                const relevant = relevantDomainsForPath(window.location.pathname);
+                if (changed.some(d => relevant.includes(d))) {
+                    window.location.reload();
+                }
+            }
+
+            async function pollLiveUpdates() {
+                if (isPolling || document.visibilityState !== 'visible') return;
+                const now = Date.now();
+                if (now - lastPollAt < 1000) return;
+
+                isPolling = true;
+                lastPollAt = now;
+
+                try {
+                    const response = await originalFetch(POLL_URL, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        cache: 'no-store'
+                    });
+
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    const versions = data.versions || {};
+
+                    if (!initialized) {
+                        initialized = true;
+                        lastVersions = versions;
+                        lastPendingCount = data.pending_actions_count ?? null;
+                        lastNotificationId = data.latest_notification ? data.latest_notification.id : null;
+                        return;
+                    }
+
+                    const notificationsChanged = versions.notifications !== lastVersions.notifications;
+                    const latestNotif = data.latest_notification || null;
+
+                    if (notificationsChanged || (latestNotif && latestNotif.id !== lastNotificationId)) {
+                        window.dispatchEvent(new CustomEvent('live-sync-notifications', {
+                            detail: {
+                                unread_notifications: data.unread_notifications,
+                                notifications_changed: true,
+                                latest_notification: latestNotif
+                            }
+                        }));
+
+                        if (latestNotif && !latestNotif.is_read && (lastNotificationId === null || latestNotif.id > lastNotificationId)) {
+                            if (typeof window.showToast === 'function') {
+                                window.showToast({
+                                    type: 'info',
+                                    title: latestNotif.title || 'New Notification',
+                                    message: latestNotif.message || '',
+                                    duration: 6000
+                                });
+                            }
+                        }
+                        lastNotificationId = latestNotif ? latestNotif.id : lastNotificationId;
+                    }
+
+                    if (typeof data.pending_actions_count === 'number' && data.pending_actions_count !== lastPendingCount) {
+                        lastPendingCount = data.pending_actions_count;
+                        window.dispatchEvent(new CustomEvent('live-sync-pending-count', {
+                            detail: { count: data.pending_actions_count }
+                        }));
+                    }
+
+                    const changedDomains = [];
+                    for (const domain of ['projects', 'pending_actions', 'resources']) {
+                        if (versions[domain] !== lastVersions[domain]) {
+                            changedDomains.push(domain);
+                        }
+                    }
+
+                    lastVersions = versions;
+
+                    if (changedDomains.length > 0) {
+                        if (Date.now() >= suppressSelfReloadUntil) {
+                            changedDomains.forEach(d => pendingReloadDomains.add(d));
+                        }
+                    }
+
+                    tryFlushPendingReload();
+                } catch (_) {
+                    // Silent fail — next poll interval will retry
+                } finally {
+                    isPolling = false;
+                }
+            }
+
+            setInterval(pollLiveUpdates, POLL_INTERVAL_MS);
+            setInterval(tryFlushPendingReload, 1500);
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    pollLiveUpdates();
+                }
+            });
+            window.addEventListener('focus', () => pollLiveUpdates());
+        })();
+    </script>
+    @endauth
     @include('layouts.partials.onboarding-tour')
     @stack('scripts')
 </body>

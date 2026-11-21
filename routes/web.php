@@ -70,6 +70,9 @@ Route::middleware(['auth', 'two-factor', 'must-change-password'])->group(functio
     // Global real-time search across Projects, Manpower, and Resources
     Route::get('/global-search', [\App\Http\Controllers\GlobalSearchController::class, 'search'])->name('global-search');
 
+    // Real-time live-update poll (notifications, requests, workspace changes)
+    Route::get('/live-updates/poll', [\App\Http\Controllers\LiveUpdateController::class, 'poll'])->name('live-updates.poll');
+
     // ─── Account settings & User management ─────────────────────────────────
     Route::prefix('account')->name('account.')->group(function () {
         Route::get('/settings', function () {
