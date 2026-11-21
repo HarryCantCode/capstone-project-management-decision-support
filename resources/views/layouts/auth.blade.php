@@ -98,7 +98,7 @@
     </header>
 
     {{-- Main Container Card with 50/50 vertical split --}}
-    <main class="auth-container">
+    <main class="auth-container" style="flex-direction: column;">
         <div class="auth-card-split" role="main">
 
             {{-- Left Column: Pictures in Slideshow --}}
@@ -130,6 +130,19 @@
                 </div>
             </div>
 
+        </div>
+
+        {{-- External Company Link placed below the modal/card --}}
+        <div class="text-center" style="width: 100%; margin-top: 28px; padding-bottom: 16px;">
+            <p class="mb-0" style="font-size: 0.875rem; color: var(--color-muted, #94A3B8);">
+                Wanna know more about
+                <a
+                    href="http://www.dex.com.ph/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="color: var(--color-accent, #38BDF8); font-weight: 500; text-decoration: underline; text-underline-offset: 3px;"
+                >DEX International?</a>
+            </p>
         </div>
     </main>
 
