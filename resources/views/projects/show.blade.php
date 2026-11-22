@@ -2565,9 +2565,17 @@
     {{-- ─── Modal 2: Assign Personnel to Project (Multi-Select) ───────────────── --}}
     <div class="reassign-modal-overlay" style="display: none;" x-show="assignModalOpen" x-cloak>
         <div class="reassign-modal-backdrop" @click="assignModalOpen = false"></div>
-        <div class="reassign-modal-content card" x-show="assignModalOpen" x-transition style="max-width: 560px;">
-            <div class="card-header">
-                <span>Assign Field Personnel (Select Multiple)</span>
+        <div class="reassign-modal-content card" x-show="assignModalOpen" x-transition style="max-width: 720px; width: 100%;">
+            <div class="card-header" style="font-weight: 700; font-size: 0.9375rem; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                    <svg style="width: 18px; height: 18px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    <span>Assign Field Personnel (Select Multiple)</span>
+                </div>
                 <button type="button" class="flash-close" @click="assignModalOpen = false" aria-label="Close modal">&times;</button>
             </div>
             @php
@@ -2577,56 +2585,115 @@
                     'full_name' => $p->full_name,
                     'employee_id' => $p->employee_id,
                     'expertise' => $p->expertise,
+                    'is_assigned' => !empty($p->project_id),
+                    'project_code' => $p->project?->project_code ?? null,
                 ])->values();
             @endphp
             <form 
                 action="{{ route('projects.assign-personnel', $project) }}" 
                 method="POST" 
                 x-data="{
-                    selectedAvail: [],
-                    allAvailIds: [{{ $availablePersonnel->pluck('id')->implode(',') }}],
-                    availList: {{ Js::from($availData) }},
+                    personnelList: {{ Js::from($availData) }},
+                    selectedPersonnel: [],
                     assignedCounts: {{ Js::from($existingRoles) }},
-                    limits: {
-                        'Technician': { min: 1, max: 2, label: '1-2' },
-                        'Project Manager': { min: 1, max: 1, label: '1' },
-                        'QA Inspector': { min: 1, max: 1, label: '1' },
-                        'Site Engineer': { min: 1, max: 1, label: '1' },
-                        'Worker / Installation Personnel': { min: 4, max: 6, label: '4-6' },
-                        'Safety Officer': { min: 1, max: 1, label: '1' },
-                        'Foreman': { min: 1, max: 1, label: '1' }
-                    },
-                    toggleAll() {
-                        this.selectedAvail = (this.selectedAvail.length === this.allAvailIds.length) ? [] : [...this.allAvailIds];
-                    },
-                    getExceededRoles() {
-                        const newCounts = {};
-                        this.selectedAvail.forEach(id => {
-                            const p = this.availList.find(item => item.id === id);
+                    searchQuery: '',
+                    roleFilter: 'all',
+                    statusFilter: 'all',
+                    benchmarks: [
+                        { role: 'Project Manager', short: 'PM', min: 1, max: 1, label: '1' },
+                        { role: 'Site Engineer', short: 'Site Eng', min: 1, max: 1, label: '1' },
+                        { role: 'Technician', short: 'Tech', min: 1, max: 2, label: '1-2' },
+                        { role: 'QA Inspector', short: 'QA', min: 1, max: 1, label: '1' },
+                        { role: 'Foreman', short: 'Foreman', min: 1, max: 1, label: '1' },
+                        { role: 'Safety Officer', short: 'Safety', min: 1, max: 1, label: '1' },
+                        { role: 'Elevator Control', short: 'Control', min: 1, max: 2, label: '1-2' },
+                        { role: 'Worker / Installation Personnel', short: 'Workers', min: 4, max: 6, label: '4-6' }
+                    ],
+                    get selectedRoleCounts() {
+                        const counts = {};
+                        this.selectedPersonnel.forEach(id => {
+                            const numId = Number(id);
+                            const p = this.personnelList.find(item => Number(item.id) === numId);
                             if (p && p.expertise) {
-                                newCounts[p.expertise] = (newCounts[p.expertise] || 0) + 1;
+                                counts[p.expertise] = (counts[p.expertise] || 0) + 1;
                             }
                         });
+                        return counts;
+                    },
+                    isPersonnelSelected(id) {
+                        const numId = Number(id);
+                        return this.selectedPersonnel.some(item => Number(item) === numId);
+                    },
+                    togglePersonnel(id) {
+                        const numId = Number(id);
+                        if (this.isPersonnelSelected(numId)) {
+                            this.selectedPersonnel = this.selectedPersonnel.filter(item => Number(item) !== numId);
+                        } else {
+                            this.selectedPersonnel = [...this.selectedPersonnel, numId];
+                        }
+                    },
+                    getRoleCount(role) {
+                        return (this.assignedCounts[role] || 0) + (this.selectedRoleCounts[role] || 0);
+                    },
+                    getRoleStatus(bm) {
+                        const count = this.getRoleCount(bm.role);
+                        if (count === 0) return 'unmet';
+                        if (count > bm.max) return 'exceeded';
+                        if (count >= bm.min) return 'fulfilled';
+                        return 'partial';
+                    },
+                    get fulfilledBenchmarkCount() {
+                        return this.benchmarks.filter(bm => this.getRoleCount(bm.role) >= bm.min).length;
+                    },
+                    filterByRole(role) {
+                        this.roleFilter = this.roleFilter === role ? 'all' : role;
+                    },
+                    get filteredPersonnel() {
+                        const q = this.searchQuery.toLowerCase().trim();
+                        return this.personnelList.filter(p => {
+                            const matchesSearch = !q || 
+                                p.full_name.toLowerCase().includes(q) || 
+                                p.employee_id.toLowerCase().includes(q) ||
+                                (p.expertise && p.expertise.toLowerCase().includes(q));
+                            const matchesRole = this.roleFilter === 'all' || p.expertise === this.roleFilter;
+                            const matchesStatus = this.statusFilter === 'all' || 
+                                (this.statusFilter === 'available' && !p.is_assigned) ||
+                                (this.statusFilter === 'assigned' && p.is_assigned);
+                            return matchesSearch && matchesRole && matchesStatus;
+                        });
+                    },
+                    get exceededRoles() {
                         const warnings = [];
-                        for (const [role, rule] of Object.entries(this.limits)) {
-                            const current = this.assignedCounts[role] || 0;
-                            const adding = newCounts[role] || 0;
+                        for (const bm of this.benchmarks) {
+                            const current = this.assignedCounts[bm.role] || 0;
+                            const adding = this.selectedRoleCounts[bm.role] || 0;
                             const total = current + adding;
-                            if (total > rule.max) {
+                            if (total > bm.max) {
                                 warnings.push({
-                                    role: role,
+                                    role: bm.role,
                                     current: current,
                                     adding: adding,
                                     total: total,
-                                    max: rule.max,
-                                    recommended: rule.label
+                                    max: bm.max,
+                                    recommended: bm.label
                                 });
                             }
                         }
                         return warnings;
                     },
+                    toggleSelectFiltered() {
+                        const filteredIds = this.filteredPersonnel.map(p => Number(p.id));
+                        if (filteredIds.length === 0) return;
+                        const allSelected = filteredIds.every(id => this.isPersonnelSelected(id));
+                        if (allSelected) {
+                            this.selectedPersonnel = this.selectedPersonnel.filter(id => !filteredIds.includes(Number(id)));
+                        } else {
+                            const currentIds = this.selectedPersonnel.map(id => Number(id));
+                            this.selectedPersonnel = Array.from(new Set([...currentIds, ...filteredIds]));
+                        }
+                    },
                     handleSubmit(e) {
-                        const exceeded = this.getExceededRoles();
+                        const exceeded = this.exceededRoles.filter(item => item.adding > 0);
                         if (exceeded.length > 0) {
                             const details = exceeded.map(item => 
                                 `• ${item.role}: ${item.total} total (${item.current} already assigned + ${item.adding} new) exceeds recommended ${item.recommended}`
@@ -2643,96 +2710,174 @@
             >
                 @csrf
                 <div class="card-body">
-                    <p class="text-muted" style="font-size: 0.875rem; margin-bottom: var(--space-4);">
-                        Assign available field workers to <strong>{{ $project->name }}</strong> (<span class="font-mono">{{ $project->project_code }}</span>).
+                    <p class="form-hint" style="margin-bottom: var(--space-3); margin-top: 0;">
+                        Select the field personnel to assign to <strong>{{ $project->name }}</strong> (<span class="font-mono">{{ $project->project_code }}</span>). At least one personnel is required.
                     </p>
 
                     @if ($availablePersonnel->isEmpty())
                         <div class="alert alert-info">
-                            All personnel in the roster are currently assigned to projects. You can add new personnel from the Manpower module or unassign workers from other projects.
+                            All personnel in the roster are already assigned to this project. You can add new personnel from the Manpower module.
                         </div>
                     @else
-                        {{-- Estimation Guide Banner --}}
-                        <div style="background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); margin-bottom: var(--space-3); font-size: 0.75rem;">
-                            <div style="font-weight: 600; color: var(--color-ink); margin-bottom: 2px;">
-                                Project Expert Estimation Guide:
+                        {{-- Staffing Benchmark Checklist Panel --}}
+                        <div class="pms-benchmark-box">
+                            <div class="pms-benchmark-top">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <svg style="width: 14px; height: 14px; color: var(--color-accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="m9 11 3 3L22 4"/>
+                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                                    </svg>
+                                    <span style="font-weight: 600; font-size: 0.8125rem; color: var(--color-ink);">Staffing Benchmark Checklist</span>
+                                    <span class="pms-benchmark-badge" :class="{ 'is-complete': fulfilledBenchmarkCount === benchmarks.length }">
+                                        <span x-text="fulfilledBenchmarkCount"></span> / <span x-text="benchmarks.length"></span> fulfilled
+                                    </span>
+                                </div>
+                                <div style="font-size: 0.6875rem;">
+                                    <template x-if="roleFilter !== 'all'">
+                                        <span class="text-muted">
+                                            Filtered by: <strong x-text="roleFilter" style="color: var(--color-accent);"></strong> 
+                                            (<button type="button" @click="roleFilter = 'all'" style="background: none; border: none; padding: 0; color: var(--color-danger); cursor: pointer; text-decoration: underline; font-size: 0.6875rem;">Reset</button>)
+                                        </span>
+                                    </template>
+                                    <template x-if="roleFilter === 'all'">
+                                        <span class="text-muted">Click any role to filter roster below</span>
+                                    </template>
+                                </div>
                             </div>
-                            <div style="display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--color-muted);">
-                                <span>Technician: <strong>1-2</strong></span>
-                                <span>Project Manager: <strong>1</strong></span>
-                                <span>QA Inspector: <strong>1</strong></span>
-                                <span>Site Engineer: <strong>1</strong></span>
-                                <span>Worker / Installation: <strong>4-6</strong></span>
-                                <span>Safety Officer: <strong>1</strong></span>
-                                <span>Foreman: <strong>1</strong></span>
+
+                            <div class="pms-benchmark-chips">
+                                <template x-for="bm in benchmarks" :key="bm.role">
+                                    <button
+                                        type="button"
+                                        class="pms-benchmark-chip"
+                                        :class="{
+                                            'status-fulfilled': getRoleStatus(bm) === 'fulfilled',
+                                            'status-partial': getRoleStatus(bm) === 'partial',
+                                            'status-exceeded': getRoleStatus(bm) === 'exceeded',
+                                            'status-unmet': getRoleStatus(bm) === 'unmet',
+                                            'is-filtered': roleFilter === bm.role
+                                        }"
+                                        @click="filterByRole(bm.role)"
+                                        :title="'Click to filter list by ' + bm.role"
+                                    >
+                                        <span class="pms-benchmark-indicator">
+                                            <template x-if="getRoleStatus(bm) === 'fulfilled'">
+                                                <svg viewBox="0 0 16 16" fill="currentColor" style="width: 12px; height: 12px;"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>
+                                            </template>
+                                            <template x-if="getRoleStatus(bm) === 'exceeded'">
+                                                <span style="font-weight: 700; font-size: 0.6875rem; line-height: 1;">!</span>
+                                            </template>
+                                            <template x-if="getRoleStatus(bm) === 'partial'">
+                                                <span style="font-size: 0.625rem; line-height: 1;">◐</span>
+                                            </template>
+                                            <template x-if="getRoleStatus(bm) === 'unmet'">
+                                                <span style="font-size: 0.625rem; line-height: 1; opacity: 0.4;">○</span>
+                                            </template>
+                                        </span>
+                                        <span class="pms-benchmark-label" x-text="bm.short"></span>
+                                        <span class="pms-benchmark-ratio font-mono" x-text="getRoleCount(bm.role) + '/' + bm.label"></span>
+                                    </button>
+                                </template>
                             </div>
                         </div>
 
-                        {{-- Real-time Exceeded Warning Banner --}}
-                        <template x-if="getExceededRoles().length > 0">
-                            <div class="alert alert-warning" style="margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3); font-size: 0.8125rem; border-left: 3px solid #f59e0b; background: rgba(245, 158, 11, 0.08);">
-                                <div style="display: flex; align-items: flex-start; gap: 6px;">
-                                    <svg style="width: 16px; height: 16px; color: #d97706; flex-shrink: 0; margin-top: 2px;" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                    </svg>
-                                    <div>
-                                        <strong style="color: #92400e;">Estimation Requirement Exceeded:</strong>
-                                        <ul style="margin: 4px 0 0 16px; padding: 0; list-style-type: disc;">
-                                            <template x-for="item in getExceededRoles()" :key="item.role">
-                                                <li style="color: #92400e; margin-bottom: 2px;">
-                                                    <span x-text="item.role"></span>: total of <strong x-text="item.total"></strong> (<span x-text="item.current"></span> assigned + <span x-text="item.adding"></span> selected) exceeds recommended max of <strong x-text="item.recommended"></strong>.
-                                                </li>
-                                            </template>
-                                        </ul>
-                                    </div>
-                                </div>
+                        {{-- Exceeded Staffing Notice --}}
+                        <template x-if="exceededRoles.length > 0">
+                            <div class="alert alert-warning" style="margin-bottom: var(--space-3); padding: 8px 12px; font-size: 0.75rem;">
+                                <strong>Staffing Notice:</strong>
+                                <template x-for="item in exceededRoles" :key="item.role">
+                                    <span style="display: block; margin-top: 2px;">
+                                        • <span x-text="item.role"></span>: total <strong x-text="item.total"></strong> (<span x-text="item.current"></span> assigned + <span x-text="item.adding"></span> selected) exceeds recommended max of <strong x-text="item.recommended"></strong>.
+                                    </span>
+                                </template>
                             </div>
                         </template>
 
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
-                            <span class="form-label" style="margin-bottom: 0;">Choose Personnel (<span x-text="selectedAvail.length"></span> of {{ $availablePersonnel->count() }} selected):</span>
-                            <button type="button" class="btn btn-secondary btn-sm" @click="toggleAll()" style="font-size: 0.75rem; padding: 2px 8px;">
-                                <span x-text="selectedAvail.length === allAvailIds.length ? 'Deselect All' : 'Select All Available'"></span>
+                        {{-- Search & Filtering Toolbar (Uniform 34px controls) --}}
+                        <div class="pms-toolbar">
+                            <div style="flex: 1 1 200px; min-width: 180px; position: relative;">
+                                <input
+                                    type="text"
+                                    x-model="searchQuery"
+                                    class="form-control pms-toolbar-item"
+                                    placeholder="Search by name, ID, or role..."
+                                    style="padding-left: 30px !important;"
+                                >
+                                <svg style="position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--color-muted); pointer-events: none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                            </div>
+
+                            <select x-model="roleFilter" class="pms-toolbar-select">
+                                <option value="all">All Roles</option>
+                                @foreach(\App\Models\Personnel::EXPERTISE_OPTIONS as $exp)
+                                    <option value="{{ $exp }}">{{ $exp }}</option>
+                                @endforeach
+                            </select>
+
+                            <select x-model="statusFilter" class="pms-toolbar-select">
+                                <option value="all">All Status</option>
+                                <option value="available">Available Only</option>
+                                <option value="assigned">Assigned</option>
+                            </select>
+
+                            <button type="button" class="btn btn-secondary pms-toolbar-btn" @click="toggleSelectFiltered()">
+                                <span x-text="filteredPersonnel.length > 0 && filteredPersonnel.every(p => isPersonnelSelected(p.id)) ? 'Deselect All' : 'Select Filtered'"></span>
                             </button>
                         </div>
 
-                        <div class="personnel-select-list" style="max-height: 260px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface);">
-                            @foreach ($availablePersonnel as $avail)
-                                <label 
-                                    class="personnel-select-row"
-                                    for="personnel_check_{{ $avail->id }}"
-                                    :class="{ 'is-selected': selectedAvail.includes({{ $avail->id }}) }"
-                                >
-                                    <div class="personnel-select-checkbox-cell">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.75rem;">
+                            <span style="font-weight: 600; color: var(--color-ink);" x-text="selectedPersonnel.length + ' personnel selected' + (selectedPersonnel.length === 0 ? ' (at least 1 required)' : '')"></span>
+                            <span class="text-muted" x-text="'Showing ' + filteredPersonnel.length + ' of ' + personnelList.length"></span>
+                        </div>
+
+                        {{-- Persistent hidden inputs ensure all selected personnel across all checklist role filters are submitted --}}
+                        <div style="display: none;">
+                            <template x-for="id in selectedPersonnel" :key="'modal-selected-personnel-input-' + id">
+                                <input type="hidden" name="personnel_ids[]" :value="id">
+                            </template>
+                        </div>
+
+                        {{-- Scrollable List of Personnel --}}
+                        <div class="pms-roster-box">
+                            <template x-for="p in filteredPersonnel" :key="p.id">
+                                <label class="pms-personnel-row" :class="{ 'is-selected': isPersonnelSelected(p.id) }">
+                                    <div class="pms-personnel-check">
                                         <input
                                             type="checkbox"
-                                            name="personnel_ids[]"
-                                            id="personnel_check_{{ $avail->id }}"
-                                            value="{{ $avail->id }}"
-                                            x-model.number="selectedAvail"
-                                            class="personnel-select-checkbox form-check-input"
+                                            :value="p.id"
+                                            :checked="isPersonnelSelected(p.id)"
+                                            @change="togglePersonnel(p.id)"
                                         >
                                     </div>
-                                    <div class="personnel-select-info-cell">
-                                        <div class="personnel-select-name-wrap">
-                                            <strong class="personnel-select-name">{{ $avail->full_name }}</strong>
-                                            <span class="font-mono text-muted personnel-select-id">{{ $avail->employee_id }}</span>
+                                    <div class="pms-personnel-body">
+                                        <div class="pms-personnel-name-group">
+                                            <span class="pms-personnel-name" x-text="p.full_name"></span>
+                                            <span class="pms-personnel-id" x-text="p.employee_id"></span>
                                         </div>
-                                        <span class="badge personnel-select-badge">
-                                            {{ $avail->expertise }}
-                                        </span>
+                                        <div class="pms-personnel-meta">
+                                            <span class="badge" style="background: var(--color-surface-alt); border: 1px solid var(--color-border); font-size: 0.6875rem; font-weight: 600;" x-text="p.expertise"></span>
+                                            <span class="badge" style="background: rgba(46, 125, 83, 0.12); color: var(--color-success); font-size: 0.6875rem;" x-show="!p.is_assigned">Available</span>
+                                            <span class="badge" style="background: rgba(201, 138, 44, 0.12); color: #C98A2C; font-size: 0.6875rem;" x-show="p.is_assigned" x-text="p.project_code ? 'Assigned: ' + p.project_code : 'Assigned'"></span>
+                                        </div>
                                     </div>
                                 </label>
-                            @endforeach
+                            </template>
+                            <template x-if="filteredPersonnel.length === 0">
+                                <div style="padding: var(--space-4); text-align: center; color: var(--color-muted); font-size: 0.8125rem;">
+                                    No personnel match your search or filter criteria.
+                                </div>
+                            </template>
                         </div>
-                        <p class="form-hint" style="margin-top: 6px;">Select one or multiple personnel to assign them together in a single step.</p>
+                        <p class="form-hint" style="margin-top: 6px; margin-bottom: 0;">Select one or multiple personnel to assign them together in a single step.</p>
                     @endif
                 </div>
                 <div class="card-footer">
                     <div class="form-actions">
                         @if ($availablePersonnel->isNotEmpty())
-                            <button type="submit" class="btn btn-primary" :disabled="selectedAvail.length === 0">
-                                Assign <span x-text="selectedAvail.length > 0 ? selectedAvail.length + ' Personnel' : 'Personnel'"></span>
+                            <button type="submit" class="btn btn-primary" :disabled="selectedPersonnel.length === 0">
+                                Assign <span x-text="selectedPersonnel.length > 0 ? selectedPersonnel.length + ' Personnel' : 'Personnel'"></span>
                             </button>
                         @endif
                         <button type="button" class="btn btn-secondary" @click="assignModalOpen = false">Cancel</button>
@@ -2741,6 +2886,330 @@
             </form>
         </div>
     </div>
+
+    <style>
+        /* Staffing Benchmark Checklist & Manpower Roster Styles for Assign Personnel Modal */
+        .pms-benchmark-box {
+            background: var(--color-surface-alt) !important;
+            border: 1px solid var(--color-border) !important;
+            border-radius: var(--radius-md) !important;
+            padding: 10px 12px !important;
+            margin-bottom: var(--space-3) !important;
+            box-sizing: border-box !important;
+        }
+        .pms-benchmark-top {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 8px !important;
+            margin-bottom: 8px !important;
+            flex-wrap: wrap !important;
+        }
+        .pms-benchmark-badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            font-size: 0.6875rem !important;
+            font-weight: 600 !important;
+            padding: 2px 8px !important;
+            border-radius: var(--radius-pill) !important;
+            background: var(--color-surface) !important;
+            border: 1px solid var(--color-border) !important;
+            color: var(--color-muted) !important;
+        }
+        .pms-benchmark-badge.is-complete {
+            background: rgba(46, 125, 83, 0.12) !important;
+            color: var(--color-success) !important;
+            border-color: rgba(46, 125, 83, 0.3) !important;
+        }
+        .pms-benchmark-chips {
+            display: grid !important;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 6px !important;
+        }
+        @media (max-width: 720px) {
+            .pms-benchmark-chips {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+        }
+        @media (max-width: 480px) {
+            .pms-benchmark-chips {
+                grid-template-columns: 1fr !important;
+            }
+        }
+        .pms-benchmark-chip {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding: 6px 8px !important;
+            border-radius: var(--radius-sm) !important;
+            background: var(--color-surface) !important;
+            border: 1px solid var(--color-border) !important;
+            font-size: 0.75rem !important;
+            cursor: pointer !important;
+            transition: all var(--transition-fast) !important;
+            gap: 6px !important;
+            box-sizing: border-box !important;
+            text-align: left !important;
+        }
+        .pms-benchmark-chip:hover {
+            border-color: var(--color-accent) !important;
+            transform: translateY(-1px) !important;
+        }
+        .pms-benchmark-chip.status-fulfilled {
+            background: rgba(46, 125, 83, 0.08) !important;
+            border-color: rgba(46, 125, 83, 0.3) !important;
+            color: var(--color-success) !important;
+        }
+        .pms-benchmark-chip.status-fulfilled .pms-benchmark-indicator {
+            color: var(--color-success) !important;
+        }
+        .pms-benchmark-chip.status-partial {
+            background: rgba(44, 95, 124, 0.08) !important;
+            border-color: rgba(44, 95, 124, 0.3) !important;
+            color: var(--color-accent) !important;
+        }
+        .pms-benchmark-chip.status-partial .pms-benchmark-indicator {
+            color: var(--color-accent) !important;
+        }
+        .pms-benchmark-chip.status-exceeded {
+            background: rgba(201, 138, 44, 0.08) !important;
+            border-color: rgba(201, 138, 44, 0.3) !important;
+            color: #C98A2C !important;
+        }
+        .pms-benchmark-chip.status-exceeded .pms-benchmark-indicator {
+            color: #C98A2C !important;
+        }
+        .pms-benchmark-chip.status-unmet {
+            background: var(--color-surface) !important;
+            border-color: var(--color-border) !important;
+            color: var(--color-muted) !important;
+        }
+        .pms-benchmark-chip.is-filtered {
+            outline: 2px solid var(--color-accent) !important;
+            outline-offset: 1px !important;
+        }
+        .pms-benchmark-indicator {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 14px !important;
+            height: 14px !important;
+            flex-shrink: 0 !important;
+        }
+        .pms-benchmark-label {
+            font-weight: 500 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            flex: 1 1 auto !important;
+        }
+        .pms-benchmark-ratio {
+            font-size: 0.6875rem !important;
+            font-weight: 600 !important;
+            flex-shrink: 0 !important;
+        }
+        .pms-roster-box {
+            height: 260px !important;
+            max-height: 260px !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            border: 1px solid var(--color-border) !important;
+            border-radius: var(--radius-md) !important;
+            background: var(--color-surface) !important;
+            scrollbar-width: thin !important;
+            scrollbar-color: var(--color-border) transparent !important;
+            box-sizing: border-box !important;
+        }
+        .pms-roster-box::-webkit-scrollbar {
+            width: 6px !important;
+        }
+        .pms-roster-box::-webkit-scrollbar-thumb {
+            background: var(--color-border) !important;
+            border-radius: 4px !important;
+        }
+        .pms-personnel-row {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            padding: 8px 12px !important;
+            border-bottom: 1px solid var(--color-border) !important;
+            cursor: pointer !important;
+            user-select: none !important;
+            gap: 12px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            transition: background-color var(--transition-fast) !important;
+        }
+        .pms-personnel-row:last-child {
+            border-bottom: none !important;
+        }
+        .pms-personnel-row:hover {
+            background-color: var(--color-surface-alt) !important;
+        }
+        .pms-personnel-row.is-selected {
+            background-color: rgba(44, 95, 124, 0.08) !important;
+        }
+        .pms-personnel-check {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex: 0 0 20px !important;
+            width: 20px !important;
+            height: 20px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .pms-personnel-check input[type="checkbox"] {
+            width: 16px !important;
+            height: 16px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            cursor: pointer !important;
+            accent-color: var(--color-accent) !important;
+            vertical-align: middle !important;
+        }
+        .pms-personnel-body {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            gap: 10px !important;
+        }
+        .pms-personnel-name-group {
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            min-width: 0 !important;
+            overflow: hidden !important;
+        }
+        .pms-personnel-name {
+            font-size: 0.8125rem !important;
+            font-weight: 600 !important;
+            color: var(--color-ink) !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        .pms-personnel-id {
+            font-size: 0.75rem !important;
+            color: var(--color-muted) !important;
+            font-family: var(--font-mono) !important;
+            flex-shrink: 0 !important;
+        }
+        .pms-personnel-meta {
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            flex-shrink: 0 !important;
+        }
+        .pms-toolbar {
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            margin-bottom: var(--space-3) !important;
+            flex-wrap: wrap !important;
+        }
+        .pms-toolbar-item {
+            height: 34px !important;
+            min-height: 34px !important;
+            max-height: 34px !important;
+            padding: 0 10px !important;
+            font-size: 0.8125rem !important;
+            line-height: 32px !important;
+            box-sizing: border-box !important;
+            border: 1px solid var(--color-border) !important;
+            border-radius: var(--radius-md) !important;
+            background: var(--color-surface) !important;
+            color: var(--color-ink) !important;
+        }
+        .pms-toolbar-select {
+            height: 34px !important;
+            min-height: 34px !important;
+            max-height: 34px !important;
+            padding: 0 10px !important;
+            font-size: 0.8125rem !important;
+            line-height: 32px !important;
+            border: 1px solid var(--color-border) !important;
+            border-radius: var(--radius-md) !important;
+            background: var(--color-surface) !important;
+            color: var(--color-ink) !important;
+            box-sizing: border-box !important;
+        }
+        .pms-toolbar-btn {
+            height: 34px !important;
+            min-height: 34px !important;
+            max-height: 34px !important;
+            padding: 0 12px !important;
+            font-size: 0.8125rem !important;
+            font-weight: 500 !important;
+            border-radius: var(--radius-md) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+            white-space: nowrap !important;
+            box-sizing: border-box !important;
+            cursor: pointer !important;
+            border: 1px solid var(--color-border) !important;
+            background: var(--color-surface) !important;
+            color: var(--color-ink) !important;
+            transition: background-color var(--transition-fast), border-color var(--transition-fast) !important;
+        }
+        .pms-toolbar-btn:hover {
+            background: var(--color-surface-alt) !important;
+            border-color: var(--color-muted) !important;
+        }
+        [data-theme="dark"] .pms-benchmark-box {
+            background: #0E1522 !important;
+            border-color: #243042 !important;
+        }
+        [data-theme="dark"] .pms-benchmark-chip {
+            background: #111A28 !important;
+            border-color: #243042 !important;
+        }
+        [data-theme="dark"] .pms-benchmark-chip.status-fulfilled {
+            background: rgba(46, 125, 83, 0.2) !important;
+            border-color: rgba(74, 222, 128, 0.4) !important;
+            color: #4ADE80 !important;
+        }
+        [data-theme="dark"] .pms-benchmark-chip.status-partial {
+            background: rgba(44, 95, 124, 0.25) !important;
+            border-color: rgba(56, 189, 248, 0.4) !important;
+            color: #38BDF8 !important;
+        }
+        [data-theme="dark"] .pms-benchmark-chip.status-exceeded {
+            background: rgba(201, 138, 44, 0.2) !important;
+            border-color: rgba(251, 191, 36, 0.4) !important;
+            color: #FBBF24 !important;
+        }
+        [data-theme="dark"] .pms-benchmark-chip.status-unmet {
+            background: #111A28 !important;
+            border-color: #243042 !important;
+            color: #94A3B8 !important;
+        }
+        [data-theme="dark"] .pms-roster-box {
+            background: #111A28 !important;
+            border-color: #243042 !important;
+        }
+        [data-theme="dark"] .pms-personnel-row {
+            border-bottom-color: #243042 !important;
+        }
+        [data-theme="dark"] .pms-personnel-row:hover {
+            background-color: #1A263A !important;
+        }
+        [data-theme="dark"] .pms-personnel-row.is-selected {
+            background-color: rgba(44, 95, 124, 0.25) !important;
+        }
+        [data-theme="dark"] .pms-toolbar-select {
+            background: #0E1522 !important;
+            border-color: #243042 !important;
+            color: #F1F5F9 !important;
+        }
+    </style>
 
     {{-- ─── Modal 3: Add Major Task ─────────────────────────────────────────── --}}
     <div 
@@ -5647,7 +6116,7 @@ function projectDetail() {
                     this.applySubtaskResponseUI(taskId, subtaskId, data);
 
                     const toastDetail = {
-                        type: data.is_completed ? 'success' : 'info',
+                        type: 'success',
                         title: data.is_completed ? 'Task Completed' : 'Task Incomplete',
                         message: data.is_completed 
                             ? 'Task marked as completed.' 

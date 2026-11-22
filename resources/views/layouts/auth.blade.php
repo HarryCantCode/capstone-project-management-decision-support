@@ -146,6 +146,7 @@
         </div>
     </main>
 
+    @include('layouts.partials.processing-indicator')
     @stack('scripts')
 </body>
 </html>

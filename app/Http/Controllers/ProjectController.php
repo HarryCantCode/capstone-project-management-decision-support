@@ -180,9 +180,13 @@ class ProjectController extends Controller
         ]);
 
         $availablePersonnel = Personnel::query()
-            ->whereNull('project_id')
+            ->with('project')
+            ->where(function ($q) use ($project) {
+                $q->whereNull('project_id')
+                    ->orWhere('project_id', '!=', $project->id);
+            })
             ->orderBy('last_name')
-            ->get(['id', 'employee_id', 'first_name', 'middle_name', 'last_name', 'expertise']);
+            ->get(['id', 'employee_id', 'first_name', 'middle_name', 'last_name', 'expertise', 'project_id']);
 
         $catalogMaterials = \App\Models\Resource::query()
             ->orderBy('name')
@@ -438,35 +442,55 @@ class ProjectController extends Controller
         $personnelList = Personnel::whereIn('id', $ids)->get();
 
         DB::transaction(function () use ($personnelList, $project, $now, &$count) {
-            foreach ($personnelList as $personnel) {
-                $oldProjectId = $personnel->project_id;
-                if ($oldProjectId && $oldProjectId != $project->id) {
-                    \App\Models\ProjectPersonnelHistory::where('project_id', $oldProjectId)
-                        ->where('personnel_id', $personnel->id)
-                        ->whereNull('released_at')
-                        ->update([
-                            'released_at'    => $now,
-                            'release_reason' => 'reassigned',
-                            'released_by'    => auth()->id(),
-                        ]);
-                }
+            $timestamp = now();
+            $userId = auth()->id();
 
-                $personnel->update([
+            $reassignedIds = $personnelList
+                ->filter(fn ($p) => $p->project_id && (int) $p->project_id !== (int) $project->id)
+                ->pluck('id')
+                ->all();
+
+            if (!empty($reassignedIds)) {
+                \App\Models\ProjectPersonnelHistory::whereIn('personnel_id', $reassignedIds)
+                    ->where('project_id', '!=', $project->id)
+                    ->whereNull('released_at')
+                    ->update([
+                        'released_at'    => $now,
+                        'release_reason' => 'reassigned',
+                        'released_by'    => $userId,
+                        'updated_at'     => $timestamp,
+                    ]);
+            }
+
+            $allIds = $personnelList->pluck('id')->all();
+            if (!empty($allIds)) {
+                Personnel::whereIn('id', $allIds)->update([
                     'project_id'    => $project->id,
                     'date_assigned' => $now,
-                    'updated_by'    => auth()->id(),
+                    'updated_by'    => $userId,
+                    'updated_at'    => $timestamp,
                 ]);
-
-                if ($oldProjectId != $project->id) {
-                    \App\Models\ProjectPersonnelHistory::create([
-                        'project_id'   => $project->id,
-                        'personnel_id' => $personnel->id,
-                        'assigned_at'  => $now,
-                        'assigned_by'  => auth()->id(),
-                    ]);
-                }
-                $count++;
             }
+
+            $newHistoryRows = $personnelList
+                ->filter(fn ($p) => (int) $p->project_id !== (int) $project->id)
+                ->map(fn ($p) => [
+                    'project_id'   => $project->id,
+                    'personnel_id' => $p->id,
+                    'assigned_at'  => $now,
+                    'assigned_by'  => $userId,
+                    'created_at'   => $timestamp,
+                    'updated_at'   => $timestamp,
+                ])
+                ->values()
+                ->all();
+
+            if (!empty($newHistoryRows)) {
+                \App\Models\ProjectPersonnelHistory::insert($newHistoryRows);
+            }
+
+            $count = $personnelList->count();
+            app(\App\Services\LiveUpdateService::class)->bump('resources');
 
             $manpowerSummary = $personnelList->map(fn ($p) => "{$p->employee_id} ({$p->full_name} - {$p->expertise})")->implode(', ');
             \App\Models\ProjectStatusHistory::create([
@@ -476,8 +500,8 @@ class ProjectController extends Controller
                 'notes'       => $count === 1
                     ? "Assigned manpower: {$manpowerSummary}"
                     : "Assigned {$count} manpower: {$manpowerSummary}",
-                'changed_by'  => auth()->id(),
-                'changed_at'  => now(),
+                'changed_by'  => $userId,
+                'changed_at'  => $timestamp,
             ]);
         });
 

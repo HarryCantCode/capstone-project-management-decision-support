@@ -184,7 +184,19 @@ class StoreProjectRequest extends FormRequest
             }
 
             if ($this->has('expenses') && is_array($this->input('expenses'))) {
-                foreach ($this->input('expenses') as $idx => $exp) {
+                $expensesInput = $this->input('expenses');
+                $resourceIds = collect($expensesInput)
+                    ->pluck('resource_id')
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
+                $resourcesById = !empty($resourceIds)
+                    ? \App\Models\Resource::whereIn('id', $resourceIds)->get()->keyBy('id')
+                    : collect();
+
+                foreach ($expensesInput as $idx => $exp) {
                     $hasDesc = !empty($exp['description']);
                     $hasAmt = !empty($exp['amount']);
                     $hasRes = !empty($exp['resource_id']);
@@ -196,7 +208,7 @@ class StoreProjectRequest extends FormRequest
                     }
 
                     if (!empty($exp['resource_id'])) {
-                        $res = \App\Models\Resource::find($exp['resource_id']);
+                        $res = $resourcesById->get((int) $exp['resource_id']);
                         $qty = !empty($exp['quantity']) && (int) $exp['quantity'] > 0 ? (int) $exp['quantity'] : 1;
                         if ($res && $qty > $res->quantity_available) {
                             $validator->errors()->add("expenses.{$idx}.quantity", "Requested quantity ({$qty}) exceeds available stock ({$res->quantity_available}) for {$res->name}.");

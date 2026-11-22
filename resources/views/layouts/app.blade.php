@@ -1268,29 +1268,45 @@
             </header>
 
             {{-- Global Toast Notifications (Centered auto-dismissing floating alert) --}}
+            @php
+                $hasServerFlashToast = session()->has('staff_submitted')
+                    || session()->has('status')
+                    || session()->has('success')
+                    || session()->has('error')
+                    || session()->has('warning');
+            @endphp
             <div
                 class="app-toast-container"
                 x-data="{
                     toasts: [],
+                    hasServerToast: {{ $hasServerFlashToast ? 'true' : 'false' }},
                     init() {
                         window.__dexAddToast = (t) => this.add(t);
                         const savedToast = sessionStorage.getItem('dex_pending_toast');
                         if (savedToast) {
                             sessionStorage.removeItem('dex_pending_toast');
-                            try {
-                                const parsed = JSON.parse(savedToast);
-                                setTimeout(() => this.add(parsed), 250);
-                            } catch (e) {}
+                            if (!this.hasServerToast) {
+                                try {
+                                    const parsed = JSON.parse(savedToast);
+                                    setTimeout(() => this.add(parsed), 250);
+                                } catch (e) {}
+                            }
                         }
                     },
                     add(toast) {
                         if (!toast) return;
+                        if (toast.type === 'info') return;
+                        const type = toast.type || 'success';
+                        const title = toast.title || (type === 'error' ? 'Error' : (type === 'warning' ? 'Notice' : 'Success'));
+                        const message = toast.message || '';
+                        const isDuplicate = this.toasts.some(existing => existing.type === type && existing.title === title && existing.message === message);
+                        if (isDuplicate) return;
                         const id = Date.now() + Math.random();
                         const t = {
                             id,
-                            type: toast.type || 'info',
-                            title: toast.title || (toast.type === 'error' ? 'Error' : (toast.type === 'warning' ? 'Notice' : (toast.type === 'success' ? 'Success' : 'Notification'))),
-                            message: toast.message || ''
+                            type,
+                            title,
+                            message
                         };
                         this.toasts.push(t);
                         setTimeout(() => this.remove(id), toast.duration || 6500);
@@ -1329,9 +1345,7 @@
                             </button>
                         </div>
                     </div>
-                @endif
-
-                @if (session('status') || session('success'))
+                @elseif (session('status') || session('success'))
                     <div
                         class="app-toast-item"
                         x-data="{ show: true }"
@@ -2007,11 +2021,6 @@
 
         window.showToast = function(detail) {
             if (!detail) return;
-            if (typeof window.__dexAddToast === 'function') {
-                try {
-                    window.__dexAddToast(detail);
-                } catch (e) {}
-            }
             window.dispatchEvent(new CustomEvent('show-toast', { detail }));
         };
 
@@ -2168,16 +2177,6 @@
                             }
                         }));
 
-                        if (latestNotif && !latestNotif.is_read && (lastNotificationId === null || latestNotif.id > lastNotificationId)) {
-                            if (typeof window.showToast === 'function') {
-                                window.showToast({
-                                    type: 'info',
-                                    title: latestNotif.title || 'New Notification',
-                                    message: latestNotif.message || '',
-                                    duration: 6000
-                                });
-                            }
-                        }
                         lastNotificationId = latestNotif ? latestNotif.id : lastNotificationId;
                     }
 
@@ -2224,6 +2223,7 @@
     </script>
     @endauth
     @include('layouts.partials.onboarding-tour')
+    @include('layouts.partials.processing-indicator')
     @stack('scripts')
 </body>
 </html>

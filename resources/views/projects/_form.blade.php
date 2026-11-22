@@ -694,12 +694,26 @@
                 get roleCounts() {
                     const counts = {};
                     this.selectedPersonnel.forEach(id => {
-                        const p = this.personnelList.find(item => item.id === id);
+                        const numId = Number(id);
+                        const p = this.personnelList.find(item => Number(item.id) === numId);
                         if (p && p.expertise) {
                             counts[p.expertise] = (counts[p.expertise] || 0) + 1;
                         }
                     });
                     return counts;
+                },
+                isPersonnelSelected(id) {
+                    const numId = Number(id);
+                    return this.selectedPersonnel.some(item => Number(item) === numId);
+                },
+                togglePersonnel(id) {
+                    const numId = Number(id);
+                    if (this.isPersonnelSelected(numId)) {
+                        this.selectedPersonnel = this.selectedPersonnel.filter(item => Number(item) !== numId);
+                    } else {
+                        this.selectedPersonnel = [...this.selectedPersonnel, numId];
+                    }
+                    this.updatePreview();
                 },
                 getRoleCount(role) {
                     return this.roleCounts[role] || 0;
@@ -747,13 +761,14 @@
                     return warnings;
                 },
                 toggleSelectFiltered() {
-                    const filteredIds = this.filteredPersonnel.map(p => p.id);
+                    const filteredIds = this.filteredPersonnel.map(p => Number(p.id));
                     if (filteredIds.length === 0) return;
-                    const allSelected = filteredIds.every(id => this.selectedPersonnel.includes(id));
+                    const allSelected = filteredIds.every(id => this.isPersonnelSelected(id));
                     if (allSelected) {
-                        this.selectedPersonnel = this.selectedPersonnel.filter(id => !filteredIds.includes(id));
+                        this.selectedPersonnel = this.selectedPersonnel.filter(id => !filteredIds.includes(Number(id)));
                     } else {
-                        this.selectedPersonnel = Array.from(new Set([...this.selectedPersonnel, ...filteredIds]));
+                        const currentIds = this.selectedPersonnel.map(id => Number(id));
+                        this.selectedPersonnel = Array.from(new Set([...currentIds, ...filteredIds]));
                     }
                     this.updatePreview();
                 },
@@ -896,7 +911,7 @@
                     </select>
 
                     <button type="button" class="btn btn-secondary pms-toolbar-btn" @click="toggleSelectFiltered()">
-                        <span x-text="filteredPersonnel.length > 0 && filteredPersonnel.every(p => selectedPersonnel.includes(p.id)) ? 'Deselect All' : 'Select Filtered'"></span>
+                        <span x-text="filteredPersonnel.length > 0 && filteredPersonnel.every(p => isPersonnelSelected(p.id)) ? 'Deselect All' : 'Select Filtered'"></span>
                     </button>
                 </div>
 
@@ -905,16 +920,23 @@
                     <span class="text-muted" x-text="'Showing ' + filteredPersonnel.length + ' of ' + personnelList.length"></span>
                 </div>
 
+                {{-- Persistent hidden inputs ensure all selected personnel across all checklist role filters are submitted --}}
+                <div id="selected-personnel-hidden-inputs" style="display: none;">
+                    <template x-for="id in selectedPersonnel" :key="'selected-personnel-input-' + id">
+                        <input type="hidden" name="personnel_ids[]" :value="id">
+                    </template>
+                </div>
+
                 {{-- Scrollable List of Personnel --}}
                 <div class="pms-roster-box">
                     <template x-for="p in filteredPersonnel" :key="p.id">
-                        <label class="pms-personnel-row" :class="{ 'is-selected': selectedPersonnel.includes(p.id) }">
+                        <label class="pms-personnel-row" :class="{ 'is-selected': isPersonnelSelected(p.id) }">
                             <div class="pms-personnel-check">
                                 <input
                                     type="checkbox"
-                                    name="personnel_ids[]"
                                     :value="p.id"
-                                    x-model.number="selectedPersonnel"
+                                    :checked="isPersonnelSelected(p.id)"
+                                    @change="togglePersonnel(p.id)"
                                 >
                             </div>
                             <div class="pms-personnel-body">
@@ -3057,8 +3079,8 @@
             projectForm.addEventListener('submit', function (e) {
                 const isCreateMode = !@js($isEditing);
                 if (isCreateMode) {
-                    const checkedPersonnel = projectForm.querySelectorAll('input[name="personnel_ids[]"]:checked');
-                    if (checkedPersonnel.length === 0) {
+                    const selectedPersonnelInputs = projectForm.querySelectorAll('input[name="personnel_ids[]"]');
+                    if (selectedPersonnelInputs.length === 0) {
                         e.preventDefault();
                         window.dispatchEvent(new CustomEvent('show-toast', {
                             detail: {

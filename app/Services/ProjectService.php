@@ -93,8 +93,7 @@ class ProjectService
                 'updated_by' => $user->id,
             ]);
 
-            // Create initial default Major Task: Pre-construction & Regulatory Compliance (covering Week 1)
-            $this->createDefaultPermitTask($project, $user->id);
+            // Initial default Major Task (Pre-construction & Regulatory Compliance) is created by ProjectObserver::created()
 
             // Handle invoice attachments (multiple or single)
             if (!empty($validated['invoice_files']) && is_array($validated['invoice_files'])) {
@@ -107,35 +106,50 @@ class ProjectService
                 $this->storeProjectFile($project, $validated['invoice_file'], 'invoice', $user->id, 'Initial project invoice attachment.');
             }
 
-            // Assign selected manpower (Required)
+            // Assign selected manpower (Required) — bulk queries for low latency
             if (!empty($validated['personnel_ids']) && is_array($validated['personnel_ids'])) {
-                $personnelList = Personnel::whereIn('id', $validated['personnel_ids'])->get();
+                $uniquePersonnelIds = array_values(array_unique(array_map('intval', $validated['personnel_ids'])));
+                $personnelList = Personnel::whereIn('id', $uniquePersonnelIds)->get();
                 $now = $startDate ?? now()->toDateString();
-                foreach ($personnelList as $personnel) {
-                    $oldProjectId = $personnel->project_id;
-                    if ($oldProjectId && $oldProjectId != $project->id) {
-                        \App\Models\ProjectPersonnelHistory::where('project_id', $oldProjectId)
-                            ->where('personnel_id', $personnel->id)
-                            ->whereNull('released_at')
-                            ->update([
-                                'released_at'    => $now,
-                                'release_reason' => 'reassigned',
-                                'released_by'    => $user->id,
-                            ]);
-                    }
+                $timestamp = now();
 
-                    $personnel->update([
+                $reassignedIds = $personnelList
+                    ->filter(fn ($p) => $p->project_id && (int) $p->project_id !== (int) $project->id)
+                    ->pluck('id')
+                    ->all();
+
+                if (!empty($reassignedIds)) {
+                    \App\Models\ProjectPersonnelHistory::whereIn('personnel_id', $reassignedIds)
+                        ->where('project_id', '!=', $project->id)
+                        ->whereNull('released_at')
+                        ->update([
+                            'released_at'    => $now,
+                            'release_reason' => 'reassigned',
+                            'released_by'    => $user->id,
+                            'updated_at'     => $timestamp,
+                        ]);
+                }
+
+                $foundIds = $personnelList->pluck('id')->all();
+                if (!empty($foundIds)) {
+                    Personnel::whereIn('id', $foundIds)->update([
                         'project_id'    => $project->id,
                         'date_assigned' => $now,
                         'updated_by'    => $user->id,
+                        'updated_at'    => $timestamp,
                     ]);
 
-                    \App\Models\ProjectPersonnelHistory::create([
+                    $historyRows = $personnelList->map(fn ($p) => [
                         'project_id'   => $project->id,
-                        'personnel_id' => $personnel->id,
+                        'personnel_id' => $p->id,
                         'assigned_at'  => $now,
                         'assigned_by'  => $user->id,
-                    ]);
+                        'created_at'   => $timestamp,
+                        'updated_at'   => $timestamp,
+                    ])->all();
+
+                    \App\Models\ProjectPersonnelHistory::insert($historyRows);
+                    app(LiveUpdateService::class)->bump('resources');
                 }
 
                 $count = $personnelList->count();
@@ -148,7 +162,7 @@ class ProjectService
                         ? "Assigned initial manpower: {$manpowerSummary}"
                         : "Assigned initial manpower team ({$count}): {$manpowerSummary}",
                     'changed_by'  => $user->id,
-                    'changed_at'  => now(),
+                    'changed_at'  => $timestamp,
                 ]);
 
                 $this->notificationService->notifyManpowerAssigned($project, $personnelList);
@@ -243,14 +257,21 @@ class ProjectService
             ['title' => 'Initial site mobilization and safety barricade staging', 'due_date' => $startDate->copy()->addDays(6)->toDateString()],
         ];
 
+        $now = now();
+        $subtaskRows = [];
         foreach ($defaultSubtasks as $index => $subtaskData) {
-            $task->subtasks()->create([
+            $subtaskRows[] = [
+                'project_task_id' => $task->id,
                 'title' => $subtaskData['title'],
                 'due_date' => $subtaskData['due_date'],
                 'is_completed' => false,
                 'sort_order' => $index + 1,
-            ]);
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
+
+        \App\Models\ProjectSubtask::insert($subtaskRows);
 
         return $task;
     }

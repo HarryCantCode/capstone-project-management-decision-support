@@ -18,9 +18,12 @@ use App\Models\ProjectTask;
 use App\Models\Resource;
 use App\Models\StaffPendingAction;
 use App\Models\User;
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Testing\Fakes\MailFake;
 
 /**
  * EmailNotificationService — dispatches transactional email notifications.
@@ -59,19 +62,19 @@ class EmailNotificationService
         ProjectSubtask $subtask,
         User $staffUser,
     ): void {
-        if (empty($staffUser->email)) {
+        if (empty($staffUser->email) || !$this->isDeliverableEmail($staffUser->email)) {
             return;
         }
 
-        try {
-            Mail::to($staffUser->email)->send(new TaskAssignedMail($staffUser, $project, $task, $subtask));
-        } catch (\Throwable $e) {
-            Log::error("Failed sending task assigned email to {$staffUser->email}: {$e->getMessage()}", [
+        $this->deliverSingle(
+            $staffUser->email,
+            fn () => new TaskAssignedMail($staffUser, $project, $task, $subtask),
+            [
                 'staff_id' => $staffUser->id,
                 'subtask_id' => $subtask->id,
-                'exception' => $e,
-            ]);
-        }
+            ],
+            "Failed sending task assigned email to {$staffUser->email}",
+        );
     }
 
     /**
@@ -160,19 +163,19 @@ class EmailNotificationService
 
         // Verify recipient is indeed a staff member (or the submitting non-admin user)
         if ($recipient->hasRole('Staff') || (!$recipient->hasRole('Admin') && !$recipient->hasRole('Manager'))) {
-            try {
-                Mail::to($recipient->email)->send(new StaffActionResultMail($recipient, $pendingAction, $decision));
-                Log::info("Staff action result email sent to {$recipient->email}", [
-                    'pending_action_id' => $pendingAction->id,
-                    'decision' => $decision,
-                ]);
-            } catch (\Throwable $e) {
-                Log::error("Failed sending staff action result email to {$recipient->email}: {$e->getMessage()}", [
-                    'pending_action_id' => $pendingAction->id,
-                    'decision' => $decision,
-                    'exception' => $e,
-                ]);
+            if (!$this->isDeliverableEmail($recipient->email)) {
+                return;
             }
+
+            $this->deliverSingle(
+                $recipient->email,
+                fn () => new StaffActionResultMail($recipient, $pendingAction, $decision),
+                [
+                    'pending_action_id' => $pendingAction->id,
+                    'decision' => $decision,
+                ],
+                "Failed sending staff action result email to {$recipient->email}",
+            );
         }
     }
 
@@ -195,18 +198,16 @@ class EmailNotificationService
      */
     public function sendPasswordChangedEmail(User $user, ?string $ipAddress = null): void
     {
-        if (empty($user->email) || $user->trashed()) {
+        if (empty($user->email) || $user->trashed() || !$this->isDeliverableEmail($user->email)) {
             return;
         }
 
-        try {
-            Mail::to($user->email)->send(new PasswordChangedMail($user, null, $ipAddress));
-        } catch (\Throwable $e) {
-            Log::error("Failed sending password changed email notification to {$user->email}: {$e->getMessage()}", [
-                'user_id' => $user->id,
-                'exception' => $e,
-            ]);
-        }
+        $this->deliverSingle(
+            $user->email,
+            fn () => new PasswordChangedMail($user, null, $ipAddress),
+            ['user_id' => $user->id],
+            "Failed sending password changed email notification to {$user->email}",
+        );
     }
 
     /**
@@ -253,25 +254,155 @@ class EmailNotificationService
 
     /**
      * Dispatch mailables to a collection of users with defensive error handling.
+     * Queues asynchronously after DB transaction commit during live HTTP requests
+     * so slow SMTP handshakes never block user actions (such as project creation).
      *
      * @param Collection<int, User> $recipients
-     * @param callable(User): \Illuminate\Mail\Mailable $mailableFactory
+     * @param callable(User): Mailable $mailableFactory
      */
     private function dispatchToRecipients(Collection $recipients, callable $mailableFactory): void
     {
-        foreach ($recipients as $recipient) {
-            if (empty($recipient->email)) {
-                continue;
+        $validRecipients = $recipients->filter(
+            fn (User $recipient) => !empty($recipient->email) && $this->isDeliverableEmail($recipient->email),
+        )->values();
+
+        if ($validRecipients->isEmpty()) {
+            return;
+        }
+
+        if ($this->shouldSendSynchronously()) {
+            foreach ($validRecipients as $recipient) {
+                try {
+                    Mail::to($recipient->email)->send($mailableFactory($recipient));
+                } catch (\Throwable $e) {
+                    Log::error("Failed sending email notification to {$recipient->email}: {$e->getMessage()}", [
+                        'recipient_id' => $recipient->id,
+                        'exception' => $e,
+                    ]);
+                }
             }
 
-            try {
-                Mail::to($recipient->email)->send($mailableFactory($recipient));
-            } catch (\Throwable $e) {
-                Log::error("Failed sending email notification to {$recipient->email}: {$e->getMessage()}", [
-                    'recipient_id' => $recipient->id,
-                    'exception' => $e,
-                ]);
+            return;
+        }
+
+        DB::afterCommit(function () use ($validRecipients, $mailableFactory) {
+            $queuedAny = false;
+
+            foreach ($validRecipients as $recipient) {
+                try {
+                    Mail::to($recipient->email)->queue($mailableFactory($recipient));
+                    $queuedAny = true;
+                } catch (\Throwable $e) {
+                    Log::error("Failed queueing email notification to {$recipient->email}: {$e->getMessage()}", [
+                        'recipient_id' => $recipient->id,
+                        'exception' => $e,
+                    ]);
+                }
             }
+
+            if ($queuedAny) {
+                $this->triggerBackgroundQueueWorker();
+            }
+        });
+    }
+
+    /**
+     * Deliver a single mailable (synchronously in tests, queued asynchronously in live requests).
+     *
+     * @param callable(): Mailable $mailableResolver
+     * @param array<string, mixed> $logContext
+     */
+    private function deliverSingle(
+        string $email,
+        callable $mailableResolver,
+        array $logContext,
+        string $errorPrefix,
+    ): void {
+        if ($this->shouldSendSynchronously()) {
+            try {
+                Mail::to($email)->send($mailableResolver());
+            } catch (\Throwable $e) {
+                Log::error("{$errorPrefix}: {$e->getMessage()}", array_merge($logContext, ['exception' => $e]));
+            }
+
+            return;
+        }
+
+        DB::afterCommit(function () use ($email, $mailableResolver, $logContext, $errorPrefix) {
+            try {
+                Mail::to($email)->queue($mailableResolver());
+                $this->triggerBackgroundQueueWorker();
+            } catch (\Throwable $e) {
+                Log::error("{$errorPrefix}: {$e->getMessage()}", array_merge($logContext, ['exception' => $e]));
+            }
+        });
+    }
+
+    /**
+     * Determine whether emails should be sent synchronously in the current process
+     * (automated tests, Mail::fake(), array/log drivers, or sync queue driver).
+     */
+    private function shouldSendSynchronously(): bool
+    {
+        if (app()->runningUnitTests()) {
+            return true;
+        }
+
+        if (Mail::getFacadeRoot() instanceof MailFake) {
+            return true;
+        }
+
+        if (in_array(config('mail.default'), ['array', 'log'], true)) {
+            return true;
+        }
+
+        if (config('queue.default') === 'sync') {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check whether an email address is routable on external SMTP.
+     * In tests or local log/array drivers, all email addresses are allowed.
+     */
+    private function isDeliverableEmail(string $email): bool
+    {
+        if ($this->shouldSendSynchronously()) {
+            return true;
+        }
+
+        $lower = strtolower(trim($email));
+        if (
+            str_ends_with($lower, '.local')
+            || str_ends_with($lower, '.test')
+            || str_ends_with($lower, '.invalid')
+            || str_ends_with($lower, '@example.com')
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Spawn a non-blocking detached background worker to drain queued emails
+     * immediately without delaying the HTTP response.
+     */
+    private function triggerBackgroundQueueWorker(): void
+    {
+        try {
+            $php = escapeshellarg(PHP_BINARY ?: 'php');
+            $artisan = escapeshellarg(base_path('artisan'));
+
+            if (DIRECTORY_SEPARATOR === '\\') {
+                @pclose(@popen("start /B \"\" {$php} {$artisan} queue:work --stop-when-empty --tries=1 --timeout=30 > NUL 2>&1", 'r'));
+            } else {
+                @exec("nohup {$php} {$artisan} queue:work --stop-when-empty --tries=1 --timeout=30 > /dev/null 2>&1 &");
+            }
+        } catch (\Throwable) {
+            // Silent catch — background worker spawn is best-effort
         }
     }
 }
