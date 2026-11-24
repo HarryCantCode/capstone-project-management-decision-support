@@ -2093,7 +2093,6 @@
         /* ── Tab 3: Kuya DEX (Personal AI Assistant) Volatile Session State ── */
         kuyaDexConnected: @js((bool) ($kuyaDexConnected ?? false)),
         kuyaDexProjectId: {{ $selectedProject ? (int) $selectedProject->id : ($matrix[0]['id'] ?? 'null') }},
-        kuyaDexReadProjectTasks: true,
         kuyaDexInput: '',
         kuyaDexIsTyping: false,
         kuyaDexPendingChoiceText: '',
@@ -2460,8 +2459,7 @@
                 const csrfMeta = document.querySelector('meta[name="csrf-token"]');
                 const requestBody = {
                     message: cleanText,
-                    project_id: this.kuyaDexProjectId ? Number(this.kuyaDexProjectId) : null,
-                    include_tasks: Boolean(this.kuyaDexReadProjectTasks)
+                    project_id: this.kuyaDexProjectId ? Number(this.kuyaDexProjectId) : null
                 };
                 if (confirmAction && typeof confirmAction === 'object') {
                     requestBody.confirm_action = confirmAction;
@@ -5774,7 +5772,7 @@
                     </div>
                 </div>
 
-                {{-- Right Controls: Active Project Reference Selector, Read Project Tasks Option & Reset Chat --}}
+                {{-- Right Controls: Active Project Reference Selector & Reset Chat --}}
                 <div class="dss-filter-group">
                     <template x-if="matrix && matrix.length > 0">
                         <div data-tour="dss-kuya-dex-context" style="display: flex; align-items: center; gap: 0.45rem;">
@@ -5794,20 +5792,6 @@
                             </select>
                         </div>
                     </template>
-
-                    <label
-                        for="kuya-dex-read-tasks-toggle"
-                        style="display: inline-flex; align-items: center; gap: 0.42rem; height: 34px; padding: 0 0.75rem; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface-alt); font-size: 0.75rem; font-weight: 600; color: var(--color-ink); cursor: pointer; user-select: none; white-space: nowrap;"
-                        title="Allow Kuya DEX to read Major & Minor project tasks to assess execution pace, overdue items, and provide task-based forecasting and suggestions"
-                    >
-                        <input
-                            id="kuya-dex-read-tasks-toggle"
-                            type="checkbox"
-                            x-model="kuyaDexReadProjectTasks"
-                            style="width: 14px; height: 14px; accent-color: var(--color-accent); cursor: pointer; margin: 0;"
-                        >
-                        <span>Read Project Tasks</span>
-                    </label>
 
                     <button
                         type="button"

@@ -1384,33 +1384,27 @@ CRITICAL DOMAIN ACCURACY RULES:
    - If the user asks about "this project" or "project x" without naming a specific project code, use the active project context and mention its project code and name.
    - Always format Philippine Peso amounts clearly (e.g., ₱1,250,000.00).
    - When presenting structured lists or comparisons (such as projects, expenses, material catalogs, or manpower), you may use concise Markdown tables (ideally 3 to 4 columns) or bullet lists. Keep cell text compact so the table reads smoothly.
-5. PROJECT & BUSINESS ANALYST SKILL — FORECASTING, LOCAL DATE/TIME SCHEDULE AWARENESS, TASK EXECUTION & HYPOTHETICAL SCENARIO MODELING:
-   - You act as a senior **Project & Business Analyst** for DEX PMS.
-   - **Local Date & Time Awareness (No Online Lookup Needed):**
-     * Always read the exact current local date and time from `current_server_date_and_time` in the provided data (fetched directly from the local DEX PMS server clock).
-     * Reference today's date when assessing whether a project, Major Task, or Minor Checklist Task is ahead of schedule, on pace, approaching its deadline, or overdue/behind schedule.
-   - When asked to forecast, project, assess task execution, or analyze revenues, shortcomings, roadblocks, or how we are progressing/executing a project (or portfolio), structure your response into clear, executive-ready sections:
-     1) **Current Date Benchmark & Task Execution Velocity Assessment (When Task Reading is Enabled):**
-        - State today's date and compare actual task completion (completed Major Tasks and Minor checklist subtasks) against the planned schedule elapsed percentage.
-        - State the current **Execution Velocity** (Ahead of Schedule, On Pace, Slightly Behind Pace, Behind Schedule, or Critical Slippage) and the **Projected Estimated Completion Date** at the current pace.
-        - Call out specific **Overdue Major Tasks**, **Overdue Minor Checklist Tasks** (including their due dates, days overdue as of today, and assigned staff), **Bottleneck Phases** (in-progress Major Tasks with <50% minor task completion), and any **Unassigned Minor Tasks** lacking a responsible staff owner.
-        - If task reading was disabled by the user in the chat header toggle (`task_reading_enabled` is false), politely note that **Read Project Tasks** is currently toggled off in the chat bar and can be turned on for deep task-level execution diagnostics.
-     2) **Financial, Budgeting & Revenue Forecast:**
-        - Report projected contract revenue, current actual spend, remaining budget, and projected gross profit margin (Contract Price − Actual Spend).
-        - Compare budget burn rate (% spent) against actual task completion pace (% checklist done) and flag any cost overrun or margin compression risks.
-     3) **Resource Shortcomings & Manpower State:**
-        - Manpower state: evaluate currently assigned personnel vs. missing core roles for the project's elevator specifications (e.g., whether a dedicated Project Manager, Site Engineer, Foreman, Safety Officer, or Technician is missing) and check available unassigned manpower in the pool.
-        - Material deficits: highlight any required elevator components in the catalog that are out-of-stock or low-stock.
-     4) **Roadblocks & Operational Bottlenecks:**
-        - Schedule roadblocks: highlight concurrent schedule overlaps between projects that compete for manpower, overdue milestones as of today, or sequential task lock bottlenecks.
-     5) **Hypothetical Scenarios & "What-If" Business Analyst Projections:**
-        - Present 2 to 3 concrete **Hypothetical Scenarios** grounded in the project's current progress, tasks, manpower assignment, and budgeting (using `hypothetical_scenarios` in the data):
-          * **Scenario A (Baseline / Current Trajectory):** What happens to the completion date and final budget variance/profit margin if the team continues at the current task execution velocity and spend burn rate.
-          * **Scenario B (Manpower & Task Acceleration):** How allocating available unassigned personnel to missing roles and clearing bottleneck/overdue subtasks impacts delivery speed and schedule recovery.
-          * **Scenario C (Downside Slippage & Cost Risk):** What happens if active bottlenecks or overdue tasks slip by another 7–14 days (impact on held field crew, overlapping projects, and remaining budget contingency).
-     6) **Kuya DEX Actionable Business & Execution Suggestions:**
-        - Provide specific, prioritized recommendations based on the project's live tasks, manpower, and budget (e.g., which overdue subtasks to close out first, assigning staff to unassigned checklist items, filling missing manpower roles, reviewing pending Task Completion submissions in Staff Requests, or reordering low-stock catalog materials).
-   - STRICT SCOPE: All forecasts, hypothetical scenarios, and task execution assessments MUST be grounded directly in the provided DEX PMS project, task, financial, manpower, and catalog data. Do NOT invent external stock market trends or non-existent projects.
+5. PROJECT & BUSINESS ANALYST SKILL — FORECASTING, SCHEDULE AWARENESS, TASK EXECUTION & HYPOTHETICAL SCENARIO MODELING:
+   - You act as a thoughtful, conversational **Project & Business Analyst** for DEX PMS.
+   - **CRITICAL ANTI-PARROTING GUARDRAIL (SPEAK NATURALLY):**
+     * NEVER copy or parrot prompt instruction labels, internal system headers, or robotic phrases such as `"Local Server Date & Time Benchmark:"`, `"Current Date Benchmark & Task Execution Velocity Assessment"`, `"Scenario A (Baseline / Current Trajectory):"`, `"When Task Reading is Enabled"`, or `"Kuya DEX Actionable Business & Execution Suggestions"`.
+     * Instead, weave today's date (`current_server_date_and_time.current_date_human`) and your analysis naturally into your conversation (for example: *"As of today, November 25, 2026, here is how our projects are progressing..."* or *"Looking at our schedule as of today..."*).
+     * Use clean, natural business headings (such as **Revenue & Budget Outlook**, **Task Progress & Schedule Pace**, **Shortcomings & Roadblocks**, **What-If Scenarios**, and **Recommended Next Steps**).
+   - **Always Read Project Tasks by Default:**
+     * You always have full visibility into every project's Major Tasks and Minor Checklist Subtasks.
+     * Compare actual task completion (completed Major Tasks and Minor checklist subtasks) against the planned schedule elapsed percentage as of today's date.
+     * Naturally explain whether the project is ahead of schedule, on pace, or behind schedule, what the projected completion date looks like at the current pace, and which specific overdue tasks, bottleneck phases (<50% minor tasks completed), or unassigned subtasks need attention.
+   - **Financial, Resource & Roadblock Analysis:**
+     * Report projected contract revenue, actual spend, remaining budget, and gross profit margin (Contract Price − Actual Spend), pointing out if budget burn (% spent) is running ahead of actual task completion (% done).
+     * Point out manpower gaps (such as missing core roles for the project's elevator specs versus available unassigned personnel in the pool) and material catalog shortages (out-of-stock or low-stock items).
+     * Highlight operational roadblocks such as overlapping project schedules competing for manpower or overdue milestones.
+   - **Hypothetical Scenarios & Practical Recommendations:**
+     * Present 2 to 3 natural "What-If" business scenarios based on the project's current progress, tasks, manpower, and budget:
+       1) Continuing at the current task execution pace and spend rate.
+       2) Accelerating progress by assigning available unassigned manpower to missing roles and clearing bottleneck subtasks.
+       3) The downside risk if current overdue tasks or bottlenecks slip by another 1–2 weeks.
+     * Close with clear, practical next steps tailored to the live project state.
+   - STRICT SCOPE: All forecasts, hypothetical scenarios, and task assessments MUST be grounded directly in the provided DEX PMS data. Do NOT invent external stock market trends or non-existent projects.
 6. ELEVATOR SPECIFICATION SIZING, MANPOWER ESTIMATION & FEASIBILITY RULE:
    - When the user asks what expertise and how many personnel are needed for a specific elevator configuration (such as stops, capacity in kg, speed, or elevator type), or asks whether DEX PMS currently has the needed manpower:
      1) **Provide the Recommended Crew Sizing by Elevator Specification (Industry & DEX Standard):**
@@ -1760,14 +1754,13 @@ GUIDE;
         $pSpendPct = round((float) $activeProject->spend_percentage, 1);
         $pMarginPct = $pContract > 0 ? round((($pContract - $pSpend) / $pContract) * 100, 1) : 0.0;
 
+        $todayDateOnly = $nowLocal->format('F j, Y');
         $lines = [];
-        $lines[] = "### 📊 Project & Business Analyst Forecast Report";
-        $lines[] = "**Local Server Date & Time Benchmark:** {$todayHuman}";
-        $lines[] = "**Active Focus Project:** **{$activeProject->project_code} — {$activeProject->name}** (" . ucfirst((string) $activeProject->status) . ")";
+        $lines[] = "Here is my project and business analysis as of **{$todayDateOnly}** for **{$activeProject->project_code} — {$activeProject->name}** (" . ucfirst((string) $activeProject->status) . "):";
         $lines[] = '';
-        $lines[] = "#### 1. Financial & Revenue Forecast";
+        $lines[] = "#### Revenue & Budget Outlook";
         $lines[] = sprintf(
-            "- **Portfolio Revenue Outlook:** Across **%d total projects**, total contract revenue is **₱%s** against **₱%s** actual spend, yielding a projected portfolio gross margin of **₱%s (%s%%)**.",
+            "- **Portfolio Overview:** Across our **%d projects**, total contract value stands at **₱%s** with **₱%s** spent so far, giving us a projected gross margin of **₱%s (%s%%)**.",
             $projects->count(),
             number_format($portfolioRevenue, 2),
             number_format($portfolioSpend, 2),
@@ -1775,7 +1768,7 @@ GUIDE;
             (string) $portfolioMarginPct,
         );
         $lines[] = sprintf(
-            "- **%s Budget & Margin State:** Contract budget is **₱%s**, actual spend is **₱%s (%s%% utilized)**, leaving **₱%s (%s%% projected gross margin)**.",
+            "- **%s Financials:** Out of the **₱%s** contract budget, **₱%s (%s%%)** has been spent, leaving **₱%s (%s%% projected margin)**.",
             $activeProject->project_code,
             number_format($pContract, 2),
             number_format($pSpend, 2),
@@ -1785,41 +1778,37 @@ GUIDE;
         );
 
         $lines[] = '';
-        $lines[] = "#### 2. Schedule Pace & Task Execution Assessment";
-        if ($includeProjectTasks) {
-            $lines[] = sprintf(
-                "- **Execution Velocity vs. Today's Date:** **%s** — **%s%%** of planned calendar time has elapsed, with **%d/%d Major Tasks (%s%%)** and **%d/%d Minor Checklist Tasks (%s%%)** completed.",
-                $velocityLabel,
-                (string) $elapsedPct,
-                $majorDone,
-                $majorTotal,
-                (string) $majorPct,
-                $minorDone,
-                $minorTotal,
-                (string) $minorPct,
-            );
-            $lines[] = sprintf(
-                "- **Target vs. Projected Completion Date:** Scheduled target date is **%s**; at current task execution pace, projected completion is **%s**.",
-                $activeProject->target_completion_date?->format('Y-m-d') ?? 'N/A',
-                $projectedFinish,
-            );
-            if ($overdueMajorCount > 0 || $overdueMinorCount > 0) {
-                $lines[] = "- **Overdue Milestones as of Today:** {$overdueMajorCount} overdue Major Task phase(s) and {$overdueMinorCount} overdue Minor checklist task(s)" . (! empty($overdueTaskLabels) ? ' (' . implode(', ', array_slice($overdueTaskLabels, 0, 3)) . ')' : '') . '.';
-            }
-            if (! empty($bottleneckLabels)) {
-                $lines[] = '- **Active Bottleneck Phases (<50% Checklist Done):** ' . implode(', ', array_slice($bottleneckLabels, 0, 3)) . '.';
-            }
-        } else {
-            $lines[] = "- *Note: **Read Project Tasks** is currently toggled off in the chat header. Turn it on to include deep task and subtask velocity diagnostics.*";
+        $lines[] = "#### Task Progress & Schedule Pace";
+        $lines[] = sprintf(
+            "- **Current Execution Pace:** **%s** — **%s%%** of the planned schedule has passed as of today, while **%d of %d Major Tasks (%s%%)** and **%d of %d Minor Checklist Tasks (%s%%)** are complete.",
+            $velocityLabel,
+            (string) $elapsedPct,
+            $majorDone,
+            $majorTotal,
+            (string) $majorPct,
+            $minorDone,
+            $minorTotal,
+            (string) $minorPct,
+        );
+        $lines[] = sprintf(
+            "- **Completion Outlook:** The target completion date is **%s**. Based on our current task completion speed, the projected finish date is **%s**.",
+            $activeProject->target_completion_date?->format('Y-m-d') ?? 'N/A',
+            $projectedFinish,
+        );
+        if ($overdueMajorCount > 0 || $overdueMinorCount > 0) {
+            $lines[] = "- **Overdue Items:** There are **{$overdueMajorCount} overdue Major Task phase(s)** and **{$overdueMinorCount} overdue Minor checklist task(s)**" . (! empty($overdueTaskLabels) ? ' (' . implode(', ', array_slice($overdueTaskLabels, 0, 3)) . ')' : '') . '.';
+        }
+        if (! empty($bottleneckLabels)) {
+            $lines[] = '- **Slow-Moving Phases:** ' . implode(', ', array_slice($bottleneckLabels, 0, 3)) . '.';
         }
 
         $lines[] = '';
-        $lines[] = "#### 3. Resource Shortcomings & Operational Roadblocks";
+        $lines[] = "#### Shortcomings & Operational Roadblocks";
         $lines[] = ! empty($missingRoles)
-            ? "- **Manpower Shortcomings on {$activeProject->project_code}:** Missing core roles for elevator specs: **" . implode(', ', $missingRoles) . "** (Currently **{$unassignedPersonnel->count()} unassigned personnel** available in pool)."
-            : "- **Manpower State on {$activeProject->project_code}:** All core technical roles are currently filled (**{$activeProject->personnel->count()} personnel** assigned; **{$unassignedPersonnel->count()} unassigned** available in pool).";
+            ? "- **Manpower Gaps on {$activeProject->project_code}:** Still missing **" . implode(', ', $missingRoles) . "** based on the project's elevator specs (**{$unassignedPersonnel->count()} unassigned personnel** are currently available in the pool)."
+            : "- **Manpower Staffing on {$activeProject->project_code}:** All core roles are filled (**{$activeProject->personnel->count()} personnel** assigned; **{$unassignedPersonnel->count()} unassigned** available in the pool).";
         $lines[] = sprintf(
-            "- **Materials Catalog Shortcomings:** **%d out-of-stock** item(s)%s and **%d low-stock** item(s)%s.",
+            "- **Materials Inventory:** **%d out-of-stock** item(s)%s and **%d low-stock** item(s)%s in the catalog.",
             $outOfStock->count(),
             $outOfStock->isNotEmpty() ? ' (' . $outOfStock->take(3)->pluck('name')->implode(', ') . ')' : '',
             $lowStock->count(),
@@ -1827,10 +1816,10 @@ GUIDE;
         );
 
         $lines[] = '';
-        $lines[] = "#### 4. Hypothetical Scenarios & What-If Business Projections";
+        $lines[] = "#### What-If Scenarios";
         $remMinor = max(0, $minorTotal - $minorDone);
         $lines[] = sprintf(
-            "1. **Scenario A (Baseline Current Trajectory):** If the team maintains its current pace (**%s%%** checklist completion vs. **%s%%** time elapsed), **%s** is projected to conclude around **%s** with a remaining buffer of **₱%s**.",
+            "- **If We Continue at Current Pace:** With **%s%%** of checklist tasks done against **%s%%** elapsed time, **%s** is on track to finish around **%s** with **₱%s** in remaining budget.",
             (string) $minorPct,
             (string) $elapsedPct,
             $activeProject->project_code,
@@ -1839,36 +1828,36 @@ GUIDE;
         );
         $lines[] = ! empty($missingRoles)
             ? sprintf(
-                "2. **Scenario B (Manpower & Task Acceleration):** If you allocate available unassigned personnel to fill **%s** and close out the **%d remaining minor checklist task(s)**, site velocity can accelerate by ~20%%–30%%, pulling the completion date back toward **%s**.",
+                "- **If We Fill Missing Manpower & Clear Bottlenecks:** Assigning available personnel to cover **%s** and focusing on the **%d remaining minor task(s)** can speed up site execution by ~20%%–30%% and help bring delivery back toward **%s**.",
                 implode(', ', $missingRoles),
                 $remMinor,
-                $activeProject->target_completion_date?->format('Y-m-d') ?? 'schedule',
+                $activeProject->target_completion_date?->format('Y-m-d') ?? 'the target date',
             )
             : sprintf(
-                "2. **Scenario B (Bottleneck Compression):** Re-focusing the **%d assigned crew members** onto the **%d remaining minor checklist task(s)** can compress remaining milestone duration and safeguard the **%s%%** gross margin.",
+                "- **If We Focus Crew on Bottleneck Tasks:** Concentrating our **%d assigned crew members** on the **%d remaining minor checklist task(s)** will help compress the remaining timeline and protect the **%s%%** gross margin.",
                 $activeProject->personnel->count(),
                 $remMinor,
                 (string) $pMarginPct,
             );
         $lines[] = sprintf(
-            "3. **Scenario C (Downside 7–14 Day Slippage Risk):** If active tasks slip by another 7–14 days, the **%d assigned personnel** will remain tied up longer, delaying crew turnover to concurrent projects and increasing labor/overhead burn against the **₱%s** remaining budget.",
+            "- **If Tasks Slip by Another 1–2 Weeks:** A 7–14 day delay on active milestones will keep our **%d assigned personnel** tied up longer, delaying their transfer to other projects and putting extra pressure on the **₱%s** remaining budget.",
             $activeProject->personnel->count(),
             number_format($pRem, 2),
         );
 
         $lines[] = '';
-        $lines[] = "#### 5. Actionable Analyst Recommendations";
+        $lines[] = "#### Recommended Next Steps";
         if (! empty($missingRoles)) {
-            $lines[] = "- **Deploy Available Manpower:** Ask me *\"Fill the necessary manpower for this project\"* to automatically match and assign available personnel to **" . implode(', ', $missingRoles) . "**.";
+            $lines[] = "- **Fill Missing Roles:** You can ask me *\"Fill the necessary manpower for this project\"* to match and assign available personnel to **" . implode(', ', $missingRoles) . "**.";
         }
         if ($overdueMajorCount > 0 || $overdueMinorCount > 0) {
-            $lines[] = "- **Clear Overdue Checklist Tasks:** Prioritize completing the **{$overdueMinorCount} overdue minor task(s)** and review any pending Task Completion requests in the **Staff Requests** module.";
+            $lines[] = "- **Resolve Overdue Tasks:** Follow up on the **{$overdueMinorCount} overdue minor task(s)** and check the **Staff Requests** module for any pending task completions waiting for review.";
         }
         if ($unassignedMinorCount > 0) {
-            $lines[] = "- **Assign Subtask Owners:** Assign responsible staff members to the **{$unassignedMinorCount} unassigned minor checklist task(s)** in the Project Progress Timeline.";
+            $lines[] = "- **Assign Task Owners:** Assign responsible staff to the **{$unassignedMinorCount} unassigned minor task(s)** in the Project Progress Timeline.";
         }
         if ($outOfStock->isNotEmpty() || $lowStock->isNotEmpty()) {
-            $lines[] = "- **Restock Critical Catalog Materials:** Replenish out-of-stock/low-stock elevator components in the **Materials Catalog** before upcoming installation milestones.";
+            $lines[] = "- **Restock Catalog Items:** Replenish out-of-stock and low-stock elevator components in the **Materials Catalog** before upcoming installation phases.";
         }
 
         return implode("\n", $lines);
