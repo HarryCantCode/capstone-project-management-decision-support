@@ -272,17 +272,71 @@ class DecisionSupportController extends Controller implements HasMiddleware
      * Passes only sanitized operational JSON data (Materials, Projects, Costing, Manpower)
      * and enforces strict domain guardrails.
      */
-    public function chat(Request $request, KuyaDexChatService $chatService): JsonResponse
+    public function chat(Request $request, KuyaDexChatService $chatService, DecisionSupportService $service): JsonResponse
     {
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:1000'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'confirm_action' => ['nullable', 'array'],
+            'confirm_action.action_type' => ['required_with:confirm_action', 'string', 'in:fill_missing_manpower,assign_personnel,remove_personnel'],
+            'confirm_action.project_id' => ['required_with:confirm_action', 'integer', 'exists:projects,id'],
+            'confirm_action.personnel_ids' => ['nullable', 'array'],
+            'confirm_action.personnel_ids.*' => ['integer', 'exists:personnel,id'],
+            'confirm_action.personnel_query' => ['nullable', 'string', 'max:255'],
         ]);
 
         $response = $chatService->ask(
             (string) $validated['message'],
             isset($validated['project_id']) ? (int) $validated['project_id'] : null,
+            $validated['confirm_action'] ?? null,
         );
+
+        if (! empty($response['action_executed'])) {
+            $projects = Project::query()
+                ->with([
+                    'personnel',
+                    'costs.resource',
+                    'tasks.subtasks',
+                    'personnelHistory.project',
+                ])
+                ->orderByRaw("CASE status
+                    WHEN 'delayed' THEN 1
+                    WHEN 'ongoing' THEN 2
+                    WHEN 'pending' THEN 3
+                    WHEN 'completed' THEN 4
+                    ELSE 5 END")
+                ->orderByDesc('created_at')
+                ->get();
+
+            $allPersonnel = Personnel::query()
+                ->with(['project', 'assignmentHistory.project'])
+                ->withCount('assignmentHistory')
+                ->orderBy('employee_id')
+                ->get();
+
+            $allResources = Resource::query()
+                ->orderBy('resource_code')
+                ->orderBy('id')
+                ->get();
+
+            $overview = $service->buildPortfolioOverview($projects, $allPersonnel, $allResources);
+
+            $response['updated_matrix'] = $overview['matrix'];
+            $response['updated_personnel_pool'] = $allPersonnel->map(function (Personnel $p) {
+                return [
+                    'id' => $p->id,
+                    'employee_id' => $p->employee_id,
+                    'full_name' => $p->full_name,
+                    'expertise' => $p->expertise,
+                    'project_id' => $p->project_id,
+                    'project_code' => $p->project?->project_code,
+                    'project_name' => $p->project?->name,
+                    'project_status' => $p->project?->status,
+                    'project_target_date' => $p->project?->target_completion_date?->format('Y-m-d'),
+                    'historical_load' => (int) ($p->assignment_history_count ?? 0),
+                ];
+            })->values()->all();
+        }
 
         return response()->json($response);
     }

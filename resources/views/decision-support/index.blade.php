@@ -2104,7 +2104,7 @@
         kuyaDexSamplePrompts: [
             'Who are my available manpower?',
             'How much is the total progress of my project x',
-            'How much is the total spend on this project',
+            'Fill the necessary manpower for this project',
             'Forecast our project revenues, shortcomings, and roadblocks'
         ],
         kuyaDexMessages: [],
@@ -2306,7 +2306,66 @@
                 return;
             }
 
+            // Check if there is an active [Yes] / [No] confirmation prompt waiting for the user's answer
+            const pendingConfirmMsg = [...this.kuyaDexMessages].reverse().find(
+                m => m && m.pendingAction && m.confirmationState === 'pending'
+            );
+            if (pendingConfirmMsg) {
+                if (/^(yes|y|yeah|yep|sure|ok|okay|confirm|proceed|go\s+ahead|do\s+it)[\.\!\?]*$/i.test(text)) {
+                    this.respondKuyaDexConfirmation(pendingConfirmMsg.id, true, text);
+                    return;
+                }
+                if (/^(no|n|nope|cancel|stop|don't|do\s+not|abort)[\.\!\?]*$/i.test(text)) {
+                    this.respondKuyaDexConfirmation(pendingConfirmMsg.id, false, text);
+                    return;
+                }
+                // User sent a different question; mark previous pending confirmation as cancelled
+                pendingConfirmMsg.confirmationState = 'cancelled';
+            }
+
             this.executeKuyaDexInquiry(text);
+        },
+
+        respondKuyaDexConfirmation(msgId, isConfirmed, userDisplayText = null) {
+            const targetMsg = this.kuyaDexMessages.find(m => m && m.id === msgId);
+            if (!targetMsg || !targetMsg.pendingAction || targetMsg.confirmationState !== 'pending') {
+                return;
+            }
+
+            const actionPayload = targetMsg.pendingAction;
+            targetMsg.confirmationState = isConfirmed ? 'confirmed' : 'cancelled';
+
+            if (!isConfirmed) {
+                const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                this.kuyaDexMessages.push({
+                    id: 'kd-user-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                    sender: 'user',
+                    text: userDisplayText || 'No',
+                    time: nowTime
+                });
+
+                this.kuyaDexIsTyping = true;
+                this.scrollKuyaDexToBottom();
+
+                const projLabel = actionPayload.project_code
+                    ? `${actionPayload.project_code} — ${actionPayload.project_name || ''}`.replace(/\s+—\s+$/, '')
+                    : 'the project';
+
+                setTimeout(() => {
+                    this.kuyaDexIsTyping = false;
+                    this.kuyaDexMessages.push({
+                        id: 'kd-ai-cancel-' + Date.now(),
+                        sender: 'assistant',
+                        text: `Alright, I have cancelled the manpower action for **${projLabel}**. No changes were made to your project assignments.`,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    });
+                    this.scrollKuyaDexToBottom();
+                }, 480);
+
+                return;
+            }
+
+            this.executeKuyaDexInquiry(userDisplayText || 'Yes', actionPayload);
         },
 
         sendKuyaDexPendingNow() {
@@ -2369,7 +2428,7 @@
             }
         },
 
-        async executeKuyaDexInquiry(text) {
+        async executeKuyaDexInquiry(text, confirmAction = null) {
             const cleanText = String(text || '').trim();
             if (!cleanText) return;
 
@@ -2398,6 +2457,14 @@
 
             try {
                 const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                const requestBody = {
+                    message: cleanText,
+                    project_id: this.kuyaDexProjectId ? Number(this.kuyaDexProjectId) : null
+                };
+                if (confirmAction && typeof confirmAction === 'object') {
+                    requestBody.confirm_action = confirmAction;
+                }
+
                 const response = await fetch('{{ route('decision-support.chat') }}', {
                     method: 'POST',
                     signal: controller ? controller.signal : undefined,
@@ -2406,10 +2473,7 @@
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': csrfMeta ? csrfMeta.getAttribute('content') : '{{ csrf_token() }}'
                     },
-                    body: JSON.stringify({
-                        message: cleanText,
-                        project_id: this.kuyaDexProjectId ? Number(this.kuyaDexProjectId) : null
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 // Ignore if superseded by a newer "Send It Now" inquiry
@@ -2437,11 +2501,27 @@
 
                 this.kuyaDexIsTyping = false;
                 this.kuyaDexAbortController = null;
+
+                // If Kuya DEX executed a manpower assignment or removal, synchronize in-memory DSS state
+                if (data && data.action_executed) {
+                    if (Array.isArray(data.updated_matrix)) {
+                        this.matrix = data.updated_matrix;
+                    }
+                    if (Array.isArray(data.updated_personnel_pool)) {
+                        this.personnelPool = data.updated_personnel_pool;
+                    }
+                    if (this.activeAllocProject) {
+                        this.applySpecTemplate('auto_spec');
+                    }
+                }
+
                 this.kuyaDexMessages.push({
                     id: 'kd-ai-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
                     sender: 'assistant',
                     text: (data && data.reply) ? data.reply : 'I have no idea with that, please let us focus to your project management',
                     isGuardrail: data && data.mode === 'guardrail',
+                    pendingAction: (data && data.pending_action) ? data.pending_action : null,
+                    confirmationState: (data && data.pending_action) ? 'pending' : null,
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 });
                 this.scrollKuyaDexToBottom();
@@ -5750,6 +5830,50 @@
                                     :class="msg.sender === 'user' ? 'is-user' : 'is-assistant'"
                                     x-html="formatKuyaDexMessage(msg.text)"
                                 ></div>
+
+                                {{-- [Yes] / [No] Confirmation Buttons for Pending Manpower Assignment / Removal --}}
+                                <template x-if="msg.sender === 'assistant' && msg.pendingAction">
+                                    <div style="margin-top: 0.55rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <template x-if="msg.confirmationState === 'pending'">
+                                            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-primary btn-sm dss-btn"
+                                                    style="height: 32px; padding: 0 1rem; font-size: 0.78rem; border-radius: 999px; font-weight: 700;"
+                                                    :disabled="kuyaDexIsTyping"
+                                                    @click="respondKuyaDexConfirmation(msg.id, true)"
+                                                >
+                                                    <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    <span>Yes</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-secondary btn-sm dss-btn"
+                                                    style="height: 32px; padding: 0 1rem; font-size: 0.78rem; border-radius: 999px; font-weight: 600;"
+                                                    :disabled="kuyaDexIsTyping"
+                                                    @click="respondKuyaDexConfirmation(msg.id, false)"
+                                                >
+                                                    <svg style="width: 14px; height: 14px;" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    <span>No</span>
+                                                </button>
+                                            </div>
+                                        </template>
+                                        <template x-if="msg.confirmationState === 'confirmed'">
+                                            <span style="font-size: 0.73rem; font-weight: 700; color: var(--status-completed-text); background: var(--status-completed-bg); padding: 0.22rem 0.7rem; border-radius: 999px; border: 1px solid rgba(46, 125, 83, 0.28);">
+                                                ✓ Confirmed
+                                            </span>
+                                        </template>
+                                        <template x-if="msg.confirmationState === 'cancelled'">
+                                            <span style="font-size: 0.73rem; font-weight: 700; color: var(--color-muted); background: var(--color-surface-alt); padding: 0.22rem 0.7rem; border-radius: 999px; border: 1px solid var(--color-border);">
+                                                ✕ Cancelled
+                                            </span>
+                                        </template>
+                                    </div>
+                                </template>
                             </div>
                         </div>
 
