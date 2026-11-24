@@ -1170,6 +1170,7 @@ CRITICAL DOMAIN ACCURACY RULES:
    - If the current user has the **Staff** role (cannot assign or remove manpower) and asks to assign, fill, or remove/unassign personnel on any project, you MUST NOT execute any assignment or removal and MUST reply with:
      "{$staffDeniedReply}"
    - When an authorized Admin or Manager asks to:
+     * "Find all projects that has missing [personnel / role], assign and allocate my available personnel" or "Allocate available manpower to all projects with missing personnel" -> invoke `find_and_allocate_missing_personnel_across_projects`.
      * "Fill the missing personnel / manpower for this project" or "Fill the necessary manpower for this project" -> invoke `fill_missing_project_manpower`.
      * "Assign [Name / Employee ID] to this project" -> invoke `assign_personnel_to_project`.
      * "Remove the assignment of [Name / Employee ID] from this project" or "Unassign [Name] from this project" -> invoke `remove_personnel_from_project`.
@@ -1312,6 +1313,90 @@ GUIDE;
     }
 
     /**
+     * Deterministically calculate the required core manpower role headcounts for a project
+     * based on its elevator technical specifications (stops, rated capacity, and project type).
+     *
+     * @param Project $project
+     * @return array<string, int>
+     */
+    private function getRequiredRoleCountsForProject(Project $project): array
+    {
+        $stops = max(2, (int) ($project->no_of_stops ?: 4));
+        preg_match('/\d+/', (string) ($project->rated_capacity ?: '800'), $capMatches);
+        $capacityKg = isset($capMatches[0]) ? (int) $capMatches[0] : 800;
+        $projType = strtolower((string) ($project->project_type ?: 'Standard Elevator'));
+
+        $techCount = 1;
+        $foremanCount = 1;
+        if ($stops >= 12 || $capacityKg >= 1350 || str_contains($projType, 'freight')) {
+            $techCount = 2;
+            $foremanCount = 2;
+        } elseif ($stops >= 6 || $capacityKg >= 1000) {
+            $techCount = 2;
+            $foremanCount = 1;
+        }
+
+        return [
+            Personnel::EXPERTISE_PROJECT_MANAGER => 1,
+            Personnel::EXPERTISE_SITE_ENGINEER => 1,
+            Personnel::EXPERTISE_FOREMAN => $foremanCount,
+            Personnel::EXPERTISE_SAFETY_OFFICER => 1,
+            Personnel::EXPERTISE_TECHNICIAN => $techCount,
+        ];
+    }
+
+    /**
+     * Resolve a user-specified personnel role or generic manpower keyword into one of the 8 official
+     * DEX PMS expertise classifications, or null if the user asked for all missing personnel/manpower in general.
+     *
+     * @param string|null $roleQuery
+     * @return string|null
+     */
+    public function resolveSpecificRoleFilter(?string $roleQuery): ?string
+    {
+        $clean = strtolower(trim((string) $roleQuery, " \t\n\r\0\x0B.!?\"'[]()"));
+        $clean = preg_replace('/^(?:a\s+|an\s+|the\s+|any\s+|some\s+|our\s+|my\s+|missing\s+|needed\s+|required\s+|necessary\s+)+/i', '', $clean) ?? $clean;
+        $clean = trim($clean);
+
+        if ($clean === '' || preg_match('/^(?:personnel|manpower|staff|staffs|crew|crews|workers?|employees?|members?|people|roles?|positions?|team|workforce|personnel\s*\/\s*manpower|manpower\s*\/\s*personnel)$/i', $clean) === 1) {
+            return null;
+        }
+
+        if (str_contains($clean, 'installation') || preg_match('/\bworker\s*\/\s*installation\b/i', $clean) === 1) {
+            return Personnel::EXPERTISE_WORKER;
+        }
+        if (str_contains($clean, 'project manager') || $clean === 'pm' || $clean === 'pms' || $clean === 'manager' || $clean === 'managers') {
+            return Personnel::EXPERTISE_PROJECT_MANAGER;
+        }
+        if (str_contains($clean, 'site engineer') || $clean === 'engineer' || $clean === 'engineers') {
+            return Personnel::EXPERTISE_SITE_ENGINEER;
+        }
+        if (str_contains($clean, 'safety officer') || str_contains($clean, 'safety')) {
+            return Personnel::EXPERTISE_SAFETY_OFFICER;
+        }
+        if (str_contains($clean, 'foreman') || str_contains($clean, 'foremen')) {
+            return Personnel::EXPERTISE_FOREMAN;
+        }
+        if (str_contains($clean, 'technician') || $clean === 'tech' || $clean === 'techs') {
+            return Personnel::EXPERTISE_TECHNICIAN;
+        }
+        if (str_contains($clean, 'qa') || str_contains($clean, 'inspector') || str_contains($clean, 'quality')) {
+            return Personnel::EXPERTISE_QA_INSPECTOR;
+        }
+        if (str_contains($clean, 'elevator control') || str_contains($clean, 'control')) {
+            return Personnel::EXPERTISE_ELEVATOR_CONTROL;
+        }
+
+        foreach (Personnel::EXPERTISE_OPTIONS as $option) {
+            if (strcasecmp($clean, $option) === 0 || strcasecmp(rtrim($clean, 's'), $option) === 0) {
+                return $option;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Gemini function declarations for manpower assignment & removal orchestration.
      *
      * @return list<array<string, mixed>>
@@ -1319,6 +1404,19 @@ GUIDE;
     private function getManpowerFunctionDeclarations(): array
     {
         return [
+            [
+                'name' => 'find_and_allocate_missing_personnel_across_projects',
+                'description' => 'Find all active projects that have missing personnel (or a specific missing expertise role such as Project Manager, Site Engineer, Technician, Foreman, Safety Officer, QA Inspector, Elevator Control, or Worker / Installation Personnel) and automatically assign/allocate available unassigned personnel across those projects.',
+                'parameters' => [
+                    'type' => 'OBJECT',
+                    'properties' => [
+                        'role_filter' => [
+                            'type' => 'STRING',
+                            'description' => 'Optional specific expertise classification to check and allocate (e.g. "Project Manager", "Technician", "Site Engineer", "Foreman", "Safety Officer", "QA Inspector", "Elevator Control", "Worker / Installation Personnel"), or "personnel" / "manpower" for all missing core roles.',
+                        ],
+                    ],
+                ],
+            ],
             [
                 'name' => 'fill_missing_project_manpower',
                 'description' => 'Automatically fill and assign the missing or necessary manpower roles for a target project using available unassigned personnel.',
@@ -1397,8 +1495,10 @@ GUIDE;
 
         $projectIdentifier = isset($args['project_identifier']) ? (string) $args['project_identifier'] : null;
         $personnelIdentifier = isset($args['personnel_identifier']) ? (string) $args['personnel_identifier'] : '';
+        $roleFilter = isset($args['role_filter']) ? (string) $args['role_filter'] : null;
 
         return match ($functionName) {
+            'find_and_allocate_missing_personnel_across_projects' => $this->executeFindAndAllocateMissingPersonnelAcrossProjects($roleFilter),
             'fill_missing_project_manpower' => $this->executeFillMissingManpower($projectIdentifier, $rawMessage, $selectedProjectId),
             'assign_personnel_to_project' => $this->executeAssignPersonnel($personnelIdentifier, $projectIdentifier, $rawMessage, $selectedProjectId),
             'remove_personnel_from_project' => $this->executeRemovePersonnel($personnelIdentifier, $projectIdentifier, $rawMessage, $selectedProjectId),
@@ -1437,14 +1537,50 @@ GUIDE;
         }
 
         // Do not intercept informational questions (e.g. "Who is assigned...", "What is the missing manpower...", "How many...")
-        // unless the user explicitly phrases an action request ("Can you assign...", "Could you fill...", "Can you remove...")
-        $isPureQuestion = preg_match('/^(who|what|which|where|when|why|how|is|are|do|does|did|list|show|check|tell)\b/i', $normalized) === 1;
+        // unless the user explicitly phrases an action request ("Can you assign...", "Could you fill...", "Can you remove...", "Find all projects... assign and allocate...")
+        $isPureQuestion = preg_match('/^(who|what|which|where|when|why|how|is|are|do|does|did|list|show|check|tell)\b/i', $normalized) === 1
+            && preg_match('/\b(assign|allocate|fill|populate|auto[\-\s]?assign)\b/i', $normalized) !== 1;
         if ($isPureQuestion) {
             return null;
         }
 
         $clean = preg_replace('/^(?:please\s+|can\s+you\s+|could\s+you\s+|would\s+you\s+|kuya(?:\s+dex)?[,:\s]+)+/i', '', $normalized) ?? $normalized;
         $clean = trim($clean, " \t\n\r\0\x0B.!?\"'");
+
+        // 0.5. Check for multi-project missing manpower search & allocation:
+        // e.g. "Find all projects that has missing [personnel], assign and allocate my available personnel"
+        // e.g. "Find all projects that have missing Project Manager, assign and allocate my available personnel"
+        if (preg_match('/^(?:find|search|check|identify|locate|look\s+for|get|list|show)\s+(?:all\s+|any\s+|the\s+|our\s+|my\s+)?projects?\s+(?:that\s+|which\s+)?(?:has|have|with|lacking|needing|missing|without)\s+(?:a\s+|an\s+|any\s+|the\s+)?(?:missing\s+|needed\s+|required\s+|necessary\s+|unfilled\s+)?(.+?)(?:\s*(?:,|\band\b|\bthen\b)\s*(?:please\s+)?(?:assign|allocate|fill|deploy|distribute|populate).*)$/i', $clean, $matches) === 1) {
+            if (! $this->canCurrentUserManageManpower()) {
+                return [
+                    'reply' => self::STAFF_MANPOWER_DENIED_REPLY,
+                    'mode' => 'guardrail',
+                    'connected' => true,
+                    'action_executed' => false,
+                ];
+            }
+
+            $roleTarget = trim($matches[1], " \t\n\r\0\x0B.!?\"'");
+
+            return $this->executeFindAndAllocateMissingPersonnelAcrossProjects($roleTarget);
+        }
+
+        // Also match "Assign and allocate my available personnel to all projects that has missing [personnel]"
+        // or "Fill / allocate missing [personnel] for all projects"
+        if (preg_match('/^(?:assign(?:\s+and\s+allocate)?|allocate(?:\s+and\s+assign)?|fill(?:\s+in|\s+up)?|populate|auto[\-\s]?assign)\s+(?:my\s+|our\s+|the\s+|all\s+)?(?:available\s+|unassigned\s+)?(?:missing\s+|necessary\s+|needed\s+|required\s+)?(.+?)\s+(?:to|for|across|on|in)\s+all\s+(?:active\s+|ongoing\s+|our\s+|my\s+)?projects?(?:\s+(?:that\s+|which\s+)?(?:has|have|with|lacking|missing)\s+(?:missing\s+|needed\s+|required\s+)?(.+))?$/i', $clean, $matches) === 1) {
+            if (! $this->canCurrentUserManageManpower()) {
+                return [
+                    'reply' => self::STAFF_MANPOWER_DENIED_REPLY,
+                    'mode' => 'guardrail',
+                    'connected' => true,
+                    'action_executed' => false,
+                ];
+            }
+
+            $roleCandidate = ! empty($matches[2]) ? trim($matches[2], " \t\n\r\0\x0B.!?\"'") : trim($matches[1], " \t\n\r\0\x0B.!?\"'");
+
+            return $this->executeFindAndAllocateMissingPersonnelAcrossProjects($roleCandidate);
+        }
 
         // 1. Check for "Remove the assignment of [Name] from [Project]" / "Unassign [Name] from [Project]"
         if (preg_match('/^(?:remove\s+(?:the\s+)?assignment\s+of|unassign|release|deallocate)\s+(.+?)(?:\s+(?:from|in|on|of|at)\s+(.+))?$/i', $clean, $matches) === 1) {
@@ -1554,11 +1690,16 @@ GUIDE;
         $actionType = (string) ($confirmAction['action_type'] ?? '');
         $targetProjectId = isset($confirmAction['project_id']) ? (int) $confirmAction['project_id'] : $selectedProjectId;
         $personnelQuery = (string) ($confirmAction['personnel_query'] ?? '');
+        $roleFilter = isset($confirmAction['role_filter']) ? (string) $confirmAction['role_filter'] : null;
         $explicitIds = isset($confirmAction['personnel_ids']) && is_array($confirmAction['personnel_ids'])
             ? array_values(array_unique(array_filter(array_map('intval', $confirmAction['personnel_ids']))))
             : null;
+        $explicitAllocations = isset($confirmAction['allocations']) && is_array($confirmAction['allocations'])
+            ? $confirmAction['allocations']
+            : null;
 
         return match ($actionType) {
+            'allocate_missing_across_projects' => $this->executeFindAndAllocateMissingPersonnelAcrossProjects($roleFilter, true, $explicitAllocations),
             'fill_missing_manpower' => $this->executeFillMissingManpower(null, '', $targetProjectId, true, $explicitIds),
             'assign_personnel' => $this->executeAssignPersonnel($personnelQuery, null, '', $targetProjectId, true, $explicitIds),
             'remove_personnel' => $this->executeRemovePersonnel($personnelQuery, null, '', $targetProjectId, true, $explicitIds),
@@ -1569,6 +1710,442 @@ GUIDE;
                 'action_executed' => false,
             ],
         };
+    }
+
+    /**
+     * Find all active projects that have missing personnel (either all core roles or a specific role like Project Manager,
+     * Technician, Site Engineer, etc.) and preview or execute allocating available unassigned personnel across those projects.
+     *
+     * @param string|null $roleQuery
+     * @param bool $confirmed
+     * @param list<array<string, mixed>>|null $explicitAllocations
+     * @return array{reply: string, mode: string, connected: bool, action_executed: bool, action_type?: string, pending_action?: array<string, mixed>}
+     */
+    public function executeFindAndAllocateMissingPersonnelAcrossProjects(
+        ?string $roleQuery = null,
+        bool $confirmed = false,
+        ?array $explicitAllocations = null,
+    ): array {
+        if (! $this->canCurrentUserManageManpower()) {
+            return [
+                'reply' => self::STAFF_MANPOWER_DENIED_REPLY,
+                'mode' => 'guardrail',
+                'connected' => true,
+                'action_executed' => false,
+            ];
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            return [
+                'reply' => self::STAFF_MANPOWER_DENIED_REPLY,
+                'mode' => 'guardrail',
+                'connected' => true,
+                'action_executed' => false,
+            ];
+        }
+
+        $specificRole = $this->resolveSpecificRoleFilter($roleQuery);
+        $roleLabel = $specificRole ?: 'core manpower roles';
+
+        // Load all active (non-completed, non-deleted) projects in priority order (delayed -> ongoing -> pending)
+        $activeProjects = Project::query()
+            ->with('personnel')
+            ->whereNull('deleted_at')
+            ->where('status', '!=', 'completed')
+            ->orderByRaw("CASE status
+                WHEN 'delayed' THEN 1
+                WHEN 'ongoing' THEN 2
+                WHEN 'pending' THEN 3
+                ELSE 4 END")
+            ->orderBy('created_at')
+            ->get()
+            ->filter(fn (Project $p) => Gate::forUser($user)->allows('update', $p))
+            ->values();
+
+        if ($activeProjects->isEmpty()) {
+            return [
+                'reply' => 'There are currently no active (ongoing, delayed, or pending) projects in DEX PMS that require manpower allocation.',
+                'mode' => 'gemini',
+                'connected' => true,
+                'action_executed' => false,
+            ];
+        }
+
+        // Scan each active project for missing roles
+        /** @var list<array{project: Project, missing_roles: array<string, int>}> $projectsWithDeficits */
+        $projectsWithDeficits = [];
+
+        foreach ($activeProjects as $project) {
+            $currentAssigned = $project->personnel
+                ->filter(fn (Personnel $p) => $p->deleted_at === null);
+
+            if ($specificRole !== null) {
+                $requiredMap = $this->getRequiredRoleCountsForProject($project);
+                $reqCount = $requiredMap[$specificRole] ?? 1;
+                $existingCount = $currentAssigned
+                    ->filter(fn (Personnel $p) => strcasecmp(trim((string) $p->expertise), $specificRole) === 0)
+                    ->count();
+                $deficit = max(0, $reqCount - $existingCount);
+                if ($deficit > 0) {
+                    $projectsWithDeficits[] = [
+                        'project' => $project,
+                        'missing_roles' => [$specificRole => $deficit],
+                    ];
+                }
+            } else {
+                $requiredMap = $this->getRequiredRoleCountsForProject($project);
+                $missingMap = [];
+                foreach ($requiredMap as $rName => $reqCount) {
+                    $existingCount = $currentAssigned
+                        ->filter(fn (Personnel $p) => strcasecmp(trim((string) $p->expertise), $rName) === 0)
+                        ->count();
+                    $deficit = max(0, $reqCount - $existingCount);
+                    if ($deficit > 0) {
+                        $missingMap[$rName] = $deficit;
+                    }
+                }
+                if (! empty($missingMap)) {
+                    $projectsWithDeficits[] = [
+                        'project' => $project,
+                        'missing_roles' => $missingMap,
+                    ];
+                }
+            }
+        }
+
+        if (empty($projectsWithDeficits)) {
+            $targetText = $specificRole ? "missing **{$specificRole}**" : 'missing core manpower roles';
+
+            return [
+                'reply' => "I scanned all active projects in DEX PMS, and every active project currently has its {$targetText} filled! No new personnel allocations are needed right now.",
+                'mode' => 'gemini',
+                'connected' => true,
+                'action_executed' => false,
+            ];
+        }
+
+        // Phase 1: Preview all projects with missing personnel and proposed allocations, then ask [Yes] / [No]
+        if (! $confirmed) {
+            $availablePool = Personnel::query()
+                ->whereNull('project_id')
+                ->whereNull('deleted_at')
+                ->withCount('assignmentHistory')
+                ->get();
+
+            $usedPersonnelIds = [];
+            /** @var list<array{project_id: int, project_code: string, project_name: string, personnel_id: int, employee_id: string, full_name: string, expertise: string}> $proposedAllocations */
+            $proposedAllocations = [];
+            /** @var list<string> $projectSummaryLines */
+            $projectSummaryLines = [];
+            /** @var list<string> $unfilledSummaryLines */
+            $unfilledSummaryLines = [];
+
+            foreach ($projectsWithDeficits as $entry) {
+                /** @var Project $proj */
+                $proj = $entry['project'];
+                $missingRoles = $entry['missing_roles'];
+
+                $missingDesc = collect($missingRoles)
+                    ->map(fn (int $cnt, string $role) => "{$role} (×{$cnt})")
+                    ->implode(', ');
+
+                $projectSummaryLines[] = sprintf(
+                    '- **%s — %s** (%s): Missing %s',
+                    $proj->project_code,
+                    $proj->name,
+                    ucfirst((string) $proj->status),
+                    $missingDesc,
+                );
+
+                foreach ($missingRoles as $roleName => $neededCount) {
+                    $candidates = $availablePool
+                        ->filter(fn (Personnel $p) => ! in_array((int) $p->id, $usedPersonnelIds, true)
+                            && strcasecmp(trim((string) $p->expertise), $roleName) === 0)
+                        ->sort(function (Personnel $a, Personnel $b): int {
+                            $loadCmp = ($a->assignment_history_count ?? 0) <=> ($b->assignment_history_count ?? 0);
+                            if ($loadCmp !== 0) {
+                                return $loadCmp;
+                            }
+
+                            return strcmp((string) $a->employee_id, (string) $b->employee_id);
+                        })
+                        ->values();
+
+                    $chosenList = $candidates->take($neededCount);
+                    foreach ($chosenList as $chosen) {
+                        $usedPersonnelIds[] = (int) $chosen->id;
+                        $proposedAllocations[] = [
+                            'project_id' => (int) $proj->id,
+                            'project_code' => (string) $proj->project_code,
+                            'project_name' => (string) $proj->name,
+                            'personnel_id' => (int) $chosen->id,
+                            'employee_id' => (string) $chosen->employee_id,
+                            'full_name' => (string) $chosen->full_name,
+                            'expertise' => (string) $chosen->expertise,
+                        ];
+                    }
+
+                    $shortfall = $neededCount - $chosenList->count();
+                    if ($shortfall > 0) {
+                        $unfilledSummaryLines[] = sprintf(
+                            '- **%s — %s:** %s (%d still needed — 0 available in unassigned pool)',
+                            $proj->project_code,
+                            $proj->name,
+                            $roleName,
+                            $shortfall,
+                        );
+                    }
+                }
+            }
+
+            if (empty($proposedAllocations)) {
+                return [
+                    'reply' => sprintf(
+                        "I found **%d active project(s)** with missing **%s**:\n\n%s\n\nHowever, there are currently **0 unassigned personnel** in the available manpower pool matching those missing roles. Please release personnel from other projects or add new manpower records first.",
+                        count($projectsWithDeficits),
+                        $roleLabel,
+                        implode("\n", $projectSummaryLines),
+                    ),
+                    'mode' => 'gemini',
+                    'connected' => true,
+                    'action_executed' => false,
+                ];
+            }
+
+            $previewTableRows = collect($proposedAllocations)->map(fn (array $item) => sprintf(
+                '| %s | **%s** | %s | Assign to **%s — %s** |',
+                $item['employee_id'],
+                $item['full_name'],
+                $item['expertise'],
+                $item['project_code'],
+                $item['project_name'],
+            ))->implode("\n");
+
+            $affectedProjectsCount = count(array_unique(array_column($proposedAllocations, 'project_id')));
+
+            $previewReply = sprintf(
+                "I found **%d active project(s)** with missing **%s**:\n\n%s\n\nI can allocate **%d available personnel** from your unassigned pool across **%d project(s)**:\n\n| Employee ID | Full Name | Expertise Classification | Proposed Allocation |\n| :--- | :--- | :--- | :--- |\n%s",
+                count($projectsWithDeficits),
+                $roleLabel,
+                implode("\n", $projectSummaryLines),
+                count($proposedAllocations),
+                $affectedProjectsCount,
+                $previewTableRows,
+            );
+
+            if (! empty($unfilledSummaryLines)) {
+                $previewReply .= "\n\n**Remaining Unfilled Roles (Insufficient Unassigned Pool):**\n" . implode("\n", $unfilledSummaryLines);
+            }
+
+            $previewReply .= sprintf(
+                "\n\nWould you like me to proceed with assigning and allocating these **%d personnel** across the affected projects?",
+                count($proposedAllocations),
+            );
+
+            return [
+                'reply' => $previewReply,
+                'mode' => 'confirmation_required',
+                'connected' => true,
+                'action_executed' => false,
+                'pending_action' => [
+                    'action_type' => 'allocate_missing_across_projects',
+                    'project_code' => "{$affectedProjectsCount} Active Project(s)",
+                    'project_name' => 'Portfolio Allocation',
+                    'role_filter' => $specificRole,
+                    'allocations' => array_map(fn (array $item) => [
+                        'project_id' => $item['project_id'],
+                        'personnel_id' => $item['personnel_id'],
+                    ], $proposedAllocations),
+                ],
+            ];
+        }
+
+        // Phase 2: Confirmed by the user -> execute atomic DB transaction across all target projects
+        $userId = $user->id;
+        $nowDate = now()->toDateString();
+        /** @var list<array{employee_id: string, full_name: string, expertise: string, project_code: string, project_name: string}> $committedAllocations */
+        $committedAllocations = [];
+
+        DB::transaction(function () use ($user, $userId, $nowDate, $explicitAllocations, $projectsWithDeficits, &$committedAllocations) {
+            $availablePool = Personnel::query()
+                ->whereNull('project_id')
+                ->whereNull('deleted_at')
+                ->withCount('assignmentHistory')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            /** @var array<int, Collection<int, Personnel>> $assignedByProject */
+            $assignedByProject = [];
+            /** @var array<int, Project> $lockedProjectsById */
+            $lockedProjectsById = [];
+
+            if (! empty($explicitAllocations)) {
+                foreach ($explicitAllocations as $pair) {
+                    $projId = isset($pair['project_id']) ? (int) $pair['project_id'] : 0;
+                    $persId = isset($pair['personnel_id']) ? (int) $pair['personnel_id'] : 0;
+                    if ($projId <= 0 || $persId <= 0 || ! $availablePool->has($persId)) {
+                        continue;
+                    }
+
+                    if (! isset($lockedProjectsById[$projId])) {
+                        $lockedProj = Project::query()->lockForUpdate()->find($projId);
+                        if (! $lockedProj || $lockedProj->trashed() || $lockedProj->status === 'completed' || ! Gate::forUser($user)->allows('update', $lockedProj)) {
+                            continue;
+                        }
+                        $lockedProjectsById[$projId] = $lockedProj;
+                        $assignedByProject[$projId] = collect();
+                    }
+
+                    $lockedProject = $lockedProjectsById[$projId];
+                    /** @var Personnel $chosen */
+                    $chosen = $availablePool->pull($persId);
+                    if ($chosen->project_id !== null) {
+                        continue;
+                    }
+
+                    $chosen->update([
+                        'project_id' => $lockedProject->id,
+                        'date_assigned' => $nowDate,
+                        'updated_by' => $userId,
+                    ]);
+
+                    ProjectPersonnelHistory::create([
+                        'project_id' => $lockedProject->id,
+                        'personnel_id' => $chosen->id,
+                        'assigned_at' => $nowDate,
+                        'assigned_by' => $userId,
+                    ]);
+
+                    $assignedByProject[$projId]->push($chosen);
+                    $committedAllocations[] = [
+                        'employee_id' => (string) $chosen->employee_id,
+                        'full_name' => (string) $chosen->full_name,
+                        'expertise' => (string) $chosen->expertise,
+                        'project_code' => (string) $lockedProject->project_code,
+                        'project_name' => (string) $lockedProject->name,
+                    ];
+                }
+            } else {
+                foreach ($projectsWithDeficits as $entry) {
+                    /** @var Project $proj */
+                    $proj = $entry['project'];
+                    $lockedProject = Project::query()->lockForUpdate()->find($proj->id);
+                    if (! $lockedProject || $lockedProject->trashed() || $lockedProject->status === 'completed') {
+                        continue;
+                    }
+
+                    $lockedProjectsById[$lockedProject->id] = $lockedProject;
+                    $assignedByProject[$lockedProject->id] = collect();
+
+                    foreach ($entry['missing_roles'] as $roleName => $neededCount) {
+                        $candidates = $availablePool
+                            ->filter(fn (Personnel $p) => strcasecmp(trim((string) $p->expertise), $roleName) === 0)
+                            ->sort(function (Personnel $a, Personnel $b): int {
+                                $loadCmp = ($a->assignment_history_count ?? 0) <=> ($b->assignment_history_count ?? 0);
+                                if ($loadCmp !== 0) {
+                                    return $loadCmp;
+                                }
+
+                                return strcmp((string) $a->employee_id, (string) $b->employee_id);
+                            })
+                            ->values();
+
+                        $selected = $candidates->take($neededCount);
+                        foreach ($selected as $chosen) {
+                            $availablePool->forget($chosen->id);
+
+                            $chosen->update([
+                                'project_id' => $lockedProject->id,
+                                'date_assigned' => $nowDate,
+                                'updated_by' => $userId,
+                            ]);
+
+                            ProjectPersonnelHistory::create([
+                                'project_id' => $lockedProject->id,
+                                'personnel_id' => $chosen->id,
+                                'assigned_at' => $nowDate,
+                                'assigned_by' => $userId,
+                            ]);
+
+                            $assignedByProject[$lockedProject->id]->push($chosen);
+                            $committedAllocations[] = [
+                                'employee_id' => (string) $chosen->employee_id,
+                                'full_name' => (string) $chosen->full_name,
+                                'expertise' => (string) $chosen->expertise,
+                                'project_code' => (string) $lockedProject->project_code,
+                                'project_name' => (string) $lockedProject->name,
+                            ];
+                        }
+                    }
+                }
+            }
+
+            $anyCommitted = false;
+            foreach ($assignedByProject as $projId => $assignedCollection) {
+                if ($assignedCollection->isEmpty() || ! isset($lockedProjectsById[$projId])) {
+                    continue;
+                }
+                $anyCommitted = true;
+                $lockedProject = $lockedProjectsById[$projId];
+                $count = $assignedCollection->count();
+                $manpowerSummary = $assignedCollection
+                    ->map(fn (Personnel $p) => "{$p->employee_id} ({$p->full_name} - {$p->expertise})")
+                    ->implode(', ');
+
+                ProjectStatusHistory::create([
+                    'project_id' => $lockedProject->id,
+                    'from_status' => $lockedProject->status,
+                    'to_status' => $lockedProject->status,
+                    'notes' => $count === 1
+                        ? "Assigned manpower: {$manpowerSummary}"
+                        : "Assigned {$count} manpower: {$manpowerSummary}",
+                    'changed_by' => $userId,
+                    'changed_at' => now(),
+                ]);
+
+                app(NotificationService::class)->notifyManpowerAssigned($lockedProject, $assignedCollection);
+            }
+
+            if ($anyCommitted) {
+                app(LiveUpdateService::class)->bump('resources');
+            }
+        });
+
+        if (empty($committedAllocations)) {
+            return [
+                'reply' => 'No personnel could be allocated because the selected personnel are no longer available in the unassigned pool.',
+                'mode' => 'gemini',
+                'connected' => true,
+                'action_executed' => false,
+            ];
+        }
+
+        $tableRows = collect($committedAllocations)->map(fn (array $item) => sprintf(
+            '| %s | **%s** | %s | Assigned to **%s — %s** |',
+            $item['employee_id'],
+            $item['full_name'],
+            $item['expertise'],
+            $item['project_code'],
+            $item['project_name'],
+        ))->implode("\n");
+
+        $affectedProjectsCount = count(array_unique(array_column($committedAllocations, 'project_code')));
+
+        return [
+            'reply' => sprintf(
+                "Confirmed! I have assigned and allocated **%d available personnel** across **%d project(s)** with missing **%s**:\n\n| Employee ID | Full Name | Expertise Classification | Status |\n| :--- | :--- | :--- | :--- |\n%s",
+                count($committedAllocations),
+                $affectedProjectsCount,
+                $roleLabel,
+                $tableRows,
+            ),
+            'mode' => 'gemini',
+            'connected' => true,
+            'action_executed' => true,
+            'action_type' => 'allocate_missing_across_projects',
+        ];
     }
 
     /**

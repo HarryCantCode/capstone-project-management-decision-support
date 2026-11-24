@@ -278,11 +278,15 @@ class DecisionSupportController extends Controller implements HasMiddleware
             'message' => ['required', 'string', 'max:1000'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'confirm_action' => ['nullable', 'array'],
-            'confirm_action.action_type' => ['required_with:confirm_action', 'string', 'in:fill_missing_manpower,assign_personnel,remove_personnel'],
-            'confirm_action.project_id' => ['required_with:confirm_action', 'integer', 'exists:projects,id'],
+            'confirm_action.action_type' => ['required_with:confirm_action', 'string', 'in:fill_missing_manpower,assign_personnel,remove_personnel,allocate_missing_across_projects'],
+            'confirm_action.project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'confirm_action.personnel_ids' => ['nullable', 'array'],
             'confirm_action.personnel_ids.*' => ['integer', 'exists:personnel,id'],
             'confirm_action.personnel_query' => ['nullable', 'string', 'max:255'],
+            'confirm_action.role_filter' => ['nullable', 'string', 'max:255'],
+            'confirm_action.allocations' => ['nullable', 'array'],
+            'confirm_action.allocations.*.project_id' => ['required_with:confirm_action.allocations', 'integer', 'exists:projects,id'],
+            'confirm_action.allocations.*.personnel_id' => ['required_with:confirm_action.allocations', 'integer', 'exists:personnel,id'],
         ]);
 
         $response = $chatService->ask(
