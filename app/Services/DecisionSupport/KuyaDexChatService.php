@@ -83,10 +83,15 @@ class KuyaDexChatService
      * @param string $message
      * @param int|null $selectedProjectId
      * @param array<string, mixed>|null $confirmAction
+     * @param bool $includeProjectTasks
      * @return array{reply: string|null, mode: string, connected: bool, action_executed?: bool, action_type?: string, project_id?: int, pending_action?: array<string, mixed>}
      */
-    public function ask(string $message, ?int $selectedProjectId = null, ?array $confirmAction = null): array
-    {
+    public function ask(
+        string $message,
+        ?int $selectedProjectId = null,
+        ?array $confirmAction = null,
+        bool $includeProjectTasks = true,
+    ): array {
         $cleanMessage = trim($message);
         $apiKey = trim((string) config('services.gemini.api_key', ''));
         $isConnected = $apiKey !== '';
@@ -148,7 +153,7 @@ class KuyaDexChatService
             // Do not block chat if cache driver is temporarily unavailable
         }
 
-        $sanitizedPayload = $this->buildSanitizedSystemJson($selectedProjectId);
+        $sanitizedPayload = $this->buildSanitizedSystemJson($selectedProjectId, $includeProjectTasks);
         $configuredModel = trim((string) config('services.gemini.model', 'gemini-3.5-flash-lite')) ?: 'gemini-3.5-flash-lite';
 
         // Automatically remap retired/congested model IDs to the fastest verified free-tier model (gemini-3.5-flash-lite)
@@ -181,12 +186,13 @@ class KuyaDexChatService
             ],
             'generationConfig' => [
                 'temperature' => 0.15,
-                'maxOutputTokens' => 1200,
+                'maxOutputTokens' => 1800,
             ],
         ];
 
         // Attach Gemini Function Calling declarations ONLY for authorized Admin / Manager users
-        if ($this->canCurrentUserManageManpower()) {
+        // and only when the message is an explicit manpower assignment/removal command (to keep forecasting/analysis fast)
+        if ($this->canCurrentUserManageManpower() && $this->shouldAttachManpowerTools($cleanMessage)) {
             $requestPayload['tools'] = [
                 [
                     'function_declarations' => $this->getManpowerFunctionDeclarations(),
@@ -212,7 +218,7 @@ class KuyaDexChatService
                     urlencode($apiKey),
                 );
 
-                $attemptResponse = Http::timeout(15)
+                $attemptResponse = Http::timeout(25)
                     ->acceptJson()
                     ->post($endpoint, $requestPayload);
 
@@ -235,6 +241,17 @@ class KuyaDexChatService
         }
 
         if (! $response || ! $response->successful()) {
+            // If Gemini API is temporarily congested or timed out on a forecasting / business analysis inquiry,
+            // generate a rich, data-grounded Project & Business Analyst report directly from the live DEX PMS snapshot
+            $fallbackForecast = $this->tryGenerateLocalForecastAndAnalystFallback($cleanMessage, $selectedProjectId, $includeProjectTasks);
+            if ($fallbackForecast !== null) {
+                return [
+                    'reply' => $fallbackForecast,
+                    'mode' => 'gemini',
+                    'connected' => true,
+                ];
+            }
+
             return [
                 'reply' => self::ERROR_FALLBACK_REPLY,
                 'mode' => 'error',
@@ -304,7 +321,7 @@ class KuyaDexChatService
      * Build a strictly sanitized JSON string of operational DEX PMS data.
      * Excludes all sensitive user credentials, passwords, OTPs, tokens, or session records.
      */
-    public function buildSanitizedSystemJson(?int $selectedProjectId = null): string
+    public function buildSanitizedSystemJson(?int $selectedProjectId = null, bool $includeProjectTasks = true): string
     {
         $projects = Project::query()
             ->with([
@@ -330,16 +347,38 @@ class KuyaDexChatService
 
         $portfolioOverlaps = [];
 
-        $formattedProjects = $projects->map(function (Project $project) use ($projects, &$portfolioOverlaps): array {
+        $formattedProjects = $projects->map(function (Project $project) use ($projects, &$portfolioOverlaps, $includeProjectTasks): array {
             $tasks = $project->tasks ?? collect();
+            $today = Carbon::now()->startOfDay();
 
-            // Major Tasks & Minor Tasks (Subtasks / Checklist) breakdown
+            // Major Tasks & Minor Tasks (Subtasks / Checklist) breakdown + execution velocity diagnostics
             $totalMajorTasks = $tasks->count();
             $completedMajorTasks = 0;
+            $inProgressMajorTasks = 0;
+            $pendingMajorTasks = 0;
+            $overdueMajorTasks = 0;
             $totalMinorTasks = 0;
             $completedMinorTasks = 0;
+            $overdueMinorTasks = 0;
+            $unassignedPendingMinorTasks = 0;
+            $overdueMajorTaskNames = [];
+            $overdueMinorTaskList = [];
+            $bottleneckMajorTasks = [];
 
-            $formattedMajorTasks = $tasks->map(function (ProjectTask $task) use (&$completedMajorTasks, &$totalMinorTasks, &$completedMinorTasks): array {
+            $formattedMajorTasks = $tasks->map(function (ProjectTask $task) use (
+                $today,
+                &$completedMajorTasks,
+                &$inProgressMajorTasks,
+                &$pendingMajorTasks,
+                &$overdueMajorTasks,
+                &$totalMinorTasks,
+                &$completedMinorTasks,
+                &$overdueMinorTasks,
+                &$unassignedPendingMinorTasks,
+                &$overdueMajorTaskNames,
+                &$overdueMinorTaskList,
+                &$bottleneckMajorTasks,
+            ): array {
                 $subtasks = $task->subtasks ?? collect();
                 $minorTotal = $subtasks->count();
                 $minorCompleted = $subtasks->where('is_completed', true)->count();
@@ -347,32 +386,99 @@ class KuyaDexChatService
                 $totalMinorTasks += $minorTotal;
                 $completedMinorTasks += $minorCompleted;
 
-                $isMajorComplete = $task->computed_status === 'completed';
+                $computedStatus = (string) $task->computed_status;
+                $isMajorComplete = $computedStatus === 'completed';
                 if ($isMajorComplete) {
                     $completedMajorTasks++;
+                } elseif ($computedStatus === 'in_progress') {
+                    $inProgressMajorTasks++;
+                } else {
+                    $pendingMajorTasks++;
                 }
 
                 $minorCompletionRatePct = $minorTotal > 0
                     ? round(($minorCompleted / $minorTotal) * 100, 1)
                     : ($isMajorComplete ? 100.0 : 0.0);
 
+                $taskEnd = $task->end_date ? Carbon::parse($task->end_date)->startOfDay() : null;
+                $isMajorTaskOverdue = ! $isMajorComplete && $taskEnd && $today->gt($taskEnd);
+                $majorDaysOverdue = $isMajorTaskOverdue && $taskEnd ? (int) $taskEnd->diffInDays($today) : 0;
+
+                if ($isMajorTaskOverdue) {
+                    $overdueMajorTasks++;
+                    $overdueMajorTaskNames[] = sprintf(
+                        '%s (ended %s, %d day(s) overdue, %s%% minor tasks done)',
+                        (string) $task->task_name,
+                        $taskEnd?->format('Y-m-d') ?? 'N/A',
+                        $majorDaysOverdue,
+                        (string) $minorCompletionRatePct,
+                    );
+                }
+
+                if (! $isMajorComplete && ($isMajorTaskOverdue || ($computedStatus === 'in_progress' && $minorCompletionRatePct < 50))) {
+                    $bottleneckMajorTasks[] = sprintf(
+                        '%s (%d/%d minor tasks completed — %s%%)',
+                        (string) $task->task_name,
+                        $minorCompleted,
+                        $minorTotal,
+                        (string) $minorCompletionRatePct,
+                    );
+                }
+
+                $formattedMinorTasks = $subtasks->map(function (ProjectSubtask $st) use (
+                    $task,
+                    $today,
+                    &$overdueMinorTasks,
+                    &$unassignedPendingMinorTasks,
+                    &$overdueMinorTaskList,
+                ): array {
+                    $isDone = (bool) $st->is_completed;
+                    $stDue = $st->due_date ? Carbon::parse($st->due_date)->startOfDay() : null;
+                    $isStOverdue = ! $isDone && $stDue && $today->gt($stDue);
+                    $stDaysOverdue = $isStOverdue && $stDue ? (int) $stDue->diffInDays($today) : 0;
+                    $assignedName = (string) ($st->assignedTo?->name ?: 'Unassigned');
+
+                    if (! $isDone && $st->assigned_to === null) {
+                        $unassignedPendingMinorTasks++;
+                    }
+
+                    if ($isStOverdue) {
+                        $overdueMinorTasks++;
+                        $overdueMinorTaskList[] = sprintf(
+                            '%s [under %s] — due %s (%d day(s) overdue, assigned to: %s)',
+                            (string) $st->title,
+                            (string) $task->task_name,
+                            $stDue?->format('Y-m-d') ?? 'N/A',
+                            $stDaysOverdue,
+                            $assignedName,
+                        );
+                    }
+
+                    return [
+                        'title' => (string) $st->title,
+                        'is_completed' => $isDone,
+                        'status' => $isDone
+                            ? 'Completed'
+                            : ($isStOverdue ? "Overdue by {$stDaysOverdue} day(s)" : 'Pending / Incomplete'),
+                        'due_date' => $st->due_date?->format('Y-m-d'),
+                        'completed_at' => $st->completed_at?->format('Y-m-d'),
+                        'assigned_to' => $assignedName,
+                    ];
+                })->values()->all();
+
                 return [
                     'major_task_name' => (string) $task->task_name,
                     'description' => (string) ($task->description ?: ''),
                     'start_date' => $task->start_date?->format('Y-m-d'),
                     'end_date' => $task->end_date?->format('Y-m-d'),
-                    'status' => (string) $task->computed_status,
+                    'status' => $computedStatus,
                     'is_major_task_complete' => $isMajorComplete,
+                    'is_overdue' => $isMajorTaskOverdue,
+                    'days_overdue' => $majorDaysOverdue,
                     'minor_tasks_completed_count' => $minorCompleted,
                     'minor_tasks_total_count' => $minorTotal,
                     'minor_tasks_completion_rate_pct' => $minorCompletionRatePct,
-                    'minor_tasks' => $subtasks->map(fn (ProjectSubtask $st): array => [
-                        'title' => (string) $st->title,
-                        'is_completed' => (bool) $st->is_completed,
-                        'status' => $st->is_completed ? 'Completed' : 'Pending / Incomplete',
-                        'due_date' => $st->due_date?->format('Y-m-d'),
-                        'assigned_to' => (string) ($st->assignedTo?->name ?: 'Unassigned'),
-                    ])->values()->all(),
+                    'minor_tasks' => $formattedMinorTasks,
                 ];
             })->values()->all();
 
@@ -509,7 +615,36 @@ class KuyaDexChatService
             $now = Carbon::now()->startOfDay();
             $daysToTarget = null;
             $isOverdue = false;
-            if ($project->target_completion_date) {
+            $plannedElapsedTimePct = 0.0;
+            $executionVelocityStatus = 'On Pace';
+            $projectedEstimatedCompletionDate = $project->target_completion_date?->format('Y-m-d') ?? 'Not set';
+
+            if ($project->start_date && $project->target_completion_date) {
+                $pStartDay = Carbon::parse($project->start_date)->startOfDay();
+                $pTargetDay = Carbon::parse($project->target_completion_date)->startOfDay();
+                $totalPlannedDays = max(1, (int) $pStartDay->diffInDays($pTargetDay) + 1);
+                $elapsedDays = $now->lt($pStartDay) ? 0 : (int) $pStartDay->diffInDays($now) + 1;
+                $plannedElapsedTimePct = min(100.0, round(($elapsedDays / $totalPlannedDays) * 100, 1));
+                $daysToTarget = (int) $now->diffInDays($pTargetDay, false);
+                $isOverdue = ($daysToTarget < 0 && $project->status !== 'completed');
+
+                if ($project->status === 'completed') {
+                    $executionVelocityStatus = 'Completed';
+                } elseif ($isOverdue) {
+                    $executionVelocityStatus = 'Critical Slippage (Past Target Completion Date)';
+                } elseif ($overallChecklistProgressPct >= $plannedElapsedTimePct + 10) {
+                    $executionVelocityStatus = 'Ahead of Schedule (Strong Task Execution Pace)';
+                } elseif ($plannedElapsedTimePct - $overallChecklistProgressPct >= 25) {
+                    $executionVelocityStatus = 'Behind Schedule (Slow Task Execution Velocity)';
+                } elseif ($plannedElapsedTimePct - $overallChecklistProgressPct >= 12) {
+                    $executionVelocityStatus = 'Slightly Behind Pace (Needs Task Acceleration)';
+                }
+
+                if ($project->status !== 'completed' && $elapsedDays > 0 && $overallChecklistProgressPct > 0 && $overallChecklistProgressPct < 100) {
+                    $estimatedTotalDaysNeeded = (int) ceil($elapsedDays / ($overallChecklistProgressPct / 100.0));
+                    $projectedEstimatedCompletionDate = $pStartDay->copy()->addDays(max($totalPlannedDays, $estimatedTotalDaysNeeded) - 1)->format('Y-m-d');
+                }
+            } elseif ($project->target_completion_date) {
                 $target = Carbon::parse($project->target_completion_date)->startOfDay();
                 $daysToTarget = (int) $now->diffInDays($target, false);
                 $isOverdue = ($daysToTarget < 0 && $project->status !== 'completed');
@@ -532,17 +667,109 @@ class KuyaDexChatService
                 $scheduleRisk = 'Critical Timeline Risk (Approaching Deadline with Incomplete Tasks)';
             } elseif ($daysToTarget !== null && $daysToTarget <= 30 && $majorTaskProgressionPct < 50 && $project->status !== 'completed') {
                 $scheduleRisk = 'Moderate Timeline Risk';
+            } elseif ($overdueMajorTasks > 0 || $overdueMinorTasks > 0) {
+                $scheduleRisk = 'Task-Level Schedule Slippage (Overdue Major/Minor Tasks)';
             }
 
             $hasAssignedPm = $assignedProjectManagers->isNotEmpty();
 
+            // Determine missing core manpower roles for this project based on its elevator technical specifications
+            $requiredRolesForProject = $this->getRequiredRoleCountsForProject($project);
+            $missingRolesSummary = [];
+            foreach ($requiredRolesForProject as $reqRoleName => $reqRoleCount) {
+                $assignedRoleCount = $project->personnel
+                    ->filter(fn (Personnel $p) => $p->deleted_at === null && strcasecmp(trim((string) $p->expertise), $reqRoleName) === 0)
+                    ->count();
+                $roleDeficit = max(0, $reqRoleCount - $assignedRoleCount);
+                if ($roleDeficit > 0) {
+                    $missingRolesSummary[] = "{$reqRoleName} (missing {$roleDeficit})";
+                }
+            }
+
             $projectRoadblocks = array_values(array_filter([
                 !$hasAssignedPm ? 'No Project Manager currently assigned to lead the project' : null,
+                ! empty($missingRolesSummary) ? 'Missing core manpower roles: ' . implode(', ', $missingRolesSummary) : null,
                 $isOverdue ? "Project timeline is overdue by " . abs((int) $daysToTarget) . " day(s)" : null,
+                $overdueMajorTasks > 0 ? "{$overdueMajorTasks} Major Task phase(s) are past their scheduled end date" : null,
+                $overdueMinorTasks > 0 ? "{$overdueMinorTasks} Minor checklist task(s) are past their target due date" : null,
+                $unassignedPendingMinorTasks > 0 ? "{$unassignedPendingMinorTasks} pending Minor checklist task(s) have no staff member assigned" : null,
                 ($actualSpend > $contractPrice && $contractPrice > 0) ? 'Expenditures have exceeded contract price (negative margin)' : null,
                 count($overlappingProjects) > 0 ? 'Concurrent schedule overlap with ' . count($overlappingProjects) . ' other project(s)' : null,
                 count($overlappingMajorTasks) > 0 ? count($overlappingMajorTasks) . ' overlapping major task(s) within project schedule' : null,
             ]));
+
+            // Build actionable task execution suggestions grounded in live project task progress
+            $taskExecutionSuggestions = [];
+            if ($project->status !== 'completed') {
+                if ($totalMajorTasks === 0) {
+                    $taskExecutionSuggestions[] = 'Initialize the Project Progress Timeline by adding weekly/phase Major Tasks and specific Minor checklist tasks so execution pace can be tracked.';
+                } else {
+                    if ($overdueMajorTasks > 0) {
+                        $taskExecutionSuggestions[] = 'Prioritize closing out overdue Major Task phases (' . implode('; ', array_slice($overdueMajorTaskNames, 0, 3)) . ') to prevent cascading delays to downstream installation and testing phases.';
+                    }
+                    if ($overdueMinorTasks > 0) {
+                        $taskExecutionSuggestions[] = "Follow up on the {$overdueMinorTasks} overdue minor checklist task(s) (" . implode('; ', array_slice($overdueMinorTaskList, 0, 3)) . ') and check if any pending task completions are waiting in Staff Requests.';
+                    }
+                    if ($unassignedPendingMinorTasks > 0) {
+                        $taskExecutionSuggestions[] = "Assign specific responsible staff members to the {$unassignedPendingMinorTasks} unassigned minor checklist task(s) to establish clear accountability.";
+                    }
+                    if (! empty($bottleneckMajorTasks)) {
+                        $taskExecutionSuggestions[] = 'Focus field crew bandwidth on current bottleneck phases: ' . implode(', ', array_slice($bottleneckMajorTasks, 0, 3)) . '.';
+                    }
+                    if (! empty($missingRolesSummary)) {
+                        $taskExecutionSuggestions[] = 'Fill missing technical roles (' . implode(', ', $missingRolesSummary) . ') from the available unassigned manpower pool to boost site execution capacity.';
+                    }
+                    if ($spendPct > ($overallChecklistProgressPct + 20)) {
+                        $taskExecutionSuggestions[] = "Budget spend ({$spendPct}%) is outpacing task checklist completion ({$overallChecklistProgressPct}%). Audit material consumption and ensure completed site work is promptly marked done.";
+                    }
+                    if (empty($taskExecutionSuggestions)) {
+                        $taskExecutionSuggestions[] = 'Task execution is progressing smoothly. Continue completing sequential minor tasks on schedule to maintain milestone velocity.';
+                    }
+                }
+            }
+
+            // Build data-grounded Hypothetical Scenarios (Project & Business Analyst modeling based on progress, tasks, manpower & budget)
+            $remainingMinorCount = max(0, $totalMinorTasks - $completedMinorTasks);
+            $projectedCostAtCompletion = $overallChecklistProgressPct >= 15
+                ? round($actualSpend / ($overallChecklistProgressPct / 100.0), 2)
+                : round(max($actualSpend, $contractPrice * 0.85), 2);
+            $projectedVarianceAtCompletion = round($contractPrice - $projectedCostAtCompletion, 2);
+
+            $hypotheticalScenarios = [
+                'scenario_1_baseline_current_pace' => sprintf(
+                    'If current execution velocity (%s, %s%% checklist done vs. %s%% planned time elapsed) continues without intervention, the project is projected to finish around %s with an estimated final spend of ₱%s (%s).',
+                    $executionVelocityStatus,
+                    (string) $overallChecklistProgressPct,
+                    (string) $plannedElapsedTimePct,
+                    $projectedEstimatedCompletionDate,
+                    number_format($projectedCostAtCompletion, 2),
+                    $projectedVarianceAtCompletion >= 0
+                        ? 'projected net profit margin of ₱' . number_format($projectedVarianceAtCompletion, 2)
+                        : 'projected cost overrun risk of ₱' . number_format(abs($projectedVarianceAtCompletion), 2),
+                ),
+                'scenario_2_manpower_and_task_acceleration' => ! empty($missingRolesSummary)
+                    ? sprintf(
+                        'If you allocate available unassigned personnel to fill the missing roles (%s) and clear the %d remaining minor checklist task(s), field execution velocity can improve by ~20%%–30%%, helping recover schedule slippage before the target date (%s).',
+                        implode(', ', $missingRolesSummary),
+                        $remainingMinorCount,
+                        $project->target_completion_date?->format('Y-m-d') ?? 'N/A',
+                    )
+                    : sprintf(
+                        'With all core manpower roles filled (%d crew assigned), focusing the crew on the %d remaining minor checklist task(s) (especially %s) can compress the remaining timeline and protect the ₱%s remaining budget.',
+                        $project->personnel->count(),
+                        $remainingMinorCount,
+                        ! empty($bottleneckMajorTasks) ? $bottleneckMajorTasks[0] : 'active in-progress milestones',
+                        number_format($remainingBudget, 2),
+                    ),
+                'scenario_3_downside_delay_and_budget_slip_risk' => sprintf(
+                    'If active bottlenecks or overdue tasks (%d overdue major phase(s), %d overdue minor task(s)) slip by another 7–14 days, holding the assigned crew (%d personnel) will delay their release to overlapping projects and could erode the remaining budget of ₱%s (%s%% spent so far).',
+                    $overdueMajorTasks,
+                    $overdueMinorTasks,
+                    $project->personnel->count(),
+                    number_format($remainingBudget, 2),
+                    (string) $spendPct,
+                ),
+            ];
 
             return [
                 'id' => (int) $project->id,
@@ -592,15 +819,35 @@ class KuyaDexChatService
                 'schedule_and_progress' => [
                     'start_date' => $project->start_date?->format('Y-m-d'),
                     'target_completion_date' => $project->target_completion_date?->format('Y-m-d'),
+                    'planned_schedule_elapsed_pct' => $plannedElapsedTimePct,
                     'major_task_progression_pct' => $majorTaskProgressionPct,
                     'completed_major_tasks_count' => $completedMajorTasks,
+                    'in_progress_major_tasks_count' => $inProgressMajorTasks,
+                    'pending_major_tasks_count' => $pendingMajorTasks,
+                    'overdue_major_tasks_count' => $overdueMajorTasks,
                     'total_major_tasks_count' => $totalMajorTasks,
                     'overall_checklist_progress_pct' => $overallChecklistProgressPct,
                     'completed_minor_tasks_count' => $completedMinorTasks,
+                    'pending_minor_tasks_count' => max(0, $totalMinorTasks - $completedMinorTasks),
+                    'overdue_minor_tasks_count' => $overdueMinorTasks,
+                    'unassigned_pending_minor_tasks_count' => $unassignedPendingMinorTasks,
                     'total_minor_tasks_count' => $totalMinorTasks,
-                    'major_tasks' => $formattedMajorTasks,
+                    'task_reading_enabled' => $includeProjectTasks,
+                    'major_tasks' => $includeProjectTasks ? $formattedMajorTasks : [],
                     'overlapping_projects_schedule' => $overlappingProjects,
                     'overlapping_major_tasks_within_project' => $overlappingMajorTasks,
+                ],
+                'task_execution_assessment_and_forecast' => [
+                    'task_reading_enabled' => $includeProjectTasks,
+                    'execution_velocity_status' => $executionVelocityStatus,
+                    'planned_time_elapsed_pct' => $plannedElapsedTimePct,
+                    'actual_major_task_completion_pct' => $majorTaskProgressionPct,
+                    'actual_minor_checklist_completion_pct' => $overallChecklistProgressPct,
+                    'projected_estimated_completion_date_at_current_pace' => $projectedEstimatedCompletionDate,
+                    'overdue_major_tasks' => $includeProjectTasks ? $overdueMajorTaskNames : [],
+                    'overdue_minor_tasks' => $includeProjectTasks ? $overdueMinorTaskList : [],
+                    'bottleneck_phases' => $includeProjectTasks ? $bottleneckMajorTasks : [],
+                    'actionable_execution_suggestions' => $includeProjectTasks ? $taskExecutionSuggestions : [],
                 ],
                 'costing_and_expenses' => [
                     'contract_price_php' => round($contractPrice, 2),
@@ -619,12 +866,19 @@ class KuyaDexChatService
                     'projected_revenue_php' => round($contractPrice, 2),
                     'projected_gross_margin_php' => $projectedGrossMarginPhp,
                     'projected_gross_margin_pct' => $projectedGrossMarginPct,
+                    'projected_cost_at_completion_php' => $projectedCostAtCompletion,
+                    'projected_variance_at_completion_php' => $projectedVarianceAtCompletion,
                     'budget_risk_assessment' => $budgetRisk,
                     'schedule_risk_assessment' => $scheduleRisk,
+                    'execution_velocity_status' => $executionVelocityStatus,
+                    'projected_completion_date_at_current_pace' => $projectedEstimatedCompletionDate,
                     'days_until_target_completion' => $daysToTarget,
                     'is_schedule_overdue' => $isOverdue,
                     'has_assigned_project_manager' => $hasAssignedPm,
+                    'missing_core_manpower_roles' => $missingRolesSummary,
                     'identified_roadblocks' => $projectRoadblocks,
+                    'task_execution_suggestions' => $includeProjectTasks ? $taskExecutionSuggestions : [],
+                    'hypothetical_scenarios' => $hypotheticalScenarios,
                 ],
             ];
         })->values();
@@ -839,8 +1093,18 @@ class KuyaDexChatService
             ];
         }
 
+        $nowLocal = Carbon::now(config('app.timezone', 'Asia/Manila'));
+
         $payload = [
             'system' => 'DEX Project Management System (DEX PMS)',
+            'current_server_date_and_time' => [
+                'current_date_iso' => $nowLocal->format('Y-m-d'),
+                'current_date_human' => $nowLocal->format('l, F j, Y'),
+                'current_time_human' => $nowLocal->format('g:i A'),
+                'current_datetime_full' => $nowLocal->format('l, F j, Y \a\t g:i A (T)'),
+                'timezone' => (string) config('app.timezone', 'Asia/Manila'),
+                'note' => 'Fetched directly from the local DEX PMS application clock without any external online lookup. Use this exact date and time to evaluate whether projects, major tasks, and minor checklist subtasks are on track, approaching deadlines, or behind schedule.',
+            ],
             'current_user_permissions' => [
                 'role' => (string) $userRole,
                 'can_assign_or_remove_manpower' => $canManageManpower,
@@ -914,10 +1178,10 @@ class KuyaDexChatService
         }
 
         // Explicitly forbidden patterns requested by the specification
+        // Note: Date/time questions that are combined with project/schedule/forecast context are allowed
+        $hasProjectDomainTerm = preg_match('/\b(project|projects|task|tasks|schedule|deadline|overdue|behind|ahead|pace|progress|forecast|milestone|manpower|personnel|budget|cost|dex|pms)\b/i', $normalized) === 1;
+
         $explicitForbiddenPatterns = [
-            '/\bwhat\s+(is|\'s)\s+the\s+(date|day|time)\b/i',
-            '/\b(date|day)\s+today\b/i',
-            '/\bwhat\s+today(\'s)?\s+date\b/i',
             '/\bwho\s+(is|\'s|was)\s+the\s+(president|prime\s+minister|mayor|governor|king|queen|pope)\b/i',
             '/\bpresident\s+of\b/i',
             '/\bwho\s+is\s+this\??$/i',
@@ -930,6 +1194,10 @@ class KuyaDexChatService
             '/\brecipe\s+for\b/i',
         ];
 
+        if (! $hasProjectDomainTerm) {
+            $explicitForbiddenPatterns[] = '/^(?:what\s+(?:is|\'s)\s+the\s+(?:date|day|time)(?:\s+today|\s+now)?|what\s+today(?:\'s)?\s+date)\??$/i';
+        }
+
         foreach ($explicitForbiddenPatterns as $pattern) {
             if (preg_match($pattern, $normalized) === 1) {
                 return true;
@@ -937,7 +1205,7 @@ class KuyaDexChatService
         }
 
         // Check if the query references any allowed DEX PMS, Manpower Expertise/Classification, Project Details, Schedule Overlaps, Catalog Materials, Staff Requests/Approvals, Module/View Guides, or Elevator construction domain terms
-        $allowedDomainPattern = '/\b(project|projects|proj|pms|dex|kuya\s*dex|dashboard|module|modules|view|views|page|pages|tab|tabs|sidebar|navigation|navigate|tutorial|guide|how\s+to|how\s+can\s+i|how\s+do\s+i|step|steps|create|add|edit|update|delete|archive|restore|search|filter|notification|notifications|report|reports|export|exporting|pdf|dossier|chart|charts|graph|file|files|upload|uploading|attachment|attachments|document|documents|audit|audit\s+trail|history|ping|verdict|reassign|configure|template|templates|decision\s+support|dss|gantt|calendar|supplier|suppliers|creator|created\s+by|who\s+created|who\s+made|author|warranty|description|describe|details|overview|summary|type|types|client|clients|customer|code|codes|location|locations|site|address|barangay|city|province|region|postal|manpower|personnel|staff|staffs|crew|crews|workforce|staffing|pool|expertise|expertises|classification|classifications|category|categories|role|roles|position|positions|designation|designations|specialty|specialties|specialization|skill|skills|job|jobs|department|manager|project\s+manager|technician|technicians|engineer|engineers|site\s+engineer|safety\s+officer|foreman|foremen|qa\s+inspector|inspector|inspectors|elevator\s+control|installation\s+personnel|electrician|mechanic|installer|installers|worker|workers|employee|employees|headcount|available|unassigned|assigned|assign|assigning|assignment|assignments|unassign|unassigning|remove|removing|removal|release|releasing|fill|filling|missing|necessary|unexamined|examine|examined|request|requests|approve|approving|approval|approvals|approved|reject|rejecting|rejected|rejection|submission|submissions|review|reviewing|reviewed|sufficient|shortage|deficit|deficits|shortcoming|shortcomings|roadblock|roadblocks|bottleneck|bottlenecks|risk|risks|hazard|hazards|forecast|forecasts|forecasting|projection|projections|outlook|prediction|predictions|contingency|profitability|burn\s*rate|overrun|overruns|gross\s*margin|cost|costs|costing|spend|spending|spent|budget|expense|expenses|expenditure|expenditures|price|unit\s+cost|contract|margin|revenue|payment|terms|invoice|progress|progression|completion|complete|completed|incomplete|major\s+task|major\s+tasks|minor\s+task|minor\s+tasks|mother\s+task|baby\s+task|task|tasks|subtask|subtasks|sub-task|sub-tasks|checklist|schedule|schedules|scheduling|overlap|overlapping|conflict|conflicts|concurrent|simultaneous|timeline|delay|delayed|overdue|milestone|start\s+date|end\s+date|target\s+date|due\s+date|status|ongoing|pending|allocat|allocation|simulat|simulate|simulation|simulator|feasibility|what-if|scenario|recommend|recommended|recommendation|recommendations|spec|specs|specification|specifications|sizing|size|estimate|estimation|estimates|estimating|estimator|require|requires|required|requirement|requirements|needed|need|needs|stops?|floors?|levels?|storeys?|stories|capacity|capacities|kg|kilograms?|tons?|tonnage|pax|passengers?|speed|mps|fpm|elevator|elevators|lift|lifts|escalator|hoist|hoistway|shaft|pit|overhead|machine\s+room|mrl|traction|hydraulic|counterweight|car|cage|cabin|door|interlock|governor|overspeed|safety\s+gear|buffer|guide\s+rail|wire\s+rope|sheave|inverter|vvvf|controller|plc|landing|rated\s+load|lifting\s+speed|power\s+source|flooring|wall|ceiling|construction|installation|commissioning|testing|maintenance|blueprint|transformer|ard|rescue\s+device|motor|brake|panel|button|sensor|switch|bracket|bolt|cable)\b/i';
+        $allowedDomainPattern = '/\b(project|projects|proj|pms|dex|kuya\s*dex|dashboard|module|modules|view|views|page|pages|tab|tabs|sidebar|navigation|navigate|tutorial|guide|how\s+to|how\s+can\s+i|how\s+do\s+i|step|steps|create|add|edit|update|delete|archive|restore|search|filter|notification|notifications|report|reports|export|exporting|pdf|dossier|chart|charts|graph|file|files|upload|uploading|attachment|attachments|document|documents|audit|audit\s+trail|history|ping|verdict|reassign|configure|template|templates|decision\s+support|dss|gantt|calendar|supplier|suppliers|creator|created\s+by|who\s+created|who\s+made|author|warranty|description|describe|details|overview|summary|type|types|client|clients|customer|code|codes|location|locations|site|address|barangay|city|province|region|postal|manpower|personnel|staff|staffs|crew|crews|workforce|staffing|pool|expertise|expertises|classification|classifications|category|categories|role|roles|position|positions|designation|designations|specialty|specialties|specialization|skill|skills|job|jobs|department|manager|project\s+manager|technician|technicians|engineer|engineers|site\s+engineer|safety\s+officer|foreman|foremen|qa\s+inspector|inspector|inspectors|elevator\s+control|installation\s+personnel|electrician|mechanic|installer|installers|worker|workers|employee|employees|headcount|available|unassigned|assigned|assign|assigning|assignment|assignments|unassign|unassigning|remove|removing|removal|release|releasing|fill|filling|missing|necessary|unexamined|examine|examined|request|requests|approve|approving|approval|approvals|approved|reject|rejecting|rejected|rejection|submission|submissions|review|reviewing|reviewed|sufficient|shortage|deficit|deficits|shortcoming|shortcomings|roadblock|roadblocks|bottleneck|bottlenecks|risk|risks|hazard|hazards|forecast|forecasts|forecasting|projection|projections|outlook|prediction|predictions|hypothetical|scenarios?|analyst|analysis|analyze|behind|ahead|on\s+track|deadline|deadlines|today|contingency|profitability|burn\s*rate|overrun|overruns|gross\s*margin|cost|costs|costing|spend|spending|spent|budget|budgeting|expense|expenses|expenditure|expenditures|price|unit\s+cost|contract|margin|revenue|revenues|payment|terms|invoice|progress|progression|progressing|execute|executing|execution|assess|assessing|assessment|velocity|pace|slippage|suggest|suggestion|suggestions|advice|advise|completion|complete|completed|incomplete|major\s+task|major\s+tasks|minor\s+task|minor\s+tasks|mother\s+task|baby\s+task|task|tasks|subtask|subtasks|sub-task|sub-tasks|checklist|schedule|schedules|scheduling|overlap|overlapping|conflict|conflicts|concurrent|simultaneous|timeline|delay|delayed|overdue|milestone|start\s+date|end\s+date|target\s+date|due\s+date|status|ongoing|pending|allocat|allocation|simulat|simulate|simulation|simulator|feasibility|what-if|scenario|recommend|recommended|recommendation|recommendations|spec|specs|specification|specifications|sizing|size|estimate|estimation|estimates|estimating|estimator|require|requires|required|requirement|requirements|needed|need|needs|stops?|floors?|levels?|storeys?|stories|capacity|capacities|kg|kilograms?|tons?|tonnage|pax|passengers?|speed|mps|fpm|elevator|elevators|lift|lifts|escalator|hoist|hoistway|shaft|pit|overhead|machine\s+room|mrl|traction|hydraulic|counterweight|car|cage|cabin|door|interlock|governor|overspeed|safety\s+gear|buffer|guide\s+rail|wire\s+rope|sheave|inverter|vvvf|controller|plc|landing|rated\s+load|lifting\s+speed|power\s+source|flooring|wall|ceiling|construction|installation|commissioning|testing|maintenance|blueprint|transformer|ard|rescue\s+device|motor|brake|panel|button|sensor|switch|bracket|bolt|cable)\b/i';
 
         // Allow brief polite greetings about Kuya DEX's PMS capabilities
         $greetingPattern = '/^(hi|hello|hey|good\s+morning|good\s+afternoon|good\s+evening|help|what\s+can\s+you\s+do)(\s+kuya\s*dex)?[\?\!\.]*$/i';
@@ -1116,19 +1384,33 @@ CRITICAL DOMAIN ACCURACY RULES:
    - If the user asks about "this project" or "project x" without naming a specific project code, use the active project context and mention its project code and name.
    - Always format Philippine Peso amounts clearly (e.g., ₱1,250,000.00).
    - When presenting structured lists or comparisons (such as projects, expenses, material catalogs, or manpower), you may use concise Markdown tables (ideally 3 to 4 columns) or bullet lists. Keep cell text compact so the table reads smoothly.
-5. FORECASTING SKILL (REVENUES, SHORTCOMINGS, ROADBLOCKS & MITIGATION STRATEGIES):
-   - When asked to forecast, project, or analyze future performance, revenues, shortcomings, or roadblocks, structure your response into clear, executive-ready sections:
-     1) **Financial & Revenue Forecast:**
-        - Report projected contract revenue, current actual spend, and projected gross profit margin (Contract Price − Actual Spend).
-        - Highlight budget burn rate and flag any project spending faster than its progress (or projects that have exceeded their budget).
-     2) **Resource Shortcomings & Deficits:**
-        - Manpower gaps: highlight if active projects lack an assigned Project Manager, or if certain technical expertise classifications have low/zero unassigned personnel available for upcoming work.
+5. PROJECT & BUSINESS ANALYST SKILL — FORECASTING, LOCAL DATE/TIME SCHEDULE AWARENESS, TASK EXECUTION & HYPOTHETICAL SCENARIO MODELING:
+   - You act as a senior **Project & Business Analyst** for DEX PMS.
+   - **Local Date & Time Awareness (No Online Lookup Needed):**
+     * Always read the exact current local date and time from `current_server_date_and_time` in the provided data (fetched directly from the local DEX PMS server clock).
+     * Reference today's date when assessing whether a project, Major Task, or Minor Checklist Task is ahead of schedule, on pace, approaching its deadline, or overdue/behind schedule.
+   - When asked to forecast, project, assess task execution, or analyze revenues, shortcomings, roadblocks, or how we are progressing/executing a project (or portfolio), structure your response into clear, executive-ready sections:
+     1) **Current Date Benchmark & Task Execution Velocity Assessment (When Task Reading is Enabled):**
+        - State today's date and compare actual task completion (completed Major Tasks and Minor checklist subtasks) against the planned schedule elapsed percentage.
+        - State the current **Execution Velocity** (Ahead of Schedule, On Pace, Slightly Behind Pace, Behind Schedule, or Critical Slippage) and the **Projected Estimated Completion Date** at the current pace.
+        - Call out specific **Overdue Major Tasks**, **Overdue Minor Checklist Tasks** (including their due dates, days overdue as of today, and assigned staff), **Bottleneck Phases** (in-progress Major Tasks with <50% minor task completion), and any **Unassigned Minor Tasks** lacking a responsible staff owner.
+        - If task reading was disabled by the user in the chat header toggle (`task_reading_enabled` is false), politely note that **Read Project Tasks** is currently toggled off in the chat bar and can be turned on for deep task-level execution diagnostics.
+     2) **Financial, Budgeting & Revenue Forecast:**
+        - Report projected contract revenue, current actual spend, remaining budget, and projected gross profit margin (Contract Price − Actual Spend).
+        - Compare budget burn rate (% spent) against actual task completion pace (% checklist done) and flag any cost overrun or margin compression risks.
+     3) **Resource Shortcomings & Manpower State:**
+        - Manpower state: evaluate currently assigned personnel vs. missing core roles for the project's elevator specifications (e.g., whether a dedicated Project Manager, Site Engineer, Foreman, Safety Officer, or Technician is missing) and check available unassigned manpower in the pool.
         - Material deficits: highlight any required elevator components in the catalog that are out-of-stock or low-stock.
-     3) **Roadblocks & Operational Bottlenecks:**
-        - Schedule roadblocks: highlight concurrent schedule overlaps between projects that compete for manpower, overdue projects, or milestones with low minor task completion rates approaching deadlines.
-     4) **Kuya DEX Actionable Mitigations / Recommendations:**
-        - Provide practical elevator construction & project management advice (e.g., reordering critical catalog stock early, reallocating technicians after completed milestones, assigning dedicated Project Managers, or smoothing overlapping task schedules).
-   - STRICT SCOPE: All forecasts MUST be grounded directly in the provided DEX PMS project, financial, manpower, and catalog data. Do NOT invent external stock market trends or non-existent projects.
+     4) **Roadblocks & Operational Bottlenecks:**
+        - Schedule roadblocks: highlight concurrent schedule overlaps between projects that compete for manpower, overdue milestones as of today, or sequential task lock bottlenecks.
+     5) **Hypothetical Scenarios & "What-If" Business Analyst Projections:**
+        - Present 2 to 3 concrete **Hypothetical Scenarios** grounded in the project's current progress, tasks, manpower assignment, and budgeting (using `hypothetical_scenarios` in the data):
+          * **Scenario A (Baseline / Current Trajectory):** What happens to the completion date and final budget variance/profit margin if the team continues at the current task execution velocity and spend burn rate.
+          * **Scenario B (Manpower & Task Acceleration):** How allocating available unassigned personnel to missing roles and clearing bottleneck/overdue subtasks impacts delivery speed and schedule recovery.
+          * **Scenario C (Downside Slippage & Cost Risk):** What happens if active bottlenecks or overdue tasks slip by another 7–14 days (impact on held field crew, overlapping projects, and remaining budget contingency).
+     6) **Kuya DEX Actionable Business & Execution Suggestions:**
+        - Provide specific, prioritized recommendations based on the project's live tasks, manpower, and budget (e.g., which overdue subtasks to close out first, assigning staff to unassigned checklist items, filling missing manpower roles, reviewing pending Task Completion submissions in Staff Requests, or reordering low-stock catalog materials).
+   - STRICT SCOPE: All forecasts, hypothetical scenarios, and task execution assessments MUST be grounded directly in the provided DEX PMS project, task, financial, manpower, and catalog data. Do NOT invent external stock market trends or non-existent projects.
 6. ELEVATOR SPECIFICATION SIZING, MANPOWER ESTIMATION & FEASIBILITY RULE:
    - When the user asks what expertise and how many personnel are needed for a specific elevator configuration (such as stops, capacity in kg, speed, or elevator type), or asks whether DEX PMS currently has the needed manpower:
      1) **Provide the Recommended Crew Sizing by Elevator Specification (Industry & DEX Standard):**
@@ -1310,6 +1592,286 @@ DEX PMS MODULES & VIEWS KNOWLEDGE GUIDE (ALL MODULES EXCEPT USER MANAGEMENT):
    - **Tab 3 — Kuya DEX (Personal AI Assistant):**
      * Choose an active **Project Context** from the top-right dropdown, ask operational questions, request forecasts or elevator crew sizing, check staff requests/assigned tasks, or (for Admin/Manager) assign/remove manpower with **`[Yes]` / `[No]`** confirmation. Click **`Reset Chat`** to clear the volatile session.
 GUIDE;
+    }
+
+    /**
+     * Determine whether Gemini function declarations for manpower assignment/removal should be attached.
+     * Avoids attaching tool declarations to analytical/forecasting queries so Gemini responds faster without tool latency.
+     */
+    private function shouldAttachManpowerTools(string $message): bool
+    {
+        $normalized = strtolower(trim((string) preg_replace('/\s+/', ' ', $message)));
+        if ($normalized === '') {
+            return false;
+        }
+
+        // Do not attach action tools if the user is asking for a forecast, assessment, or explanation
+        if (preg_match('/\b(forecast|forecasts|forecasting|roadblock|roadblocks|shortcoming|shortcomings|revenue|revenues|assess|assessing|assessment|hypothetical|scenario|scenarios|how\s+to|how\s+can\s+i|how\s+do\s+i)\b/i', $normalized) === 1
+            && preg_match('/\b(assign|allocate|fill|remove|unassign)\b/i', $normalized) !== 1) {
+            return false;
+        }
+
+        return preg_match('/\b(assign|allocate|fill|populate|remove|unassign|release|deallocate)\b/i', $normalized) === 1;
+    }
+
+    /**
+     * Generate a comprehensive, data-grounded Project & Business Analyst report directly from live DEX PMS data
+     * whenever the user asks a forecasting, revenue, shortcoming, roadblock, task assessment, or hypothetical scenario
+     * inquiry and the external Gemini endpoint is temporarily congested or slow.
+     */
+    public function tryGenerateLocalForecastAndAnalystFallback(
+        string $message,
+        ?int $selectedProjectId = null,
+        bool $includeProjectTasks = true,
+    ): ?string {
+        $normalized = strtolower(trim((string) preg_replace('/\s+/', ' ', $message)));
+        $isForecastOrAnalystQuery = preg_match(
+            '/\b(forecast|forecasts|forecasting|shortcoming|shortcomings|roadblock|roadblocks|bottleneck|bottlenecks|revenue|revenues|hypothetical|scenario|scenarios|assess|assessing|assessment|progressing|executing|execution|behind|ahead|velocity|pace|burn\s*rate|overrun|margin)\b/i',
+            $normalized,
+        ) === 1;
+
+        if (! $isForecastOrAnalystQuery) {
+            return null;
+        }
+
+        $nowLocal = Carbon::now(config('app.timezone', 'Asia/Manila'));
+        $todayHuman = $nowLocal->format('l, F j, Y \a\t g:i A');
+        $todayDay = $nowLocal->copy()->startOfDay();
+
+        $projects = Project::query()
+            ->with(['personnel', 'tasks.subtasks.assignedTo', 'costs.resource'])
+            ->whereNull('deleted_at')
+            ->orderByDesc('created_at')
+            ->get();
+
+        if ($projects->isEmpty()) {
+            return "As of **{$todayHuman}**, there are currently no active projects registered in DEX PMS to forecast.";
+        }
+
+        $activeProject = $selectedProjectId
+            ? ($projects->firstWhere('id', $selectedProjectId) ?? $projects->first())
+            : $projects->first();
+
+        $allPersonnel = Personnel::query()->whereNull('deleted_at')->get();
+        $unassignedPersonnel = $allPersonnel->whereNull('project_id');
+        $allResources = Resource::query()->whereNull('deleted_at')->get();
+        $outOfStock = $allResources->filter(fn (Resource $r) => (int) $r->quantity_available <= 0);
+        $lowStock = $allResources->filter(fn (Resource $r) => (int) $r->quantity_available > 0 && $r->isLowStock());
+
+        $portfolioRevenue = round((float) $projects->sum('contract_price'), 2);
+        $portfolioSpend = round((float) $projects->sum('actual_spend'), 2);
+        $portfolioMargin = round($portfolioRevenue - $portfolioSpend, 2);
+        $portfolioMarginPct = $portfolioRevenue > 0 ? round(($portfolioMargin / $portfolioRevenue) * 100, 1) : 0.0;
+
+        // Analyze active context project in detail
+        $pTasks = $activeProject->tasks ?? collect();
+        $majorTotal = $pTasks->count();
+        $majorDone = 0;
+        $minorTotal = 0;
+        $minorDone = 0;
+        $overdueMajorCount = 0;
+        $overdueMinorCount = 0;
+        $unassignedMinorCount = 0;
+        $overdueTaskLabels = [];
+        $bottleneckLabels = [];
+
+        foreach ($pTasks as $t) {
+            $subs = $t->subtasks ?? collect();
+            $mTot = $subs->count();
+            $mComp = $subs->where('is_completed', true)->count();
+            $minorTotal += $mTot;
+            $minorDone += $mComp;
+
+            $isComp = $t->computed_status === 'completed';
+            if ($isComp) {
+                $majorDone++;
+            }
+
+            $tEnd = $t->end_date ? Carbon::parse($t->end_date)->startOfDay() : null;
+            if (! $isComp && $tEnd && $todayDay->gt($tEnd)) {
+                $overdueMajorCount++;
+                $daysLate = (int) $tEnd->diffInDays($todayDay);
+                $overdueTaskLabels[] = "**{$t->task_name}** ({$daysLate} day(s) past {$tEnd->format('Y-m-d')})";
+            }
+
+            $rate = $mTot > 0 ? round(($mComp / $mTot) * 100, 1) : ($isComp ? 100.0 : 0.0);
+            if (! $isComp && $rate < 50) {
+                $bottleneckLabels[] = "**{$t->task_name}** ({$mComp}/{$mTot} minor tasks done — {$rate}%)";
+            }
+
+            foreach ($subs as $st) {
+                if (! $st->is_completed) {
+                    if ($st->assigned_to === null) {
+                        $unassignedMinorCount++;
+                    }
+                    $stDue = $st->due_date ? Carbon::parse($st->due_date)->startOfDay() : null;
+                    if ($stDue && $todayDay->gt($stDue)) {
+                        $overdueMinorCount++;
+                    }
+                }
+            }
+        }
+
+        $majorPct = $majorTotal > 0 ? round(($majorDone / $majorTotal) * 100, 1) : ($activeProject->status === 'completed' ? 100.0 : 0.0);
+        $minorPct = $minorTotal > 0 ? round(($minorDone / $minorTotal) * 100, 1) : ($activeProject->status === 'completed' ? 100.0 : 0.0);
+
+        $elapsedPct = 0.0;
+        $velocityLabel = 'On Pace';
+        $projectedFinish = $activeProject->target_completion_date?->format('Y-m-d') ?? 'Not set';
+        if ($activeProject->start_date && $activeProject->target_completion_date) {
+            $sDay = Carbon::parse($activeProject->start_date)->startOfDay();
+            $eDay = Carbon::parse($activeProject->target_completion_date)->startOfDay();
+            $totDays = max(1, (int) $sDay->diffInDays($eDay) + 1);
+            $elDays = $todayDay->lt($sDay) ? 0 : (int) $sDay->diffInDays($todayDay) + 1;
+            $elapsedPct = min(100.0, round(($elDays / $totDays) * 100, 1));
+
+            if ($activeProject->status === 'completed') {
+                $velocityLabel = 'Completed';
+            } elseif ($todayDay->gt($eDay)) {
+                $velocityLabel = 'Critical Slippage (Past Target Completion Date)';
+            } elseif ($minorPct >= $elapsedPct + 10) {
+                $velocityLabel = 'Ahead of Schedule';
+            } elseif ($elapsedPct - $minorPct >= 20) {
+                $velocityLabel = 'Behind Schedule (Slow Task Execution Velocity)';
+            } elseif ($elapsedPct - $minorPct >= 10) {
+                $velocityLabel = 'Slightly Behind Pace';
+            }
+
+            if ($activeProject->status !== 'completed' && $elDays > 0 && $minorPct > 0 && $minorPct < 100) {
+                $estDays = (int) ceil($elDays / ($minorPct / 100.0));
+                $projectedFinish = $sDay->copy()->addDays(max($totDays, $estDays) - 1)->format('Y-m-d');
+            }
+        }
+
+        $reqRoles = $this->getRequiredRoleCountsForProject($activeProject);
+        $missingRoles = [];
+        foreach ($reqRoles as $rName => $rCnt) {
+            $haveCnt = $activeProject->personnel
+                ->filter(fn (Personnel $p) => $p->deleted_at === null && strcasecmp(trim((string) $p->expertise), $rName) === 0)
+                ->count();
+            if ($rCnt > $haveCnt) {
+                $missingRoles[] = "{$rName} (missing " . ($rCnt - $haveCnt) . ')';
+            }
+        }
+
+        $pContract = round((float) $activeProject->contract_price, 2);
+        $pSpend = round((float) $activeProject->actual_spend, 2);
+        $pRem = round((float) $activeProject->remaining_budget, 2);
+        $pSpendPct = round((float) $activeProject->spend_percentage, 1);
+        $pMarginPct = $pContract > 0 ? round((($pContract - $pSpend) / $pContract) * 100, 1) : 0.0;
+
+        $lines = [];
+        $lines[] = "### 📊 Project & Business Analyst Forecast Report";
+        $lines[] = "**Local Server Date & Time Benchmark:** {$todayHuman}";
+        $lines[] = "**Active Focus Project:** **{$activeProject->project_code} — {$activeProject->name}** (" . ucfirst((string) $activeProject->status) . ")";
+        $lines[] = '';
+        $lines[] = "#### 1. Financial & Revenue Forecast";
+        $lines[] = sprintf(
+            "- **Portfolio Revenue Outlook:** Across **%d total projects**, total contract revenue is **₱%s** against **₱%s** actual spend, yielding a projected portfolio gross margin of **₱%s (%s%%)**.",
+            $projects->count(),
+            number_format($portfolioRevenue, 2),
+            number_format($portfolioSpend, 2),
+            number_format($portfolioMargin, 2),
+            (string) $portfolioMarginPct,
+        );
+        $lines[] = sprintf(
+            "- **%s Budget & Margin State:** Contract budget is **₱%s**, actual spend is **₱%s (%s%% utilized)**, leaving **₱%s (%s%% projected gross margin)**.",
+            $activeProject->project_code,
+            number_format($pContract, 2),
+            number_format($pSpend, 2),
+            (string) $pSpendPct,
+            number_format($pRem, 2),
+            (string) $pMarginPct,
+        );
+
+        $lines[] = '';
+        $lines[] = "#### 2. Schedule Pace & Task Execution Assessment";
+        if ($includeProjectTasks) {
+            $lines[] = sprintf(
+                "- **Execution Velocity vs. Today's Date:** **%s** — **%s%%** of planned calendar time has elapsed, with **%d/%d Major Tasks (%s%%)** and **%d/%d Minor Checklist Tasks (%s%%)** completed.",
+                $velocityLabel,
+                (string) $elapsedPct,
+                $majorDone,
+                $majorTotal,
+                (string) $majorPct,
+                $minorDone,
+                $minorTotal,
+                (string) $minorPct,
+            );
+            $lines[] = sprintf(
+                "- **Target vs. Projected Completion Date:** Scheduled target date is **%s**; at current task execution pace, projected completion is **%s**.",
+                $activeProject->target_completion_date?->format('Y-m-d') ?? 'N/A',
+                $projectedFinish,
+            );
+            if ($overdueMajorCount > 0 || $overdueMinorCount > 0) {
+                $lines[] = "- **Overdue Milestones as of Today:** {$overdueMajorCount} overdue Major Task phase(s) and {$overdueMinorCount} overdue Minor checklist task(s)" . (! empty($overdueTaskLabels) ? ' (' . implode(', ', array_slice($overdueTaskLabels, 0, 3)) . ')' : '') . '.';
+            }
+            if (! empty($bottleneckLabels)) {
+                $lines[] = '- **Active Bottleneck Phases (<50% Checklist Done):** ' . implode(', ', array_slice($bottleneckLabels, 0, 3)) . '.';
+            }
+        } else {
+            $lines[] = "- *Note: **Read Project Tasks** is currently toggled off in the chat header. Turn it on to include deep task and subtask velocity diagnostics.*";
+        }
+
+        $lines[] = '';
+        $lines[] = "#### 3. Resource Shortcomings & Operational Roadblocks";
+        $lines[] = ! empty($missingRoles)
+            ? "- **Manpower Shortcomings on {$activeProject->project_code}:** Missing core roles for elevator specs: **" . implode(', ', $missingRoles) . "** (Currently **{$unassignedPersonnel->count()} unassigned personnel** available in pool)."
+            : "- **Manpower State on {$activeProject->project_code}:** All core technical roles are currently filled (**{$activeProject->personnel->count()} personnel** assigned; **{$unassignedPersonnel->count()} unassigned** available in pool).";
+        $lines[] = sprintf(
+            "- **Materials Catalog Shortcomings:** **%d out-of-stock** item(s)%s and **%d low-stock** item(s)%s.",
+            $outOfStock->count(),
+            $outOfStock->isNotEmpty() ? ' (' . $outOfStock->take(3)->pluck('name')->implode(', ') . ')' : '',
+            $lowStock->count(),
+            $lowStock->isNotEmpty() ? ' (' . $lowStock->take(3)->pluck('name')->implode(', ') . ')' : '',
+        );
+
+        $lines[] = '';
+        $lines[] = "#### 4. Hypothetical Scenarios & What-If Business Projections";
+        $remMinor = max(0, $minorTotal - $minorDone);
+        $lines[] = sprintf(
+            "1. **Scenario A (Baseline Current Trajectory):** If the team maintains its current pace (**%s%%** checklist completion vs. **%s%%** time elapsed), **%s** is projected to conclude around **%s** with a remaining buffer of **₱%s**.",
+            (string) $minorPct,
+            (string) $elapsedPct,
+            $activeProject->project_code,
+            $projectedFinish,
+            number_format($pRem, 2),
+        );
+        $lines[] = ! empty($missingRoles)
+            ? sprintf(
+                "2. **Scenario B (Manpower & Task Acceleration):** If you allocate available unassigned personnel to fill **%s** and close out the **%d remaining minor checklist task(s)**, site velocity can accelerate by ~20%%–30%%, pulling the completion date back toward **%s**.",
+                implode(', ', $missingRoles),
+                $remMinor,
+                $activeProject->target_completion_date?->format('Y-m-d') ?? 'schedule',
+            )
+            : sprintf(
+                "2. **Scenario B (Bottleneck Compression):** Re-focusing the **%d assigned crew members** onto the **%d remaining minor checklist task(s)** can compress remaining milestone duration and safeguard the **%s%%** gross margin.",
+                $activeProject->personnel->count(),
+                $remMinor,
+                (string) $pMarginPct,
+            );
+        $lines[] = sprintf(
+            "3. **Scenario C (Downside 7–14 Day Slippage Risk):** If active tasks slip by another 7–14 days, the **%d assigned personnel** will remain tied up longer, delaying crew turnover to concurrent projects and increasing labor/overhead burn against the **₱%s** remaining budget.",
+            $activeProject->personnel->count(),
+            number_format($pRem, 2),
+        );
+
+        $lines[] = '';
+        $lines[] = "#### 5. Actionable Analyst Recommendations";
+        if (! empty($missingRoles)) {
+            $lines[] = "- **Deploy Available Manpower:** Ask me *\"Fill the necessary manpower for this project\"* to automatically match and assign available personnel to **" . implode(', ', $missingRoles) . "**.";
+        }
+        if ($overdueMajorCount > 0 || $overdueMinorCount > 0) {
+            $lines[] = "- **Clear Overdue Checklist Tasks:** Prioritize completing the **{$overdueMinorCount} overdue minor task(s)** and review any pending Task Completion requests in the **Staff Requests** module.";
+        }
+        if ($unassignedMinorCount > 0) {
+            $lines[] = "- **Assign Subtask Owners:** Assign responsible staff members to the **{$unassignedMinorCount} unassigned minor checklist task(s)** in the Project Progress Timeline.";
+        }
+        if ($outOfStock->isNotEmpty() || $lowStock->isNotEmpty()) {
+            $lines[] = "- **Restock Critical Catalog Materials:** Replenish out-of-stock/low-stock elevator components in the **Materials Catalog** before upcoming installation milestones.";
+        }
+
+        return implode("\n", $lines);
     }
 
     /**

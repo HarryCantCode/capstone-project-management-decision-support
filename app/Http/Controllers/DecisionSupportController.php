@@ -277,6 +277,7 @@ class DecisionSupportController extends Controller implements HasMiddleware
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:1000'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'include_tasks' => ['nullable', 'boolean'],
             'confirm_action' => ['nullable', 'array'],
             'confirm_action.action_type' => ['required_with:confirm_action', 'string', 'in:fill_missing_manpower,assign_personnel,remove_personnel,allocate_missing_across_projects'],
             'confirm_action.project_id' => ['nullable', 'integer', 'exists:projects,id'],
@@ -289,10 +290,15 @@ class DecisionSupportController extends Controller implements HasMiddleware
             'confirm_action.allocations.*.personnel_id' => ['required_with:confirm_action.allocations', 'integer', 'exists:personnel,id'],
         ]);
 
+        $includeTasks = array_key_exists('include_tasks', $validated)
+            ? (bool) $validated['include_tasks']
+            : true;
+
         $response = $chatService->ask(
             (string) $validated['message'],
             isset($validated['project_id']) ? (int) $validated['project_id'] : null,
             $validated['confirm_action'] ?? null,
+            $includeTasks,
         );
 
         if (! empty($response['action_executed'])) {
