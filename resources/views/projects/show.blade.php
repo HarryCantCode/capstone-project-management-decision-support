@@ -385,120 +385,152 @@
                     @else
                         {{-- Category Filter Navigation --}}
                         <div style="margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 8px;">
-                            {{-- Category Filter Pills --}}
-                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                            {{-- Category Filter: All button + Rectangular Category Dropdown --}}
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                                 <button
                                     type="button"
                                     class="btn btn-sm"
                                     :class="fileCategory === 'all' ? 'btn-primary' : 'btn-secondary'"
                                     @click="fileCategory = 'all'"
-                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                    style="height: 30px; padding: 0 12px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; line-height: 1; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s ease;"
                                 >
-                                    All <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countAllFiles }})</span>
+                                    <span>All</span>
+                                    <span style="opacity: 0.85; font-weight: 700;">({{ $countAllFiles }})</span>
                                 </button>
-                                <button
-                                    type="button"
-                                    class="btn btn-sm"
-                                    :class="fileCategory === 'project_document' ? 'btn-primary' : 'btn-secondary'"
-                                    @click="fileCategory = 'project_document'"
-                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+
+                                @php
+                                    $fileCategoryOptions = [
+                                        'project_document' => 'Project document',
+                                        'project_transaction' => 'Project transaction',
+                                        'invoice' => 'Project invoice',
+                                        'project_notes' => 'Project notes',
+                                        'project_drawing' => 'Project drawing / blueprint',
+                                        'permit_to_install' => 'PTI: Permit to Install',
+                                        'permit_to_operate' => 'PTO: Permit to Operate',
+                                        'peza_permit' => 'PEZA Permit',
+                                        'mechanical_permit' => 'Mechanical Permit',
+                                    ];
+                                    if ($countOtherFiles > 0) {
+                                        $fileCategoryOptions['others'] = 'Others';
+                                    }
+                                    if ($countTaskFiles > 0) {
+                                        $fileCategoryOptions['task_attachment'] = 'Task Attachment';
+                                    }
+                                @endphp
+
+                                <div
+                                    x-data="{
+                                        catOpen: false,
+                                        menuTop: 0,
+                                        menuLeft: 0,
+                                        labels: @js($fileCategoryOptions),
+                                        toggleCatMenu() {
+                                            if (!this.catOpen) {
+                                                const rect = this.$refs.catTrigger.getBoundingClientRect();
+                                                this.menuTop = rect.bottom + 5;
+                                                this.menuLeft = rect.left;
+                                                this.catOpen = true;
+                                            } else {
+                                                this.catOpen = false;
+                                            }
+                                        },
+                                        syncCatMenuPos() {
+                                            if (this.catOpen && this.$refs.catTrigger) {
+                                                const rect = this.$refs.catTrigger.getBoundingClientRect();
+                                                this.menuTop = rect.bottom + 5;
+                                                this.menuLeft = rect.left;
+                                            }
+                                        }
+                                    }"
+                                    @keydown.escape.window="catOpen = false"
+                                    @scroll.window="syncCatMenuPos()"
+                                    @resize.window="syncCatMenuPos()"
+                                    style="position: relative; display: inline-block;"
                                 >
-                                    Project document <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countDocFiles }})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="btn btn-sm"
-                                    :class="fileCategory === 'project_transaction' ? 'btn-primary' : 'btn-secondary'"
-                                    @click="fileCategory = 'project_transaction'"
-                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
-                                >
-                                    Project transaction <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countTransFiles }})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="btn btn-sm"
-                                    :class="fileCategory === 'invoice' ? 'btn-primary' : 'btn-secondary'"
-                                    @click="fileCategory = 'invoice'"
-                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
-                                >
-                                    Project invoice <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countInvFiles }})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="btn btn-sm"
-                                    :class="fileCategory === 'project_notes' ? 'btn-primary' : 'btn-secondary'"
-                                    @click="fileCategory = 'project_notes'"
-                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
-                                >
-                                    Project notes <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countNotesFiles }})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="btn btn-sm"
-                                    :class="fileCategory === 'project_drawing' ? 'btn-primary' : 'btn-secondary'"
-                                    @click="fileCategory = 'project_drawing'"
-                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
-                                >
-                                    Project drawing / blueprint <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countDrawingFiles }})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="btn btn-sm"
-                                    :class="fileCategory === 'permit_to_install' ? 'btn-primary' : 'btn-secondary'"
-                                    @click="fileCategory = 'permit_to_install'"
-                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
-                                >
-                                    PTI: Permit to Install <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countPtiFiles }})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="btn btn-sm"
-                                    :class="fileCategory === 'permit_to_operate' ? 'btn-primary' : 'btn-secondary'"
-                                    @click="fileCategory = 'permit_to_operate'"
-                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
-                                >
-                                    PTO: Permit to Operate <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countPtoFiles }})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="btn btn-sm"
-                                    :class="fileCategory === 'peza_permit' ? 'btn-primary' : 'btn-secondary'"
-                                    @click="fileCategory = 'peza_permit'"
-                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
-                                >
-                                    PEZA Permit <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countPezaFiles }})</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="btn btn-sm"
-                                    :class="fileCategory === 'mechanical_permit' ? 'btn-primary' : 'btn-secondary'"
-                                    @click="fileCategory = 'mechanical_permit'"
-                                    style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
-                                >
-                                    Mechanical Permit <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countMechFiles }})</span>
-                                </button>
-                                @if ($countOtherFiles > 0)
                                     <button
                                         type="button"
+                                        x-ref="catTrigger"
                                         class="btn btn-sm"
-                                        :class="fileCategory === 'others' ? 'btn-primary' : 'btn-secondary'"
-                                        @click="fileCategory = 'others'"
-                                        style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
+                                        :class="fileCategory !== 'all' ? 'btn-primary' : 'btn-secondary'"
+                                        @click="toggleCatMenu()"
+                                        :aria-expanded="catOpen.toString()"
+                                        aria-haspopup="listbox"
+                                        aria-label="Filter files by category"
+                                        style="height: 30px; padding: 0 10px 0 12px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; line-height: 1; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s ease; white-space: nowrap;"
                                     >
-                                        Others <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countOtherFiles }})</span>
+                                        <span x-text="fileCategory === 'all' ? 'Category' : (labels[fileCategory] || 'Category')"></span>
+                                        <svg
+                                            width="13"
+                                            height="13"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2.25"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            aria-hidden="true"
+                                            style="width: 13px; height: 13px; flex-shrink: 0; opacity: 0.85; transition: transform 0.15s ease;"
+                                            :style="catOpen ? 'transform: rotate(180deg);' : ''"
+                                        >
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
                                     </button>
-                                @endif
-                                @if ($countTaskFiles > 0)
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm"
-                                        :class="fileCategory === 'task_attachment' ? 'btn-primary' : 'btn-secondary'"
-                                        @click="fileCategory = 'task_attachment'"
-                                        style="padding: 4px 11px; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; line-height: 1.4; transition: all 0.15s ease;"
-                                    >
-                                        Task Attachment <span style="opacity: 0.85; font-weight: 700; margin-left: 2px;">({{ $countTaskFiles }})</span>
-                                    </button>
-                                @endif
+
+                                    <template x-teleport="body">
+                                        <div
+                                            x-show="catOpen"
+                                            x-cloak
+                                            @click.outside="if (!$refs.catTrigger || !$refs.catTrigger.contains($event.target)) catOpen = false"
+                                            x-transition:enter="transition ease-out duration-100"
+                                            x-transition:enter-start="opacity-0 transform scale-95"
+                                            x-transition:enter-end="opacity-100 transform scale-100"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="opacity-100 transform scale-100"
+                                            x-transition:leave-end="opacity-0 transform scale-95"
+                                            role="listbox"
+                                            :style="'position: fixed; top: ' + menuTop + 'px; left: ' + menuLeft + 'px; z-index: 9999; width: 230px; max-height: 260px; overflow-y: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18); padding: 5px;'"
+                                        >
+                                            <div style="padding: 4px 8px 6px; margin-bottom: 3px; border-bottom: 1px solid var(--color-border); font-size: 0.625rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted);">
+                                                Filter by Category
+                                            </div>
+                                            <div style="display: flex; flex-direction: column; gap: 1px;">
+                                                @foreach ($fileCategoryOptions as $catKey => $catLabel)
+                                                    @if ($catKey === 'permit_to_install')
+                                                        <div style="height: 1px; background: var(--color-border); margin: 3px 6px;"></div>
+                                                    @endif
+                                                    <div
+                                                        role="option"
+                                                        tabindex="0"
+                                                        @click="fileCategory = '{{ $catKey }}'; catOpen = false"
+                                                        @keydown.enter.prevent="fileCategory = '{{ $catKey }}'; catOpen = false"
+                                                        @keydown.space.prevent="fileCategory = '{{ $catKey }}'; catOpen = false"
+                                                        :aria-selected="(fileCategory === '{{ $catKey }}').toString()"
+                                                        style="box-sizing: border-box; width: 100%; padding: 6px 8px; font-size: 0.75rem; font-weight: 500; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--color-ink); background: transparent; transition: background-color 0.12s ease, color 0.12s ease;"
+                                                        :style="fileCategory === '{{ $catKey }}' ? 'background-color: var(--color-accent-light); color: var(--color-accent); font-weight: 600;' : ''"
+                                                        onmouseover="if (this.getAttribute('aria-selected') !== 'true') this.style.backgroundColor='var(--color-surface-alt)'"
+                                                        onmouseout="if (this.getAttribute('aria-selected') !== 'true') this.style.backgroundColor='transparent'"
+                                                    >
+                                                        <svg
+                                                            x-show="fileCategory === '{{ $catKey }}'"
+                                                            width="12"
+                                                            height="12"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            stroke-width="2.5"
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            style="width: 12px; height: 12px; flex-shrink: 0;"
+                                                        >
+                                                            <polyline points="20 6 9 17 4 12"></polyline>
+                                                        </svg>
+                                                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ $catLabel }}</span>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
 
                             {{-- Reset Filter Button: Pinned to the bottom-right corner when filtering/searching is active --}}

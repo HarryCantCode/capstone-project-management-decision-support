@@ -502,9 +502,9 @@
                                                     class="btn btn-primary btn-sm"
                                                     @click="openActionModal({{ $action->id }})"
                                                     :disabled="processingActionId === {{ $action->id }}"
-                                                    title="Review staff action and make verdict"
+                                                    title="Review staff action and make decision"
                                                 >
-                                                    Verdict
+                                                    Decision
                                                 </button>
                                             @else
                                                 <button
@@ -817,9 +817,9 @@
                                                         class="btn btn-primary btn-sm"
                                                         @click="openActionModal(req.id)"
                                                         :disabled="processingActionId === req.id"
-                                                        title="Review staff action and make verdict"
+                                                        title="Review staff action and make decision"
                                                     >
-                                                        Verdict
+                                                        Decision
                                                     </button>
                                                 </template>
                                                 <template x-if="req.status !== 'pending'">
@@ -1075,7 +1075,7 @@
                                             style="font-size: 0.8125rem; font-weight: 600; display: inline-block; transition: all 0.2s ease;"
                                             :style="reviewNotesError ? 'color: var(--color-danger); text-decoration: underline; text-decoration-color: var(--color-danger); text-decoration-thickness: 2px; text-underline-offset: 4px;' : ''"
                                         >
-                                            Reason for the verdict <span style="color: var(--color-danger);" aria-hidden="true">*</span>
+                                            Reason for the decision <span style="color: var(--color-danger);" aria-hidden="true">*</span>
                                         </label>
                                         <input
                                             type="text"
@@ -1085,7 +1085,7 @@
                                             @input="if (reviewNotes.trim()) reviewNotesError = false"
                                             class="form-control form-control--compact"
                                             :style="reviewNotesError ? 'border-color: var(--color-danger); box-shadow: 0 0 0 1px var(--color-danger);' : ''"
-                                            placeholder="Enter the reason for the verdict..."
+                                            placeholder="Enter the reason for the decision..."
                                             autocomplete="off"
                                             required
                                         >
@@ -1094,7 +1094,7 @@
                                             x-cloak 
                                             style="color: var(--color-danger); font-size: 0.75rem; margin-top: 4px; font-weight: 500;"
                                         >
-                                            Please provide a reason for the verdict before proceeding.
+                                            Please provide a reason for the decision before proceeding.
                                         </div>
                                     </div>
 
