@@ -867,112 +867,154 @@
         @endif
 
         <div class="card-body">
-            @if ($tasks->isEmpty())
-                <div class="empty-state" style="padding: var(--space-8) var(--space-4); text-align: center;">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--color-accent-light); color: var(--color-accent); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-3);">
-                        <svg style="width: 24px; height: 24px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                    </div>
-                    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: var(--space-2);">No Timeline Tasks Scheduled</h3>
-                    <p class="text-muted" style="max-width: 520px; margin: 0 auto var(--space-4); font-size: 0.875rem;">
-                        This project does not have any weekly major tasks configured yet. You can create your first major task with week-based schedules.
-                    </p>
-                    @can('update', $project)
-                        <div style="display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap;">
-                            @if ($isProjectReadOnly)
-                                <button type="button" class="btn btn-secondary" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot add tasks to an archived project' : 'Cannot add tasks to a completed project unless reactivated' }}" id="btn-add-first-major-task">
-                                    + Add First Major Task
-                                </button>
-                            @else
-                                <button type="button" class="btn btn-primary" @click="createMajorTaskModalOpen = true" id="btn-add-first-major-task">
-                                    + Add First Major Task
-                                </button>
-                            @endif
-                        </div>
-                    @endcan
-                </div>
-            @else
-                {{-- 1. Stage Carousel View (Minimized View) --}}
-                <div x-show="timelineMode === 'minimized'" x-transition>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2);">
-                        <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0;">
-                            @if ($isManagerViewer)
-                                Weekly milestones timeline. Click any card to select it, oversee specific sub tasks, and view completion details below.
-                            @else
-                                Weekly milestones timeline. Click any card to select it, inspect specific sub tasks, and tick checkboxes below.
-                            @endif
-                        </p>
-                        @if ($tasks->count() > 3)
-                            <div style="display: flex; gap: var(--space-1); align-items: center;">
-                                <button type="button" class="btn btn-secondary btn-sm" @click="scrollCarousel('left')" title="Scroll Previous" style="padding: 2px 8px; font-weight: bold;">
-                                    ‹
-                                </button>
-                                <button type="button" class="btn btn-secondary btn-sm" @click="scrollCarousel('right')" title="Scroll Next" style="padding: 2px 8px; font-weight: bold;">
-                                    ›
-                                </button>
-                            </div>
+            @php
+                $minTimelineSlots = 6;
+                $placeholderCount = max(0, $minTimelineSlots - $tasks->count());
+                $canCreateMajorTaskFromTimeline = auth()->user()->can('update', $project) && !$isProjectReadOnly;
+            @endphp
+
+            {{-- 1. Stage Carousel View (Minimized View) --}}
+            <div x-show="timelineMode === 'minimized'" x-transition>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2);">
+                    <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0;">
+                        @if ($tasks->isEmpty())
+                            Weekly milestones timeline. Create your first major task to start filling the upcoming week slots below.
+                        @elseif ($isManagerViewer)
+                            Weekly milestones timeline. Click any card to select it, oversee specific sub tasks, and view completion details below.
+                        @else
+                            Weekly milestones timeline. Click any card to select it, inspect specific sub tasks, and tick checkboxes below.
                         @endif
+                    </p>
+                    <div style="display: flex; gap: var(--space-1); align-items: center;">
+                        <button type="button" class="btn btn-secondary btn-sm" @click="scrollCarousel('left')" title="Scroll Previous" style="padding: 2px 8px; font-weight: bold;">
+                            ‹
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="scrollCarousel('right')" title="Scroll Next" style="padding: 2px 8px; font-weight: bold;">
+                            ›
+                        </button>
                     </div>
+                </div>
 
-                    {{-- Carousel Track --}}
-                    <div class="timeline-carousel-container">
-                        <div class="timeline-carousel-track" id="timeline-carousel-track">
-                            @foreach ($tasks as $taskIndex => $task)
-                                @php
-                                    $taskProgress = $task->progress_percentage;
-                                    $taskStatus = $task->computed_status;
-                                    $statusPillClass = $taskStatus === 'completed' ? 'completed' : ($taskStatus === 'in_progress' ? 'ongoing' : 'pending');
-                                    $statusLabel = $taskStatus === 'completed' ? 'Completed' : ($taskStatus === 'in_progress' ? 'In Progress' : 'Scheduled');
-                                    $subtasksCount = $task->subtasks->count();
-                                    $completedCount = $task->subtasks->where('is_completed', true)->count();
-                                @endphp
-                                <div 
-                                    class="timeline-stage-card card" 
-                                    :class="{ 'timeline-stage-card--active': activeTaskId === {{ $task->id }} }"
-                                    @click="activeTaskId = {{ $task->id }}; checklistMinimized = false"
-                                    style="cursor: pointer;"
-                                    id="card-task-{{ $task->id }}"
-                                    @if ($loop->first) data-tour="timeline-major-task-first" @endif
-                                >
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
-                                        <span class="badge" style="background: var(--color-accent-light); color: var(--color-accent); font-weight: 700; font-size: 0.75rem;">
-                                            Week {{ $taskIndex + 1 }}
-                                        </span>
-                                        <span class="status-pill status-pill--{{ $statusPillClass }}" id="card-status-pill-{{ $task->id }}">
-                                            {{ $statusLabel }}
-                                        </span>
-                                    </div>
+                {{-- Carousel Track --}}
+                <div class="timeline-carousel-container">
+                    <div class="timeline-carousel-track" id="timeline-carousel-track">
+                        @foreach ($tasks as $taskIndex => $task)
+                            @php
+                                $taskProgress = $task->progress_percentage;
+                                $taskStatus = $task->computed_status;
+                                $statusPillClass = $taskStatus === 'completed' ? 'completed' : ($taskStatus === 'in_progress' ? 'ongoing' : 'pending');
+                                $statusLabel = $taskStatus === 'completed' ? 'Completed' : ($taskStatus === 'in_progress' ? 'In Progress' : 'Scheduled');
+                                $subtasksCount = $task->subtasks->count();
+                                $completedCount = $task->subtasks->where('is_completed', true)->count();
+                            @endphp
+                            <div 
+                                class="timeline-stage-card card" 
+                                :class="{ 'timeline-stage-card--active': activeTaskId === {{ $task->id }} }"
+                                @click="activeTaskId = {{ $task->id }}; checklistMinimized = false"
+                                style="cursor: pointer;"
+                                id="card-task-{{ $task->id }}"
+                                @if ($loop->first) data-tour="timeline-major-task-first" @endif
+                            >
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                                    <span class="badge" style="background: var(--color-accent-light); color: var(--color-accent); font-weight: 700; font-size: 0.75rem;">
+                                        Week {{ $taskIndex + 1 }}
+                                    </span>
+                                    <span class="status-pill status-pill--{{ $statusPillClass }}" id="card-status-pill-{{ $task->id }}">
+                                        {{ $statusLabel }}
+                                    </span>
+                                </div>
 
-                                    <h3 style="font-size: 0.9375rem; font-weight: 600; color: var(--color-ink); margin-bottom: var(--space-1); line-height: 1.3;">
-                                        {{ $task->task_name }}
-                                    </h3>
-                                    <p class="font-mono text-muted" style="font-size: 0.75rem; margin-bottom: var(--space-2);">
-                                        {{ $task->start_date->format('M j') }} – {{ $task->end_date->format('M j, Y') }} ({{ $task->duration_days }} {{ Str::plural('day', $task->duration_days) }})
+                                <h3 style="font-size: 0.9375rem; font-weight: 600; color: var(--color-ink); margin-bottom: var(--space-1); line-height: 1.3;">
+                                    {{ $task->task_name }}
+                                </h3>
+                                <p class="font-mono text-muted" style="font-size: 0.75rem; margin-bottom: var(--space-2);">
+                                    {{ $task->start_date->format('M j') }} – {{ $task->end_date->format('M j, Y') }} ({{ $task->duration_days }} {{ Str::plural('day', $task->duration_days) }})
+                                </p>
+                                @if ($task->description)
+                                    <p style="font-size: 0.8125rem; color: var(--color-muted); line-height: 1.4; margin-bottom: var(--space-3); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                        {{ $task->description }}
                                     </p>
-                                    @if ($task->description)
-                                        <p style="font-size: 0.8125rem; color: var(--color-muted); line-height: 1.4; margin-bottom: var(--space-3); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                            {{ $task->description }}
-                                        </p>
-                                    @endif
+                                @endif
 
-                                    {{-- Mini progress bar --}}
-                                    <div style="margin-top: auto; padding-top: var(--space-2);">
-                                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 4px;">
-                                            <span class="text-muted" id="card-task-count-{{ $task->id }}">{{ $completedCount }}/{{ $subtasksCount }} tasks</span>
-                                            <span class="font-mono font-bold" id="card-progress-text-{{ $task->id }}">{{ $taskProgress }}%</span>
-                                        </div>
-                                        <div style="width: 100%; height: 6px; background: var(--color-surface-alt); border-radius: var(--radius-pill); overflow: hidden;">
-                                            <div 
-                                                id="card-progress-bar-{{ $task->id }}"
-                                                style="height: 100%; width: {{ $taskProgress }}%; background: {{ $taskStatus === 'completed' ? 'var(--color-success)' : ($taskStatus === 'in_progress' ? 'var(--color-accent)' : 'var(--color-border)') }}; transition: width 0.3s ease;">
-                                            </div>
+                                {{-- Mini progress bar --}}
+                                <div style="margin-top: auto; padding-top: var(--space-2);">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 4px;">
+                                        <span class="text-muted" id="card-task-count-{{ $task->id }}">{{ $completedCount }}/{{ $subtasksCount }} tasks</span>
+                                        <span class="font-mono font-bold" id="card-progress-text-{{ $task->id }}">{{ $taskProgress }}%</span>
+                                    </div>
+                                    <div style="width: 100%; height: 6px; background: var(--color-surface-alt); border-radius: var(--radius-pill); overflow: hidden;">
+                                        <div 
+                                            id="card-progress-bar-{{ $task->id }}"
+                                            style="height: 100%; width: {{ $taskProgress }}%; background: {{ $taskStatus === 'completed' ? 'var(--color-success)' : ($taskStatus === 'in_progress' ? 'var(--color-accent)' : 'var(--color-border)') }}; transition: width 0.3s ease;">
                                         </div>
                                     </div>
                                 </div>
-                            @endforeach
-                        </div>
+                            </div>
+                        @endforeach
+
+                        @for ($ghostIdx = 0; $ghostIdx < $placeholderCount; $ghostIdx++)
+                            @php
+                                $ghostWeekNum = $tasks->count() + $ghostIdx + 1;
+                                $ghostPhaseClass = $ghostIdx % 2 === 0 ? 'timeline-stage-card--ghost-odd' : 'timeline-stage-card--ghost-even';
+                            @endphp
+                            <div
+                                class="timeline-stage-card timeline-stage-card--ghost {{ $ghostPhaseClass }}"
+                                aria-hidden="true"
+                                @if ($canCreateMajorTaskFromTimeline)
+                                    @click="createMajorTaskModalOpen = true"
+                                    style="cursor: pointer;"
+                                    title="Click to schedule Major Task for Week {{ $ghostWeekNum }}"
+                                @endif
+                            >
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+                                    <span class="timeline-ghost-badge">
+                                        Week {{ $ghostWeekNum }}
+                                    </span>
+                                    <span class="timeline-ghost-pill"></span>
+                                </div>
+
+                                <div class="timeline-ghost-line timeline-ghost-line--title"></div>
+                                <div class="timeline-ghost-line timeline-ghost-line--subtitle"></div>
+                                <div class="timeline-ghost-line timeline-ghost-line--desc"></div>
+
+                                <div style="margin-top: auto; padding-top: var(--space-3);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                        <span class="timeline-ghost-line timeline-ghost-line--meta"></span>
+                                        <span class="timeline-ghost-line timeline-ghost-line--pct"></span>
+                                    </div>
+                                    <div class="timeline-ghost-progress-bar"></div>
+                                </div>
+                            </div>
+                        @endfor
                     </div>
+                </div>
+
+                @if ($tasks->isEmpty())
+                    <div class="empty-state" style="padding: var(--space-6) var(--space-4) var(--space-4); text-align: center; margin-top: var(--space-4); border-top: 1px dashed var(--color-border);">
+                        <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--color-accent-light); color: var(--color-accent); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-3);">
+                            <svg style="width: 22px; height: 22px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <h3 style="font-size: 1.0625rem; font-weight: 600; margin-bottom: var(--space-2);">No Timeline Tasks Scheduled</h3>
+                        <p class="text-muted" style="max-width: 520px; margin: 0 auto var(--space-4); font-size: 0.875rem;">
+                            This project does not have any weekly major tasks configured yet. Each placeholder card above will be filled as you add major tasks.
+                        </p>
+                        @can('update', $project)
+                            <div style="display: flex; gap: var(--space-3); justify-content: center; flex-wrap: wrap;">
+                                @if ($isProjectReadOnly)
+                                    <button type="button" class="btn btn-secondary" disabled style="opacity: 0.6; cursor: not-allowed;" title="{{ $project->trashed() ? 'Cannot add tasks to an archived project' : 'Cannot add tasks to a completed project unless reactivated' }}" id="btn-add-first-major-task">
+                                        + Add First Major Task
+                                    </button>
+                                @else
+                                    <button type="button" class="btn btn-primary" @click="createMajorTaskModalOpen = true" id="btn-add-first-major-task">
+                                        + Add First Major Task
+                                    </button>
+                                @endif
+                            </div>
+                        @endcan
+                    </div>
+                @else
 
                     {{-- Selected Major Task Details & Sub Tasks Checklist --}}
                     @foreach ($tasks as $taskIndex => $task)
@@ -1397,8 +1439,10 @@
                             </div>
                         </div>
                     @endforeach
-                </div>
+                @endif
+            </div>
 
+            @if ($tasks->isNotEmpty())
                 {{-- 2. Expanded View: Full Weekly Breakdown Timeline --}}
                 <div x-show="timelineMode === 'expanded'" x-cloak x-transition>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); flex-wrap: wrap; gap: var(--space-2);">
@@ -4778,6 +4822,112 @@
     border-color: var(--color-accent);
     background: #fbfdff;
     box-shadow: 0 0 0 2px rgb(44 95 124 / 0.25);
+}
+
+@keyframes timeline-ghost-pulse {
+    0%, 100% {
+        opacity: 0.38;
+        border-color: var(--color-border);
+    }
+    50% {
+        opacity: 0.78;
+        border-color: rgba(44, 95, 124, 0.35);
+    }
+}
+
+.timeline-stage-card--ghost {
+    min-height: 184px;
+    border-style: dashed;
+    border-width: 1.5px;
+    border-color: var(--color-border);
+    background: rgba(248, 250, 252, 0.65);
+    box-shadow: none;
+    animation: timeline-ghost-pulse 3.6s ease-in-out infinite;
+    user-select: none;
+}
+
+.timeline-stage-card--ghost-odd {
+    animation-delay: 0s;
+}
+
+.timeline-stage-card--ghost-even {
+    animation-delay: 1.8s;
+}
+
+.timeline-stage-card--ghost:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: rgba(44, 95, 124, 0.45);
+    opacity: 0.9;
+}
+
+.timeline-ghost-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: var(--radius-pill);
+    border: 1px dashed var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(148, 163, 184, 0.08);
+}
+
+.timeline-ghost-pill {
+    width: 68px;
+    height: 20px;
+    border-radius: var(--radius-pill);
+    background: rgba(148, 163, 184, 0.16);
+}
+
+.timeline-ghost-line {
+    border-radius: var(--radius-pill);
+    background: rgba(148, 163, 184, 0.18);
+}
+
+.timeline-ghost-line--title {
+    width: 72%;
+    height: 14px;
+    margin-bottom: var(--space-2);
+}
+
+.timeline-ghost-line--subtitle {
+    width: 54%;
+    height: 10px;
+    margin-bottom: var(--space-3);
+    background: rgba(148, 163, 184, 0.14);
+}
+
+.timeline-ghost-line--desc {
+    width: 88%;
+    height: 10px;
+    background: rgba(148, 163, 184, 0.12);
+}
+
+.timeline-ghost-line--meta {
+    width: 58px;
+    height: 9px;
+    background: rgba(148, 163, 184, 0.16);
+}
+
+.timeline-ghost-line--pct {
+    width: 28px;
+    height: 9px;
+    background: rgba(148, 163, 184, 0.16);
+}
+
+.timeline-ghost-progress-bar {
+    width: 100%;
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: rgba(148, 163, 184, 0.16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .timeline-stage-card--ghost {
+        animation: none;
+        opacity: 0.6;
+    }
 }
 
 .timeline-weekly-container {

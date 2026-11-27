@@ -3355,6 +3355,27 @@ input::-ms-clear {
     box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
 }
 
+[data-theme="dark"] .timeline-stage-card--ghost {
+    background: rgba(19, 27, 40, 0.45);
+    border-color: #2A384E;
+}
+
+[data-theme="dark"] .timeline-stage-card--ghost:hover {
+    border-color: rgba(56, 189, 248, 0.45);
+}
+
+[data-theme="dark"] .timeline-ghost-badge {
+    border-color: #2E3C52;
+    color: #7D8FA6;
+    background: rgba(148, 163, 184, 0.06);
+}
+
+[data-theme="dark"] .timeline-ghost-pill,
+[data-theme="dark"] .timeline-ghost-line,
+[data-theme="dark"] .timeline-ghost-progress-bar {
+    background: rgba(148, 163, 184, 0.14);
+}
+
 [data-theme="dark"] .timeline-week-dot {
     background: #1A2436;
     border-color: #2E3C52;
