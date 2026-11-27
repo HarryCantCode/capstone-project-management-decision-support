@@ -161,6 +161,9 @@ class PasswordResetService
             'updated_by' => auth()->id(),
         ])->save();
 
+        // Revoke trusted devices so the user must complete OTP verification on next login
+        app(OtpService::class)->revokeTrustedDevices($user);
+
         if ($sendEmail) {
             try {
                 Mail::to($user->email)->send(new TemporaryPasswordMail($user, $temporaryPassword));

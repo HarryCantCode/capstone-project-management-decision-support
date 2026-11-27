@@ -1526,6 +1526,91 @@ input::-ms-clear {
     color: #FBBF24 !important;
 }
 
+/* ─── Modern 6-Box OTP Input ─── */
+.otp-input-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 0 auto;
+}
+
+.otp-digit-box {
+    width: 48px;
+    height: 56px;
+    padding: 0;
+    text-align: center;
+    font-family: var(--font-mono, 'Roboto Mono', monospace);
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-ink);
+    background-color: var(--color-surface);
+    border: 1.5px solid var(--color-border);
+    border-radius: 10px;
+    outline: none;
+    caret-color: var(--color-accent);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+    -moz-appearance: textfield;
+}
+
+.otp-digit-box::-webkit-outer-spin-button,
+.otp-digit-box::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.otp-digit-box:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(44, 95, 124, 0.18);
+    transform: translateY(-1px);
+}
+
+.otp-digit-box.is-filled {
+    border-color: var(--color-accent);
+    background-color: rgba(44, 95, 124, 0.04);
+}
+
+.otp-digit-box.is-invalid {
+    border-color: var(--color-danger, #dc2626);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+[data-theme="dark"] .otp-digit-box {
+    background-color: #0E1522;
+    border-color: #2A3548;
+    color: #F1F5F9;
+    caret-color: #38BDF8;
+}
+
+[data-theme="dark"] .otp-digit-box:focus {
+    border-color: #38BDF8;
+    background-color: #111B2E;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22);
+}
+
+[data-theme="dark"] .otp-digit-box.is-filled {
+    border-color: rgba(56, 189, 248, 0.65);
+    background-color: rgba(56, 189, 248, 0.08);
+}
+
+[data-theme="dark"] .otp-digit-box.is-invalid {
+    border-color: #F87171;
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.2);
+}
+
+@media (max-width: 420px) {
+    .otp-input-group {
+        gap: 6px;
+    }
+
+    .otp-digit-box {
+        width: 42px;
+        height: 50px;
+        font-size: 1.25rem;
+    }
+}
+
 /* ─── Responsive adjustments ─── */
 @media (max-width: 880px) {
     .auth-card-split {

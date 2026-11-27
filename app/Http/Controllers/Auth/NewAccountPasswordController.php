@@ -87,6 +87,9 @@ class NewAccountPasswordController extends Controller
 
         Password::broker()->deleteToken($user);
 
+        // Revoke trusted devices so the user must complete OTP verification when logging in again
+        app(\App\Services\OtpService::class)->revokeTrustedDevices($user);
+
         app(\App\Services\NotificationService::class)->notifyPasswordChanged($user, $request->ip());
 
         // Log the newly password-established user in cleanly

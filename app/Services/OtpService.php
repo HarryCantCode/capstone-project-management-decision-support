@@ -109,6 +109,15 @@ class OtpService
     }
 
     /**
+     * Revoke all trusted/verified devices for a user so their next login
+     * requires email OTP verification (e.g., after a password reset).
+     */
+    public function revokeTrustedDevices(User $user): void
+    {
+        UserDevice::where('user_id', $user->id)->delete();
+    }
+
+    /**
      * Generate and dispatch a 6-digit OTP for device verification.
      */
     public function sendDeviceVerificationOtp(User $user, Request $request): EmailOtp

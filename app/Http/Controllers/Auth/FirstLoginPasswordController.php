@@ -59,6 +59,9 @@ class FirstLoginPasswordController extends Controller
         $user->password_changed_at = now();
         $user->save();
 
+        // Revoke trusted devices so the user must complete OTP verification when logging in again
+        app(\App\Services\OtpService::class)->revokeTrustedDevices($user);
+
         app(\App\Services\NotificationService::class)->notifyPasswordChanged($user, $request->ip());
 
         // Clear any intended URL that may belong to another user or unauthorized route

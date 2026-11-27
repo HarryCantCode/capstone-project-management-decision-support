@@ -137,6 +137,9 @@ class ProfileController extends Controller implements HasMiddleware
         $user->password = Hash::make($validated['password']);
         $user->save();
 
+        // Revoke trusted devices so the user must complete OTP verification when logging in again
+        $this->otpService->revokeTrustedDevices($user);
+
         app(\App\Services\NotificationService::class)->notifyPasswordChanged($user, $request->ip());
 
         return redirect()->route('account.settings')->with('status', 'Your password has been changed successfully.');
